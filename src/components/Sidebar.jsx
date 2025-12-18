@@ -1,149 +1,218 @@
-// components/Sidebar.jsx - Updated with props
-import React, { useState } from "react";
-import { NavLink } from "react-router-dom";
-import {
-  Home,
-  BookOpen,
-  Bot,
-  Scan,
-  ClipboardList,
-  BarChart3,
-  MessageCircle,
-  User,
-  Settings,
-  ChevronLeft,
-  X,
-  GraduationCap,
-} from "lucide-react";
-
-const menuItems = [
-  { name: "Dashboard", path: "/", icon: Home },
-  { name: "Subjects", path: "/subjects", icon: BookOpen },
-  { name: "AI Tutor", path: "/ai-tutor", icon: Bot },
-  { name: "Scan & Learn", path: "/scan", icon: Scan },
-  { name: "Tests", path: "/tests", icon: ClipboardList },
-  { name: "Progress", path: "/progress", icon: BarChart3 },
-  { name: "Talk to AI", path: "/talk-ai", icon: MessageCircle },
-  { name: "Profile", path: "/profile", icon: User },
-  { name: "Settings", path: "/settings", icon: Settings },
-];
+// components/Sidebar.jsx - Updated for Tailwind v4
+import React from 'react';
+import { 
+  Home, BookOpen, Bot, Scan, FileText, BarChart3, MessageSquare, 
+  User, Settings, ChevronLeft, ChevronRight, LogOut, Sparkles 
+} from 'lucide-react';
 
 const Sidebar = ({ 
   isMobileOpen, 
   setIsMobileOpen, 
   collapsed, 
   setCollapsed,
-  toggleSidebar 
+  toggleSidebar,
+  darkMode,
+  toggleDarkMode 
 }) => {
-  // Handle click outside on mobile
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
-      setIsMobileOpen(false)
-    }
-  }
+  const menuItems = [
+    { icon: Home, label: 'Dashboard', path: '/' },
+    { icon: BookOpen, label: 'Subjects', path: '/subjects' },
+    { icon: Bot, label: 'AI Tutor', path: '/ai-tutor' },
+    { icon: Scan, label: 'Scan & Learn', path: '/scan' },
+    { icon: FileText, label: 'Tests & Quizzes', path: '/tests' },
+    { icon: BarChart3, label: 'Progress', path: '/progress' },
+    { icon: MessageSquare, label: 'Talk with AI', path: '/talk-ai' },
+  ];
+
+  const bottomItems = [
+    { icon: User, label: 'Profile', path: '/profile' },
+    { icon: Settings, label: 'Settings', path: '/settings' },
+    { icon: LogOut, label: 'Logout', path: '/logout' },
+  ];
 
   return (
     <>
-     
-      
-
-      {/* Sidebar */}
-    <aside
-  className={`fixed left-0 top-0 h-screen bg-white border-r
-    z-[60] lg:z-50 transition-all duration-300 ease-in-out
-
-    ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
-    lg:translate-x-0
-    ${collapsed ? "lg:w-20" : "lg:w-64"}
-    w-64 shadow-lg lg:shadow-none
-  `}
->
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 h-16 border-b">
-          {(!collapsed || isMobileOpen) ? (
-            <span className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <GraduationCap className="h-6 w-6 text-blue-600" />
-              <span>AI Tutor</span>
-            </span>
-          ) : (
-            <div className="flex items-center justify-center w-full">
-              <GraduationCap className="h-6 w-6 text-blue-600" />
+      {/* Desktop Sidebar */}
+      <aside className={`
+        fixed top-0 left-0 h-screen z-40 transition-all duration-300 ease-in-out
+        lg:flex flex-col hidden
+        ${collapsed ? 'w-20' : 'w-64'}
+        bg-white dark:bg-[#181818]
+        border-r border-gray-200 dark:border-white/10
+      `}>
+        {/* Logo */}
+        <div className="p-6 border-b border-gray-200 dark:border-white/10">
+          <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'}`}>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              {!collapsed && (
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">AI Tutor</h1>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Learning Platform</p>
+                </div>
+              )}
             </div>
-          )}
-          <div className="flex items-center gap-2">
-            {/* Desktop Collapse Button */}
+            {!collapsed && (
+              <button
+                onClick={toggleSidebar}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10"
+              >
+                <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Collapsed Toggle Button */}
+        {collapsed && (
+          <div className="p-4 border-b border-gray-200 dark:border-white/10 flex justify-center">
             <button
               onClick={toggleSidebar}
-              className="p-2 rounded-lg hover:bg-gray-100 hidden lg:block transition-colors"
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10"
             >
-              <ChevronLeft
-                className={`w-5 h-5 transition-transform duration-300 ${
-                  collapsed && "rotate-180"
-                }`}
-              />
+              <ChevronRight className="h-5 w-5 text-gray-600 dark:text-gray-300" />
             </button>
-            {/* Mobile Close Button */}
+          </div>
+        )}
+
+        {/* Menu Items */}
+        <div className="flex-1 overflow-y-auto py-4 px-3">
+          <nav className="space-y-1">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = window.location.pathname === item.path;
+              
+              return (
+                <a
+                  key={item.label}
+                  href={item.path}
+                  className={`
+                    flex items-center gap-3 px-4 py-3 rounded-xl transition-all
+                    ${isActive 
+                      ? 'bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' 
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'
+                    }
+                    ${collapsed ? 'justify-center' : ''}
+                  `}
+                >
+                  <Icon className="h-5 w-5" />
+                  {!collapsed && (
+                    <span className="font-medium">{item.label}</span>
+                  )}
+                </a>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Bottom Items */}
+        <div className="p-4 border-t border-gray-200 dark:border-white/10">
+          <nav className="space-y-1">
+            {bottomItems.map((item) => {
+              const Icon = item.icon;
+              
+              return (
+                <a
+                  key={item.label}
+                  href={item.path}
+                  className={`
+                    flex items-center gap-3 px-4 py-3 rounded-xl
+                    text-gray-700 dark:text-gray-300 
+                    hover:bg-gray-100 dark:hover:bg-white/10
+                    transition-all
+                    ${collapsed ? 'justify-center' : ''}
+                  `}
+                >
+                  <Icon className="h-5 w-5" />
+                  {!collapsed && (
+                    <span className="font-medium">{item.label}</span>
+                  )}
+                </a>
+              );
+            })}
+          </nav>
+        </div>
+      </aside>
+
+      {/* Mobile Sidebar */}
+      <aside className={`
+        fixed top-0 left-0 h-screen z-50 transition-transform duration-300 ease-in-out
+        lg:hidden flex flex-col w-64
+        bg-white dark:bg-[#181818]
+        border-r border-gray-200 dark:border-white/10
+        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        {/* Mobile Header */}
+        <div className="p-6 border-b border-gray-200 dark:border-white/10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">AI Tutor</h1>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Learning Platform</p>
+              </div>
+            </div>
             <button
               onClick={() => setIsMobileOpen(false)}
-              className="p-2 rounded-lg hover:bg-gray-100 lg:hidden transition-colors"
-              aria-label="Close menu"
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10"
             >
-              <X className="w-5 h-5" />
+              <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
             </button>
           </div>
         </div>
 
-        {/* Menu */}
-        <nav className="mt-4 flex flex-col gap-1 px-2 h-[calc(100vh-4rem)] overflow-y-auto">
-          {menuItems.map(({ name, path, icon: Icon }) => (
-            <NavLink
-              key={path}
-              to={path}
-              onClick={() => setIsMobileOpen(false)}
-              className={({ isActive }) =>
-                `group flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200
-                ${
-                  isActive
-                    ? "bg-blue-50 text-blue-600 border border-blue-100 shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                }`
-              }
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {(!collapsed || isMobileOpen) && (
-                <span className="transition-opacity duration-200">{name}</span>
-              )}
+        {/* Mobile Menu Items */}
+        <div className="flex-1 overflow-y-auto py-4 px-3">
+          <nav className="space-y-1">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = window.location.pathname === item.path;
+              
+              return (
+                <a
+                  key={item.label}
+                  href={item.path}
+                  onClick={() => setIsMobileOpen(false)}
+                  className={`
+                    flex items-center gap-3 px-4 py-3 rounded-xl transition-all
+                    ${isActive 
+                      ? 'bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' 
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'
+                    }
+                  `}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="font-medium">{item.label}</span>
+                </a>
+              );
+            })}
+          </nav>
+        </div>
 
-              {/* Tooltip for collapsed desktop */}
-              {collapsed && !isMobileOpen && (
-                <span className="absolute left-20 z-50 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white group-hover:block animate-in fade-in-0 zoom-in-95">
-                  {name}
-                </span>
-              )}
-            </NavLink>
-          ))}
-          
-          {/* User Profile Section */}
-          <div className={`mt-auto mb-6 px-3 transition-all duration-300 ${
-            (!collapsed || isMobileOpen) ? "opacity-100" : "opacity-0"
-          }`}>
-            <div className="pt-4 border-t">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-medium text-sm">
-                  JS
-                </div>
-                {(!collapsed || isMobileOpen) && (
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <p className="text-sm font-medium text-gray-900 truncate">John Student</p>
-                    <p className="text-xs text-gray-500 truncate">Grade 12</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </nav>
+        {/* Mobile Bottom Items */}
+        <div className="p-4 border-t border-gray-200 dark:border-white/10">
+          <nav className="space-y-1">
+            {bottomItems.map((item) => {
+              const Icon = item.icon;
+              
+              return (
+                <a
+                  key={item.label}
+                  href={item.path}
+                  onClick={() => setIsMobileOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-all"
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="font-medium">{item.label}</span>
+                </a>
+              );
+            })}
+          </nav>
+        </div>
       </aside>
     </>
   );

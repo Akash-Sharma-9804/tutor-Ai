@@ -1,43 +1,56 @@
+/* index.css */
 @import "tailwindcss";
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+
+/* =====================================================
+   CUSTOM STYLES & DARK MODE CONFIG
+   ===================================================== */
+
+/* Enable class-based dark mode */
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Apply dark mode to HTML when .dark class is present */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body {
+  height: 100%;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Remove all manual dark mode CSS - Tailwind will handle it */
+
+/* You can add custom dark mode gradients if needed */
+.dark {
+  background-color: #121212;
+  background-image:
+    radial-gradient(
+      1200px 600px at 70% -10%,
+      rgba(167, 139, 250, 0.12),
+      transparent 60%
+    ),
+    linear-gradient(
+      180deg,
+      #121212 0%,
+      #0e0e0e 100%
+    );
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* Keep scrollbar styles */
+.dark ::-webkit-scrollbar {
+  width: 10px;
 }
 
-.card {
-  padding: 2em;
+.dark ::-webkit-scrollbar-track {
+  background: #121212;
 }
 
-.read-the-docs {
-  color: #888;
+.dark ::-webkit-scrollbar-thumb {
+  background: #2c2c2c;
+  border-radius: 6px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
 }
