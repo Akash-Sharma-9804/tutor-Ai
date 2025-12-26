@@ -46,7 +46,7 @@ const Dashboard = () => {
         console.log("📡 Fetching subjects...");
 
         const response = await axios.get(
-          "${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects",
+          `${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -79,7 +79,7 @@ const Dashboard = () => {
         console.log("📡 Fetching student profile...");
 
         const response = await axios.get(
-          "${import.meta.env.VITE_BACKEND_URL}/api/student/me",
+          `${import.meta.env.VITE_BACKEND_URL}/api/student/me`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

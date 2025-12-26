@@ -535,7 +535,7 @@ const SubjectsPage = () => {
 
       try {
         const res = await axios.get(
-          "${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects",
+          `${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects`,
           {
             headers: { Authorization: `Bearer ${token}` }
           }
@@ -587,7 +587,7 @@ const SubjectsPage = () => {
         console.log("Fetching ALL books");
 
         const res = await axios.get(
-          "${import.meta.env.VITE_BACKEND_URL}/api/books",
+          `${import.meta.env.VITE_BACKEND_URL}/api/books`,
           {
             headers: { Authorization: `Bearer ${token}` }
           }

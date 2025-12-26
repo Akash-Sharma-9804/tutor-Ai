@@ -19,7 +19,7 @@ export default function Signup() {
 const handleSignup = async (e) => {
   e.preventDefault();
   try {
-    await axios.post("${import.meta.env.VITE_BACKEND_URL}/api/auth/signup", form);
+    await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/signup`, form);
     window.location.href = "/login";
   } catch {
     alert("Signup failed");
@@ -30,7 +30,7 @@ const handleSignup = async (e) => {
 const [schools, setSchools] = useState([]);
 
 useEffect(() => {
-  axios.get("${import.meta.env.VITE_BACKEND_URL}/api/data/schools")
+  axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/data/schools`)
     .then(res => setSchools(res.data))
     .catch(err => console.error(err));
 }, []);
