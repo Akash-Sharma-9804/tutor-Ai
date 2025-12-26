@@ -23,6 +23,8 @@ app.use("/api/data", dataRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/books", bookRoutes);
+
+
 // Health check
 app.get("/", (req, res) => {
   res.send("AI Tutor Backend is running 🚀");
