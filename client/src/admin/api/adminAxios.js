@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const adminAxios = axios.create({
-  baseURL: "http://localhost:4000/api/admin",
+  baseURL: `${import.meta.env.VITE_BACKEND_URL}/api/admin`,
 });
 
 // Attach token automatically

@@ -19,7 +19,7 @@
 
 //       try {
 //         const res = await axios.get(
-//           "http://localhost:4000/api/subjects/subjects",
+//           "${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects",
 //           {
 //             headers: { Authorization: `Bearer ${token}` }
 //           }
@@ -69,7 +69,7 @@
 //         console.log("Fetching ALL books");
 
 //         const res = await axios.get(
-//           "http://localhost:4000/api/books",
+//           "${import.meta.env.VITE_BACKEND_URL}/api/books",
 //           {
 //             headers: { Authorization: `Bearer ${token}` }
 //           }
@@ -535,7 +535,7 @@ const SubjectsPage = () => {
 
       try {
         const res = await axios.get(
-          "http://localhost:4000/api/subjects/subjects",
+          "${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects",
           {
             headers: { Authorization: `Bearer ${token}` }
           }
@@ -587,7 +587,7 @@ const SubjectsPage = () => {
         console.log("Fetching ALL books");
 
         const res = await axios.get(
-          "http://localhost:4000/api/books",
+          "${import.meta.env.VITE_BACKEND_URL}/api/books",
           {
             headers: { Authorization: `Bearer ${token}` }
           }
@@ -611,7 +611,7 @@ const SubjectsPage = () => {
     setLoadingBooks(true);
     try {
       const res = await axios.get(
-        `http://localhost:4000/api/books/subject/${subjectId}`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/books/subject/${subjectId}`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }

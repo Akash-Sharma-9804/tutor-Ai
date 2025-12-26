@@ -23,7 +23,7 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
       console.log("📡 Fetching student profile...");
 
       const response = await axios.get(
-        "http://localhost:4000/api/student/me",
+        "${import.meta.env.VITE_BACKEND_URL}/api/student/me",
         {
           headers: {
             Authorization: `Bearer ${token}`,

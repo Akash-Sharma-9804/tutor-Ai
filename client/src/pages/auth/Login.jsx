@@ -19,7 +19,7 @@ const navigate = useNavigate();
   e.preventDefault();
 
   try {
-    const res = await axios.post("http://localhost:4000/api/auth/login", {
+    const res = await axios.post("${import.meta.env.VITE_BACKEND_URL}/api/auth/login", {
       email,
       password,
     });
