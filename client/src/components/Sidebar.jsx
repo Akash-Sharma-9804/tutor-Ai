@@ -72,8 +72,8 @@ navigate("/login", { replace: true });
         <div className="p-6 border-b border-gray-200 dark:border-white/10">
           <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'}`}>
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
-                <Sparkles className="h-6 w-6 text-white" />
+              <div className=" flex items-center justify-center">
+                <div className="text-4xl">🎓</div>
               </div>
               {!collapsed && (
                 <div>

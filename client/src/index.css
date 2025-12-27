@@ -54,3 +54,98 @@ body {
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #3a3a3a;
 }
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes slide-in-top {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-slide-in-top {
+  animation: slide-in-top 0.5s ease-out;
+}
+
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #007BFF;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.hidescrollbar {
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.hidescrollbar::-webkit-scrollbar:vertical {
+  display: none;
+}
+
+.hidescrollbar {
+  scrollbar-width: thin;
+}
+
+.hidescrollbar::-webkit-scrollbar:horizontal {
+  height: 6px;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  /* IE & Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari, Opera */
+}
+
+
+/* Firefox */
+body {
+  scrollbar-width: thin;
+  scrollbar-color: #007BFF transparent;
+}
