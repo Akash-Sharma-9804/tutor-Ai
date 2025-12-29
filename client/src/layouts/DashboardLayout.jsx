@@ -9,19 +9,19 @@ const DashboardLayout = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     // Check localStorage or system preference
-    const savedMode = localStorage.getItem('darkMode');
+    const savedMode = localStorage.getItem("darkMode");
     if (savedMode !== null) return JSON.parse(savedMode);
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Save dark mode preference and update DOM
   useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+    localStorage.setItem("darkMode", JSON.stringify(darkMode));
     if (darkMode) {
-      document.documentElement.classList.add('dark');
+      document.documentElement.classList.add("dark");
     } else {
-      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove("dark");
     }
   }, [darkMode]);
 
@@ -63,7 +63,7 @@ const DashboardLayout = () => {
   }, [isMobileOpen]);
 
   return (
-    <div className={`min-h-screen ${darkMode ? 'dark' : 'light'}`}>
+    <div className={`min-h-screen ${darkMode ? "dark" : "light"}`}>
       <div className="flex min-h-screen bg-[#FAF9F6] dark:bg-[#121212]">
         {/* Dark overlay when sidebar is open on mobile */}
         {isMobileOpen && (
@@ -87,13 +87,12 @@ const DashboardLayout = () => {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col transition-all duration-300 ease-in-out">
           {/* TopBar with dynamic margin based on sidebar state */}
-         <div
-  className={`fixed top-0 right-0 z-40 lg:z-50 transition-all duration-300 ease-in-out
+          <div
+            className={`fixed top-0 right-0 z-40 lg:z-50 transition-all duration-300 ease-in-out
     ${sidebarCollapsed ? "lg:left-20" : "lg:left-64"}
     left-0
   `}
->
-
+          >
             <TopBar
               setIsMobileOpen={setIsMobileOpen}
               darkMode={darkMode}
@@ -104,7 +103,7 @@ const DashboardLayout = () => {
 
           {/* Main Content with dynamic padding */}
           <main
-            className={`flex-1 pt-20 p-4 sm:p-6 lg:p-8 lg:pt-12 overflow-y-auto transition-all duration-300 ease-in-out
+            className={`flex-1 pt-20 p-4 sm:p-6 lg:p-0 lg:pt-12 overflow-y-auto transition-all duration-300 ease-in-out
               ${sidebarCollapsed ? "lg:ml-20" : "lg:ml-64"}
             `}
           >

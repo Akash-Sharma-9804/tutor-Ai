@@ -22,9 +22,15 @@ import {
   FaUserFriends,
   FaBookOpen,
   FaBell,
-  FaSearch
+  FaSearch,
 } from "react-icons/fa";
-import { FiTrendingUp, FiTrendingDown, FiUsers, FiBookOpen } from "react-icons/fi";
+import {
+  FiTrendingUp,
+  FiTrendingDown,
+  FiUsers,
+  FiBookOpen,
+} from "react-icons/fi";
+import AdminFooter from "../layout/AdminFooter";
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
@@ -53,7 +59,9 @@ const Dashboard = () => {
             <div className="w-20 h-20 border-4 border-blue-100 rounded-full"></div>
             <div className="absolute top-0 left-0 w-20 h-20 border-4 border-transparent border-t-blue-500 border-r-purple-500 rounded-full animate-spin"></div>
           </div>
-          <h3 className="text-xl font-bold text-gray-800 mb-2">Loading Dashboard</h3>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">
+            Loading Dashboard
+          </h3>
           <p className="text-gray-600">Preparing your insights...</p>
         </div>
       </div>
@@ -68,42 +76,53 @@ const Dashboard = () => {
     classes: { value: "+8%", trend: "up", change: 3 },
     subjects: { value: "+15%", trend: "up", change: 5 },
     books: { value: "+23%", trend: "up", change: 7 },
-    students: { value: "+18%", trend: "up", change: 12 }
+    students: { value: "+18%", trend: "up", change: 12 },
   };
 
   // Calculate insights
-  const studentToTeacherRatio = totals.students > 0 ? (totals.students / 25).toFixed(1) : 0;
-  const avgClassesPerSchool = schools.length > 0 ? (totals.classes / schools.length).toFixed(1) : 0;
-  const avgBooksPerStudent = totals.students > 0 ? (totals.books / totals.students).toFixed(1) : 0;
+  const studentToTeacherRatio =
+    totals.students > 0 ? (totals.students / 25).toFixed(1) : 0;
+  const avgClassesPerSchool =
+    schools.length > 0 ? (totals.classes / schools.length).toFixed(1) : 0;
+  const avgBooksPerStudent =
+    totals.students > 0 ? (totals.books / totals.students).toFixed(1) : 0;
   const engagementScore = 85; // Mock engagement score
 
-  const StatCard = ({ label, value, icon: Icon, onClick, color, subText, trend }) => {
+  const StatCard = ({
+    label,
+    value,
+    icon: Icon,
+    onClick,
+    color,
+    subText,
+    trend,
+  }) => {
     const colorConfigs = {
       blue: {
         gradient: "from-blue-500 to-cyan-400",
         light: "from-blue-50 to-cyan-50",
-        dark: "from-blue-600 to-cyan-500"
+        dark: "from-blue-600 to-cyan-500",
       },
       purple: {
         gradient: "from-purple-500 to-pink-400",
         light: "from-purple-50 to-pink-50",
-        dark: "from-purple-600 to-pink-500"
+        dark: "from-purple-600 to-pink-500",
       },
       green: {
         gradient: "from-emerald-500 to-teal-400",
         light: "from-emerald-50 to-teal-50",
-        dark: "from-emerald-600 to-teal-500"
+        dark: "from-emerald-600 to-teal-500",
       },
       orange: {
         gradient: "from-orange-500 to-amber-400",
         light: "from-orange-50 to-amber-50",
-        dark: "from-orange-600 to-amber-500"
+        dark: "from-orange-600 to-amber-500",
       },
       indigo: {
         gradient: "from-indigo-500 to-blue-400",
         light: "from-indigo-50 to-blue-50",
-        dark: "from-indigo-600 to-blue-500"
-      }
+        dark: "from-indigo-600 to-blue-500",
+      },
     };
 
     const config = colorConfigs[color];
@@ -114,58 +133,89 @@ const Dashboard = () => {
         className="group cursor-pointer relative overflow-hidden bg-white rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-500 p-6 border border-gray-100 hover:-translate-y-2"
       >
         {/* Animated background gradient */}
-        <div className={`absolute -top-24 -right-24 w-48 h-48 bg-gradient-to-r ${config.gradient} rounded-full opacity-5 group-hover:opacity-10 transition-opacity duration-500 group-hover:scale-125`}></div>
-        <div className={`absolute -bottom-24 -left-24 w-48 h-48 bg-gradient-to-r ${config.gradient} rounded-full opacity-5 group-hover:opacity-10 transition-opacity duration-500 group-hover:scale-125`}></div>
-        
+        <div
+          className={`absolute -top-24 -right-24 w-48 h-48 bg-gradient-to-r ${config.gradient} rounded-full opacity-5 group-hover:opacity-10 transition-opacity duration-500 group-hover:scale-125`}
+        ></div>
+        <div
+          className={`absolute -bottom-24 -left-24 w-48 h-48 bg-gradient-to-r ${config.gradient} rounded-full opacity-5 group-hover:opacity-10 transition-opacity duration-500 group-hover:scale-125`}
+        ></div>
+
         <div className="relative z-10">
           <div className="flex justify-between items-start mb-6">
-            <div className={`p-4 bg-gradient-to-br ${config.gradient} rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+            <div
+              className={`p-4 bg-gradient-to-br ${config.gradient} rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300`}
+            >
               <Icon className="text-2xl text-white" />
             </div>
             {trend && (
-              <div className={`flex items-center px-3 py-1.5 bg-gradient-to-r ${config.light} rounded-full border ${color === 'blue' ? 'border-blue-200' : color === 'purple' ? 'border-purple-200' : color === 'green' ? 'border-green-200' : color === 'orange' ? 'border-orange-200' : 'border-indigo-200'}`}>
+              <div
+                className={`flex items-center px-3 py-1.5 bg-gradient-to-r ${
+                  config.light
+                } rounded-full border ${
+                  color === "blue"
+                    ? "border-blue-200"
+                    : color === "purple"
+                    ? "border-purple-200"
+                    : color === "green"
+                    ? "border-green-200"
+                    : color === "orange"
+                    ? "border-orange-200"
+                    : "border-indigo-200"
+                }`}
+              >
                 {trend.trend === "up" ? (
                   <FiTrendingUp className="text-green-500 mr-1.5" />
                 ) : (
                   <FiTrendingDown className="text-red-500 mr-1.5" />
                 )}
-                <span className={`text-sm font-bold ${trend.trend === "up" ? "text-green-700" : "text-red-700"}`}>
+                <span
+                  className={`text-sm font-bold ${
+                    trend.trend === "up" ? "text-green-700" : "text-red-700"
+                  }`}
+                >
                   {trend.value}
                 </span>
               </div>
             )}
           </div>
-          
+
           <p className="text-5xl font-bold text-gray-800 mb-2">{value}</p>
           <p className="text-gray-600 font-semibold text-lg">{label}</p>
           {subText && <p className="text-sm text-gray-500 mt-1">{subText}</p>}
-          
+
           <div className="mt-8 flex items-center justify-between">
             <div className="flex items-center text-gray-600 font-medium group-hover:text-blue-600 transition-colors">
               <span className="group-hover:underline">Explore</span>
               <FaArrowRight className="ml-2 group-hover:translate-x-2 transition-transform duration-300" />
             </div>
-            <div className="text-xs text-gray-400">
-              Updated just now
-            </div>
+            <div className="text-xs text-gray-400">Updated just now</div>
           </div>
         </div>
       </div>
     );
   };
 
-  const InsightCard = ({ title, value, description, icon: Icon, color, type = "normal" }) => {
+  const InsightCard = ({
+    title,
+    value,
+    description,
+    icon: Icon,
+    color,
+    type = "normal",
+  }) => {
     const colorClasses = {
       blue: "from-blue-100 to-cyan-100 border-blue-200 text-blue-700",
       purple: "from-purple-100 to-pink-100 border-purple-200 text-purple-700",
       green: "from-emerald-100 to-teal-100 border-emerald-200 text-emerald-700",
       orange: "from-orange-100 to-amber-100 border-orange-200 text-orange-700",
-      indigo: "from-indigo-100 to-blue-100 border-indigo-200 text-indigo-700"
+      indigo: "from-indigo-100 to-blue-100 border-indigo-200 text-indigo-700",
     };
 
     if (type === "featured") {
       return (
-        <div className={`bg-gradient-to-br ${colorClasses[color]} rounded-2xl p-5 border-2 shadow-lg`}>
+        <div
+          className={`bg-gradient-to-br ${colorClasses[color]} rounded-2xl p-5 border-2 shadow-lg`}
+        >
           <div className="flex items-center justify-between mb-4">
             <div className={`p-3 bg-white rounded-xl shadow`}>
               <Icon className="text-xl" />
@@ -199,17 +249,27 @@ const Dashboard = () => {
     <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg hover:shadow-xl border border-gray-100 p-5 transition-all duration-300 hover:-translate-y-1">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center">
-          <div className={`p-3 rounded-xl ${
-            index === 0 ? 'bg-gradient-to-r from-amber-500 to-orange-500' :
-            index === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-600' :
-            'bg-gradient-to-r from-blue-500 to-cyan-500'
-          } shadow-lg`}>
-            {index === 0 ? <FaCrown className="text-white text-lg" /> : 
-             index === 1 ? <FaTrophy className="text-white text-lg" /> : 
-             <FaSchool className="text-white text-lg" />}
+          <div
+            className={`p-3 rounded-xl ${
+              index === 0
+                ? "bg-gradient-to-r from-amber-500 to-orange-500"
+                : index === 1
+                ? "bg-gradient-to-r from-gray-400 to-gray-600"
+                : "bg-gradient-to-r from-blue-500 to-cyan-500"
+            } shadow-lg`}
+          >
+            {index === 0 ? (
+              <FaCrown className="text-white text-lg" />
+            ) : index === 1 ? (
+              <FaTrophy className="text-white text-lg" />
+            ) : (
+              <FaSchool className="text-white text-lg" />
+            )}
           </div>
           <div className="ml-3">
-            <h3 className="font-bold text-gray-800 text-lg">{school.school_name}</h3>
+            <h3 className="font-bold text-gray-800 text-lg">
+              {school.school_name}
+            </h3>
             <div className="flex items-center text-sm text-gray-500">
               <span>ID: {school.school_id}</span>
               {index === 0 && (
@@ -228,26 +288,34 @@ const Dashboard = () => {
           <FaEye />
         </button>
       </div>
-      
+
       <div className="grid grid-cols-4 gap-2 mb-4">
         <div className="text-center p-2 bg-blue-50 rounded-lg">
-          <div className="text-xl font-bold text-blue-700">{school.class_count}</div>
+          <div className="text-xl font-bold text-blue-700">
+            {school.class_count}
+          </div>
           <div className="text-xs text-blue-600">Classes</div>
         </div>
         <div className="text-center p-2 bg-green-50 rounded-lg">
-          <div className="text-xl font-bold text-green-700">{school.student_count}</div>
+          <div className="text-xl font-bold text-green-700">
+            {school.student_count}
+          </div>
           <div className="text-xs text-green-600">Students</div>
         </div>
         <div className="text-center p-2 bg-purple-50 rounded-lg">
-          <div className="text-xl font-bold text-purple-700">{school.subject_count}</div>
+          <div className="text-xl font-bold text-purple-700">
+            {school.subject_count}
+          </div>
           <div className="text-xs text-purple-600">Subjects</div>
         </div>
         <div className="text-center p-2 bg-orange-50 rounded-lg">
-          <div className="text-xl font-bold text-orange-700">{school.book_count}</div>
+          <div className="text-xl font-bold text-orange-700">
+            {school.book_count}
+          </div>
           <div className="text-xs text-orange-600">Books</div>
         </div>
       </div>
-      
+
       {/* Progress bars for visualization */}
       <div className="space-y-2">
         <div>
@@ -256,9 +324,11 @@ const Dashboard = () => {
             <span>{Math.round((school.student_count / 100) * 100)}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1.5">
-            <div 
-              className="bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full h-1.5" 
-              style={{ width: `${Math.min((school.student_count / 100) * 100, 100)}%` }}
+            <div
+              className="bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full h-1.5"
+              style={{
+                width: `${Math.min((school.student_count / 100) * 100, 100)}%`,
+              }}
             ></div>
           </div>
         </div>
@@ -280,7 +350,9 @@ const Dashboard = () => {
                 EduVision Dashboard
               </h1>
             </div>
-            <p className="text-gray-600">Comprehensive insights for educational management</p>
+            <p className="text-gray-600">
+              Comprehensive insights for educational management
+            </p>
           </div>
           <div className="flex items-center space-x-3 mt-4 md:mt-0">
             <div className="relative">
@@ -297,13 +369,18 @@ const Dashboard = () => {
             </button>
           </div>
         </div>
-        
+
         {/* Welcome Banner */}
         <div className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-3xl p-6 text-white shadow-xl mb-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold mb-2">Welcome to Educational Excellence! 🎓</h2>
-              <p className="text-blue-100">You're managing {totals.schools} institutions with {totals.students} students</p>
+              <h2 className="text-2xl font-bold mb-2">
+                Welcome to Educational Excellence! 🎓
+              </h2>
+              <p className="text-blue-100">
+                You're managing {totals.schools} institutions with{" "}
+                {totals.students} students
+              </p>
             </div>
             <div className="mt-4 md:mt-0">
               <button
@@ -374,7 +451,9 @@ const Dashboard = () => {
           <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 mb-6 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">School Performance</h2>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  School Performance
+                </h2>
                 <p className="text-gray-600">Ranked by student engagement</p>
               </div>
               <div className="flex items-center space-x-2">
@@ -393,8 +472,12 @@ const Dashboard = () => {
                 <div className="w-24 h-24 bg-gradient-to-r from-blue-100 to-cyan-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <FaSchool className="text-4xl text-blue-400" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">No Schools Registered</h3>
-                <p className="text-gray-600 mb-6">Start building your educational network</p>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">
+                  No Schools Registered
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Start building your educational network
+                </p>
                 <button
                   onClick={() => navigate("/admin/schools/add")}
                   className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-cyan-700 transition-all shadow-lg hover:shadow-xl"
@@ -407,7 +490,11 @@ const Dashboard = () => {
                 {/* Top Schools Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   {schools.slice(0, 2).map((school, index) => (
-                    <SchoolCard key={school.school_id} school={school} index={index} />
+                    <SchoolCard
+                      key={school.school_id}
+                      school={school}
+                      index={index}
+                    />
                   ))}
                 </div>
 
@@ -417,8 +504,12 @@ const Dashboard = () => {
                     <table className="w-full">
                       <thead>
                         <tr className="bg-gradient-to-r from-gray-100 to-gray-200">
-                          <th className="p-4 text-left font-bold text-gray-700">Rank</th>
-                          <th className="p-4 text-left font-bold text-gray-700">School</th>
+                          <th className="p-4 text-left font-bold text-gray-700">
+                            Rank
+                          </th>
+                          <th className="p-4 text-left font-bold text-gray-700">
+                            School
+                          </th>
                           <th className="p-4 text-center font-bold text-gray-700">
                             <div className="inline-flex items-center">
                               <FaChalkboardTeacher className="mr-2" />
@@ -437,18 +528,27 @@ const Dashboard = () => {
                               Resources
                             </div>
                           </th>
-                          <th className="p-4 text-center font-bold text-gray-700">Status</th>
+                          <th className="p-4 text-center font-bold text-gray-700">
+                            Status
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {schools.map((school, index) => (
-                          <tr key={school.school_id} className="border-t border-gray-100 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-cyan-50/50 transition-colors">
+                          <tr
+                            key={school.school_id}
+                            className="border-t border-gray-100 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-cyan-50/50 transition-colors"
+                          >
                             <td className="p-4">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                index === 0 ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white' :
-                                index === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-600 text-white' :
-                                'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                              } font-bold`}>
+                              <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                  index === 0
+                                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+                                    : index === 1
+                                    ? "bg-gradient-to-r from-gray-400 to-gray-600 text-white"
+                                    : "bg-gradient-to-r from-blue-500 to-cyan-500 text-white"
+                                } font-bold`}
+                              >
                                 {index + 1}
                               </div>
                             </td>
@@ -458,8 +558,12 @@ const Dashboard = () => {
                                   <FaSchool className="text-blue-600" />
                                 </div>
                                 <div>
-                                  <p className="font-bold text-gray-800">{school.school_name}</p>
-                                  <p className="text-sm text-gray-500">{school.student_count} students</p>
+                                  <p className="font-bold text-gray-800">
+                                    {school.school_name}
+                                  </p>
+                                  <p className="text-sm text-gray-500">
+                                    {school.student_count} students
+                                  </p>
                                 </div>
                               </div>
                             </td>
@@ -479,11 +583,16 @@ const Dashboard = () => {
                               </div>
                             </td>
                             <td className="p-4 text-center">
-                              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                school.student_count > 50 ? 'bg-green-100 text-green-700' :
-                                'bg-blue-100 text-blue-700'
-                              }`}>
-                                {school.student_count > 50 ? 'High Activity' : 'Active'}
+                              <div
+                                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                  school.student_count > 50
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-blue-100 text-blue-700"
+                                }`}
+                              >
+                                {school.student_count > 50
+                                  ? "High Activity"
+                                  : "Active"}
                               </div>
                             </td>
                           </tr>
@@ -510,7 +619,7 @@ const Dashboard = () => {
                 <p className="text-blue-200">Real-time metrics</p>
               </div>
             </div>
-            
+
             <div className="space-y-6">
               <div>
                 <div className="flex justify-between items-center mb-2">
@@ -521,20 +630,26 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <div className="w-full bg-blue-800/50 rounded-full h-2.5">
-                  <div className="bg-gradient-to-r from-green-400 to-cyan-400 rounded-full h-2.5" style={{ width: '98%' }}></div>
+                  <div
+                    className="bg-gradient-to-r from-green-400 to-cyan-400 rounded-full h-2.5"
+                    style={{ width: "98%" }}
+                  ></div>
                 </div>
               </div>
-              
+
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <p className="text-blue-200">Student Engagement</p>
                   <span className="font-bold">{engagementScore}%</span>
                 </div>
                 <div className="w-full bg-blue-800/50 rounded-full h-2.5">
-                  <div className="bg-gradient-to-r from-purple-400 to-pink-400 rounded-full h-2.5" style={{ width: `${engagementScore}%` }}></div>
+                  <div
+                    className="bg-gradient-to-r from-purple-400 to-pink-400 rounded-full h-2.5"
+                    style={{ width: `${engagementScore}%` }}
+                  ></div>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/20">
                 <div className="text-center">
                   <div className="text-2xl font-bold">100%</div>
@@ -559,11 +674,13 @@ const Dashboard = () => {
                 <FaRegLightbulb className="text-white text-xl" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-800">Key Insights</h3>
+                <h3 className="text-xl font-bold text-gray-800">
+                  Key Insights
+                </h3>
                 <p className="text-gray-600">Smart analytics</p>
               </div>
             </div>
-            
+
             <div className="space-y-4">
               <InsightCard
                 title="Student/Teacher Ratio"
@@ -573,7 +690,7 @@ const Dashboard = () => {
                 color="blue"
                 type="featured"
               />
-              
+
               <div className="grid grid-cols-2 gap-3">
                 <InsightCard
                   title="Avg Classes/School"
@@ -590,13 +707,18 @@ const Dashboard = () => {
                   color="orange"
                 />
               </div>
-              
+
               <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
                 <div className="flex items-center">
                   <FaTrophy className="text-amber-600 mr-3" />
                   <div>
-                    <div className="font-bold text-gray-800">Top Performing</div>
-                    <div className="text-sm text-gray-600">Delhi Public School leads with {schools[0]?.student_count || 0} students</div>
+                    <div className="font-bold text-gray-800">
+                      Top Performing
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Delhi Public School leads with{" "}
+                      {schools[0]?.student_count || 0} students
+                    </div>
                   </div>
                 </div>
               </div>
@@ -616,17 +738,19 @@ const Dashboard = () => {
                   <FiTrendingUp className="text-2xl" />
                 </div>
               </div>
-              
+
               <div className="flex justify-between items-center p-3 bg-white/10 rounded-xl backdrop-blur-sm">
                 <div>
                   <div className="text-sm text-gray-300">Active Users</div>
-                  <div className="text-2xl font-bold">{(totals.students + totals.students * 0.3).toFixed(0)}</div>
+                  <div className="text-2xl font-bold">
+                    {(totals.students + totals.students * 0.3).toFixed(0)}
+                  </div>
                 </div>
                 <div className="text-blue-400">
                   <FaUserFriends className="text-2xl" />
                 </div>
               </div>
-              
+
               <div className="flex justify-between items-center p-3 bg-white/10 rounded-xl backdrop-blur-sm">
                 <div>
                   <div className="text-sm text-gray-300">Resource Usage</div>
@@ -648,10 +772,26 @@ const Dashboard = () => {
           <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
           <div className="space-y-3">
             {[
-              { icon: FaPlus, label: "Add New School", onClick: () => navigate("/admin/schools/add") },
-              { icon: FaChalkboardTeacher, label: "Create Class", onClick: () => navigate("/admin/classes/add") },
-              { icon: FaBook, label: "Upload Books", onClick: () => navigate("/admin/books/add") },
-              { icon: FaUsers, label: "Manage Students", onClick: () => navigate("/admin/students") }
+              {
+                icon: FaPlus,
+                label: "Add New School",
+                onClick: () => navigate("/admin/schools/add"),
+              },
+              {
+                icon: FaChalkboardTeacher,
+                label: "Create Class",
+                onClick: () => navigate("/admin/classes/add"),
+              },
+              {
+                icon: FaBook,
+                label: "Upload Books",
+                onClick: () => navigate("/admin/books/add"),
+              },
+              {
+                icon: FaUsers,
+                label: "Manage Students",
+                onClick: () => navigate("/admin/students"),
+              },
             ].map((action, idx) => (
               <button
                 key={idx}
@@ -672,56 +812,77 @@ const Dashboard = () => {
         <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-2xl font-bold text-gray-800">Recent Activity</h3>
-              <p className="text-gray-600">Latest updates across your platform</p>
+              <h3 className="text-2xl font-bold text-gray-800">
+                Recent Activity
+              </h3>
+              <p className="text-gray-600">
+                Latest updates across your platform
+              </p>
             </div>
             <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl">
               <FaCalendarAlt className="text-purple-600 text-xl" />
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { 
-                type: "school", 
-                title: "New School Registration", 
-                description: "Delhi Public School joined with 5 classes", 
+              {
+                type: "school",
+                title: "New School Registration",
+                description: "Delhi Public School joined with 5 classes",
                 time: "2 hours ago",
-                color: "blue"
+                color: "blue",
               },
-              { 
-                type: "book", 
-                title: "Library Expansion", 
-                description: "Added 3 new Mathematics textbooks", 
+              {
+                type: "book",
+                title: "Library Expansion",
+                description: "Added 3 new Mathematics textbooks",
                 time: "4 hours ago",
-                color: "green"
+                color: "green",
               },
-              { 
-                type: "student", 
-                title: "Student Enrollment", 
-                description: "4 new students joined Grade 10", 
+              {
+                type: "student",
+                title: "Student Enrollment",
+                description: "4 new students joined Grade 10",
                 time: "Yesterday",
-                color: "purple"
+                color: "purple",
               },
-              { 
-                type: "system", 
-                title: "System Update", 
-                description: "Performance improvements deployed", 
+              {
+                type: "system",
+                title: "System Update",
+                description: "Performance improvements deployed",
                 time: "2 days ago",
-                color: "orange"
-              }
+                color: "orange",
+              },
             ].map((activity, idx) => (
-              <div key={idx} className={`p-4 bg-gradient-to-r from-${activity.color}-50 to-${activity.color}-100 rounded-2xl border border-${activity.color}-200`}>
+              <div
+                key={idx}
+                className={`p-4 bg-gradient-to-r from-${activity.color}-50 to-${activity.color}-100 rounded-2xl border border-${activity.color}-200`}
+              >
                 <div className="flex items-start">
-                  <div className={`p-2 bg-${activity.color}-100 rounded-lg mr-3`}>
-                    {activity.type === 'school' && <FaSchool className={`text-${activity.color}-600`} />}
-                    {activity.type === 'book' && <FaBook className={`text-${activity.color}-600`} />}
-                    {activity.type === 'student' && <FaUsers className={`text-${activity.color}-600`} />}
-                    {activity.type === 'system' && <FaChartLine className={`text-${activity.color}-600`} />}
+                  <div
+                    className={`p-2 bg-${activity.color}-100 rounded-lg mr-3`}
+                  >
+                    {activity.type === "school" && (
+                      <FaSchool className={`text-${activity.color}-600`} />
+                    )}
+                    {activity.type === "book" && (
+                      <FaBook className={`text-${activity.color}-600`} />
+                    )}
+                    {activity.type === "student" && (
+                      <FaUsers className={`text-${activity.color}-600`} />
+                    )}
+                    {activity.type === "system" && (
+                      <FaChartLine className={`text-${activity.color}-600`} />
+                    )}
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-800 mb-1">{activity.title}</h4>
-                    <p className="text-sm text-gray-600 mb-2">{activity.description}</p>
+                    <h4 className="font-bold text-gray-800 mb-1">
+                      {activity.title}
+                    </h4>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {activity.description}
+                    </p>
                     <div className="flex items-center text-xs text-gray-500">
                       <FaCalendarAlt className="mr-1" />
                       {activity.time}
@@ -732,6 +893,9 @@ const Dashboard = () => {
             ))}
           </div>
         </div>
+      </div>
+      <div className=" md:-mx-14 -mx-10">
+        <AdminFooter />
       </div>
     </div>
   );
