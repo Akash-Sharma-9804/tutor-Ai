@@ -24,6 +24,7 @@ import Schools from "./admin/pages/Schools";
 import Classes from "./admin/pages/Classes";
 import SubjectsAdmin from "./admin/pages/Subjects";
 import Books from "./admin/pages/Books";
+import Users from "./admin/pages/Users";
 // import BookDetails from "./admin/pages/BookDetails";
 // import Processing from "./admin/pages/Processing";
 
@@ -63,6 +64,7 @@ export default function App() {
             <Route path="classes" element={<Classes />} />
             <Route path="subjects" element={<SubjectsAdmin />} />
             <Route path="books" element={<Books />} />
+            <Route path="students" element={<Users />} />
             {/* <Route path="books/:id" element={<BookDetails />} />
             <Route path="processing" element={<Processing />} /> */}
           </Route>
