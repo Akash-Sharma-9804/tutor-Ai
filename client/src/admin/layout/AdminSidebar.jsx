@@ -1,12 +1,12 @@
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  LayoutDashboard, 
-  School, 
-  Users, 
-  BookOpen, 
-  BookText, 
+import {
+  LayoutDashboard,
+  School,
+  Users,
+  BookOpen,
+  BookText,
   Cpu,
   Settings,
   LogOut,
@@ -22,46 +22,39 @@ import {
   Calendar,
   Bell,
   HelpCircle,
-  Database
+  Database,
 } from "lucide-react";
 
 const menuItems = [
-  { 
-    name: "Dashboard", 
-    path: "/admin/dashboard", 
+  {
+    name: "Dashboard",
+    path: "/admin/dashboard",
     icon: <LayoutDashboard className="h-5 w-5" />,
-    badge: null
   },
-  { 
-    name: "Schools", 
-    path: "/admin/schools", 
+  {
+    name: "Schools",
+    path: "/admin/schools",
     icon: <School className="h-5 w-5" />,
-    badge: "12"
   },
-  { 
-    name: "Classes", 
-    path: "/admin/classes", 
+  {
+    name: "Classes",
+    path: "/admin/classes",
     icon: <Users className="h-5 w-5" />,
-    badge: "48"
   },
-  { 
-    name: "Subjects", 
-    path: "/admin/subjects", 
+  {
+    name: "Subjects",
+    path: "/admin/subjects",
     icon: <BookOpen className="h-5 w-5" />,
-    badge: "15"
   },
-  { 
-    name: "Books", 
-    path: "/admin/books", 
+  {
+    name: "Books",
+    path: "/admin/books",
     icon: <BookText className="h-5 w-5" />,
-    badge: "24"
   },
-  { 
-    name: "Processing", 
-    path: "/admin/processing", 
-    icon: <Cpu className="h-5 w-5" />,
-    badge: "3",
-    badgeColor: "bg-orange-500"
+  {
+    name: "Students",
+    path: "/admin/students",
+    icon: <Users className="h-5 w-5" />,
   },
 ];
 
@@ -80,14 +73,19 @@ const AdminSidebar = () => {
         onClick={() => setIsMobileOpen(!isMobileOpen)}
         className="lg:hidden fixed top-4 left-4 z-50 p-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
       >
-        {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        {isMobileOpen ? (
+          <X className="h-5 w-5" />
+        ) : (
+          <Menu className="h-5 w-5" />
+        )}
       </button>
 
       {/* Desktop Sidebar */}
-      <aside className={`hidden lg:block h-screen sticky top-0 ${
-        isCollapsed ? "w-20" : "w-64"
-      } transition-all duration-300 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950 border-r border-gray-200 dark:border-gray-800`}>
-        
+      <aside
+        className={`hidden lg:block h-screen sticky top-0 ${
+          isCollapsed ? "w-20" : "w-64"
+        } transition-all duration-300 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950 border-r border-gray-200 dark:border-gray-800`}
+      >
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-800">
           <div className="flex items-center justify-between">
@@ -98,9 +96,14 @@ const AdminSidebar = () => {
                 </div>
                 <div>
                   <h1 className="text-lg font-bold text-gray-900 dark:text-white">
-                    Admin<span className="text-blue-600 dark:text-blue-400">Pro</span>
+                    Admin
+                    <span className="text-blue-600 dark:text-blue-400">
+                      Pro
+                    </span>
                   </h1>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">v2.1</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    v2.1
+                  </p>
                 </div>
               </div>
             )}
@@ -131,30 +134,19 @@ const AdminSidebar = () => {
               key={item.path}
               to={item.path}
               className={({ isActive }) => {
-                const baseClasses = "flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-300";
-                const activeClasses = isActive 
+                const baseClasses =
+                  "flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-300";
+                const activeClasses = isActive
                   ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md"
                   : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800";
-                
+
                 return `${baseClasses} ${activeClasses}`;
               }}
             >
-              <div>
-                {item.icon}
-              </div>
-              
-              {!isCollapsed && (
-                <span className="flex-1 text-sm font-medium">
-                  {item.name}
-                </span>
-              )}
+              <div>{item.icon}</div>
 
-              {!isCollapsed && item.badge && (
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  item.badgeColor || "bg-blue-500"
-                } text-white font-bold`}>
-                  {item.badge}
-                </span>
+              {!isCollapsed && (
+                <span className="flex-1 text-sm font-medium">{item.name}</span>
               )}
             </NavLink>
           ))}
@@ -163,7 +155,7 @@ const AdminSidebar = () => {
         {/* Footer */}
         {!isCollapsed && (
           <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800">
-            <button className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+            <button className="w-full cursor-pointer flex items-center gap-3 px-3 py-3 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
               <LogOut className="h-5 w-5" />
               <span className="text-sm font-medium">Logout</span>
             </button>
@@ -199,7 +191,10 @@ const AdminSidebar = () => {
                   </div>
                   <div>
                     <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                      Admin<span className="text-blue-600 dark:text-blue-400">Pro</span>
+                      Admin
+                      <span className="text-blue-600 dark:text-blue-400">
+                        Pro
+                      </span>
                     </h1>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       v2.1 • Enterprise
@@ -216,27 +211,19 @@ const AdminSidebar = () => {
                     to={item.path}
                     onClick={() => setIsMobileOpen(false)}
                     className={({ isActive }) => {
-                      const baseClasses = "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300";
-                      const activeClasses = isActive 
+                      const baseClasses =
+                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300";
+                      const activeClasses = isActive
                         ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
                         : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800";
-                      
+
                       return `${baseClasses} ${activeClasses}`;
                     }}
                   >
-                    <div>
-                      {item.icon}
-                    </div>
+                    <div>{item.icon}</div>
                     <span className="flex-1 text-sm font-medium">
                       {item.name}
                     </span>
-                    {item.badge && (
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        item.badgeColor || "bg-blue-500"
-                      } text-white font-bold`}>
-                        {item.badge}
-                      </span>
-                    )}
                   </NavLink>
                 ))}
               </nav>

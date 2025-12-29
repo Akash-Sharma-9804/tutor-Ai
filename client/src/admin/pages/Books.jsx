@@ -1,333 +1,346 @@
 import { useEffect, useState } from "react";
 import adminAxios from "../api/adminAxios";
-import Table from "../components/Table";
-import StatusBadge from "../components/StatusBadge";
+import BooksHeader from "../components/Books/BooksHeader";
+import BooksStats from "../components/Books/BooksStats";
+import BooksFilters from "../components/Books/BooksFilters";
+import BooksGrid from "../components/Books/BooksGrid";
+import BooksTable from "../components/Books/BooksTable";
+import UploadBookModal from "../components/Books/UploadBookModal";
+import DeleteBookModal from "../components/Books/DeleteBookModal";
+import ViewBookModal from "../components/Books/ViewBookModal";
+import EmptyState from "../components/Books/EmptyState";
+import LoadingSpinner from "../components/LoadingSpinner";
+import AdminFooter from "../layout/AdminFooter";
 
 const Books = () => {
+  const [books, setBooks] = useState([]);
+  const [filteredBooks, setFilteredBooks] = useState([]);
   const [schools, setSchools] = useState([]);
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
-  const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedSchool, setSelectedSchool] = useState("");
+  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedBook, setSelectedBook] = useState(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState({ type: "", message: "" });
 
-  const [schoolId, setSchoolId] = useState("");
-  const [classId, setClassId] = useState("");
-  const [subjectId, setSubjectId] = useState("");
+  // Fetch schools
+  const fetchSchools = async () => {
+    try {
+      const res = await adminAxios.get("/schools");
+      setSchools(res.data.data);
+    } catch (error) {
+      console.error("Error fetching schools:", error);
+    }
+  };
 
-  // Store selected metadata for upload
-  const [selectedSchool, setSelectedSchool] = useState(null);
-  const [selectedClass, setSelectedClass] = useState(null);
-  const [selectedSubject, setSelectedSubject] = useState(null);
+  // Fetch classes based on school
+  const fetchClasses = async (schoolId) => {
+    if (!schoolId) {
+      setClasses([]);
+      setSelectedClass("");
+      return;
+    }
+    
+    try {
+      const res = await adminAxios.get(`/classes?school_id=${schoolId}`);
+      setClasses(res.data.data);
+    } catch (error) {
+      console.error("Error fetching classes:", error);
+      setClasses([]);
+    }
+  };
 
-  const [file, setFile] = useState(null);
-  const [title, setTitle] = useState("");
-  const [author, setAuthor] = useState("");
-  const [board, setBoard] = useState("CBSE"); // Default board
-  const [uploadStatus, setUploadStatus] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
+  // Fetch subjects based on class
+  const fetchSubjects = async (schoolId, classId) => {
+    if (!schoolId || !classId) {
+      setSubjects([]);
+      setSelectedSubject("");
+      return;
+    }
+    
+    try {
+      const res = await adminAxios.get(`/subjects?school_id=${schoolId}&class_id=${classId}`);
+      setSubjects(res.data.data);
+    } catch (error) {
+      console.error("Error fetching subjects:", error);
+      setSubjects([]);
+    }
+  };
 
-  /* Fetch schools */
+  // Fetch books based on filters
+  const fetchBooks = async () => {
+    try {
+      const params = {};
+      if (selectedSchool) params.school_id = selectedSchool;
+      if (selectedClass) params.class_id = selectedClass;
+      if (selectedSubject) params.subject_id = selectedSubject;
+      if (searchTerm) params.search = searchTerm;
+
+      const res = await adminAxios.get("/books", { params });
+      setBooks(res.data.data);
+      setFilteredBooks(res.data.data);
+    } catch (error) {
+      console.error("Error fetching books:", error);
+      setBooks([]);
+      setFilteredBooks([]);
+    }
+  };
+
+  // Initial data fetch
   useEffect(() => {
-    adminAxios.get("/schools").then(res => setSchools(res.data));
+    const initData = async () => {
+      setLoading(true);
+      await fetchSchools();
+      setLoading(false);
+    };
+    initData();
   }, []);
 
-  /* Fetch classes when school changes */
+  // Fetch classes when school changes
   useEffect(() => {
-    if (!schoolId) return;
-    setClassId("");
-    setSubjectId("");
-    setBooks([]);
-    setSelectedClass(null);
-    setSelectedSubject(null);
-    
-    adminAxios.get(`/classes?schoolId=${schoolId}`).then(res => {
-      setClasses(res.data);
-      // Store selected school object
-      const school = schools.find(s => s.id === parseInt(schoolId));
-      setSelectedSchool(school);
-      // Try to extract board from school name if available
-      if (school?.name?.includes("CBSE")) setBoard("CBSE");
-      else if (school?.name?.includes("ICSE")) setBoard("ICSE");
-      else if (school?.name?.includes("IB")) setBoard("IB");
-    });
-  }, [schoolId, schools]);
+    if (selectedSchool) {
+      fetchClasses(selectedSchool);
+    } else {
+      setClasses([]);
+      setSelectedClass("");
+    }
+  }, [selectedSchool]);
 
-  /* Fetch subjects when class changes */
+  // Fetch subjects when class changes
   useEffect(() => {
-    if (!schoolId || !classId) return;
-    setSubjectId("");
-    setBooks([]);
-    setSelectedSubject(null);
-    
-    adminAxios.get(`/subjects?schoolId=${schoolId}&classId=${classId}`).then(res => {
-      setSubjects(res.data);
-      // Store selected class object
-      const cls = classes.find(c => c.id === parseInt(classId));
-      setSelectedClass(cls);
-    });
-  }, [schoolId, classId, classes]);
+    if (selectedSchool && selectedClass) {
+      fetchSubjects(selectedSchool, selectedClass);
+    } else {
+      setSubjects([]);
+      setSelectedSubject("");
+    }
+  }, [selectedSchool, selectedClass]);
 
-  /* Fetch books when subject changes */
+  // Fetch books when filters change
   useEffect(() => {
-    if (!subjectId) return;
-    
-    // Store selected subject object
-    const subject = subjects.find(s => s.id === parseInt(subjectId));
-    setSelectedSubject(subject);
-    
-    adminAxios.get(`/books?subjectId=${subjectId}`).then(res => setBooks(res.data));
-  }, [subjectId, subjects]);
+    if (selectedSchool) {
+      fetchBooks();
+    } else {
+      setBooks([]);
+      setFilteredBooks([]);
+    }
+  }, [selectedSchool, selectedClass, selectedSubject, searchTerm]);
 
-  /* Upload Book Handler */
-  const handleUpload = async () => {
-    if (!schoolId || !classId || !subjectId) {
-      setUploadStatus("❌ Please select School, Class and Subject");
-      return;
-    }
-    if (!file) {
-      setUploadStatus("❌ Please select a PDF file");
-      return;
-    }
-    if (!title.trim()) {
-      setUploadStatus("❌ Please enter a book title");
-      return;
-    }
+  const handleUploadBook = async (formData, file) => {
+    setUploading(true);
+    setUploadStatus({ type: "info", message: "📤 Uploading PDF file..." });
 
     try {
-      setIsUploading(true);
-      setUploadStatus("⏳ Uploading PDF...");
-      
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("title", title.trim());
-      formData.append("author", author.trim() || "Unknown");
-      formData.append("subject_id", subjectId);
-      formData.append("school_id", schoolId);
-      formData.append("class_id", classId);
-      
-      // Add required metadata for new architecture
-      formData.append("board", board);
-      
-      // Extract class number from class_name (e.g., "Class 8" -> 8)
-      const classNum = selectedClass?.class_name?.match(/\d+/)?.[0] || classId;
-      formData.append("class_num", classNum);
-      
-      // Send subject name
-      formData.append("subject_name", selectedSubject?.subject_name || "Unknown");
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
+      uploadFormData.append("title", formData.title);
+      uploadFormData.append("author", formData.author || "Unknown");
+      uploadFormData.append("subject_id", selectedSubject);
+      uploadFormData.append("school_id", selectedSchool);
+      uploadFormData.append("class_id", selectedClass);
+      uploadFormData.append("board", formData.board);
+      uploadFormData.append("class_num", formData.class_num || "1");
+      uploadFormData.append("subject_name", formData.subject_name || "Unknown");
 
-      console.log("📤 Uploading with metadata:", {
-        board,
-        class_num: classNum,
-        subject_name: selectedSubject?.subject_name,
-        title: title.trim()
-      });
+      setUploadStatus({ type: "info", message: "⏳ Processing PDF with OCR..." });
 
-      setUploadStatus("⏳ Processing PDF with OCR...");
-      
-      const response = await adminAxios.post("/books/upload", formData, {
+      const response = await adminAxios.post("/books/upload", uploadFormData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 300000 // 5 minutes timeout for large PDFs
+        timeout: 300000
       });
 
-      console.log("✅ Upload response:", response.data);
+      setUploadStatus({
+        type: "success",
+        message: `✅ Book uploaded successfully! ${response.data.chapters_created} chapters processed across ${response.data.total_pages} pages`
+      });
 
-      setUploadStatus(`✅ Book uploaded! ${response.data.chapters_created} chapters processed across ${response.data.total_pages} pages`);
-      
-      // Reset form
-      setTitle("");
-      setAuthor("");
-      setFile(null);
-      
-      // Refresh books list
-      adminAxios.get(`/books?subjectId=${subjectId}`).then(res => setBooks(res.data));
-      
+      setShowUploadModal(false);
+      fetchBooks();
+
       // Clear success message after 5 seconds
-      setTimeout(() => setUploadStatus(""), 5000);
-      
-    } catch (err) {
-      console.error("Upload error:", err);
-      const errorMsg = err.response?.data?.message || err.message || "Upload failed";
-      setUploadStatus(`❌ ${errorMsg}`);
+      setTimeout(() => setUploadStatus({ type: "", message: "" }), 5000);
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || error.message || "Upload failed";
+      setUploadStatus({
+        type: "error",
+        message: `❌ ${errorMsg}`
+      });
     } finally {
-      setIsUploading(false);
+      setUploading(false);
     }
   };
 
-  /* Delete Book Handler */
-  const handleDelete = async (bookId) => {
-    if (!confirm("Are you sure you want to delete this book?")) return;
-    
+  const handleDeleteBook = async () => {
+    if (!selectedBook) return;
+
     try {
-      await adminAxios.delete(`/books/${bookId}`);
-      setUploadStatus("✅ Book deleted");
-      // Refresh list
-      adminAxios.get(`/books?subjectId=${subjectId}`).then(res => setBooks(res.data));
-      setTimeout(() => setUploadStatus(""), 3000);
-    } catch (err) {
-      console.error(err);
-      setUploadStatus("❌ Delete failed");
+      await adminAxios.delete(`/books/${selectedBook.id}`);
+      setShowDeleteModal(false);
+      setSelectedBook(null);
+      fetchBooks();
+      
+      setUploadStatus({
+        type: "success",
+        message: "✅ Book deleted successfully"
+      });
+      setTimeout(() => setUploadStatus({ type: "", message: "" }), 3000);
+    } catch (error) {
+      console.error("Error deleting book:", error);
     }
   };
 
-  const tableData = books.map(b => ({
-    Title: b.title,
-    Class: b.class_name,
-    Subject: b.subject,
-    Author: b.author || "N/A",
-    Status: <StatusBadge status="ready" />,
-    Actions: (
-      <button
-        onClick={() => handleDelete(b.id)}
-        className="text-red-600 hover:text-red-800 text-sm"
-      >
-        Delete
-      </button>
-    )
-  }));
+  const handleViewBook = (book) => {
+    setSelectedBook(book);
+    setShowViewModal(true);
+  };
+
+  const handleDeleteClick = (book) => {
+    setSelectedBook(book);
+    setShowDeleteModal(true);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedSchool("");
+    setSelectedClass("");
+    setSelectedSubject("");
+  };
+
+  if (loading) {
+    return <LoadingSpinner message="Loading books..." />;
+  }
 
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-bold mb-4">Upload Books</h2>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        <select 
-          value={schoolId} 
-          onChange={e => setSchoolId(e.target.value)} 
-          className="border p-2 rounded"
-          disabled={isUploading}
-        >
-          <option value="">Select School</option>
-          {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-
-        <select 
-          value={classId} 
-          onChange={e => setClassId(e.target.value)} 
-          className="border p-2 rounded" 
-          disabled={!schoolId || isUploading}
-        >
-          <option value="">Select Class</option>
-          {classes.map(c => <option key={c.id} value={c.id}>{c.class_name}</option>)}
-        </select>
-
-        <select 
-          value={subjectId} 
-          onChange={e => setSubjectId(e.target.value)} 
-          className="border p-2 rounded" 
-          disabled={!classId || isUploading}
-        >
-          <option value="">Select Subject</option>
-          {subjects.map(s => <option key={s.id} value={s.id}>{s.subject_name}</option>)}
-        </select>
-      </div>
-
-      {/* Upload Form - Only show when subject is selected */}
-      {subjectId && (
-        <div className="bg-gray-50 p-4 rounded-lg mb-6">
-          <h3 className="text-lg font-semibold mb-3">Upload New Book</h3>
-          
-          {/* Board Selection */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Board *</label>
-            <select
-              value={board}
-              onChange={e => setBoard(e.target.value)}
-              className="border p-2 rounded w-full max-w-sm"
-              disabled={isUploading}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800 px-4 md:px-6 lg:px-8 pt-8 pb-0  transition-colors duration-200">
+      {/* Status Message */}
+      {uploadStatus.message && (
+        <div className={`mb-6 p-4 rounded-2xl shadow-lg ${
+          uploadStatus.type === "success" 
+            ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300" 
+            : uploadStatus.type === "error"
+            ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+            : "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+        }`}>
+          <div className="flex items-center justify-between">
+            <p className="font-medium">{uploadStatus.message}</p>
+            <button
+              onClick={() => setUploadStatus({ type: "", message: "" })}
+              className="text-current hover:opacity-75"
             >
-              <option value="CBSE">CBSE</option>
-              <option value="ICSE">ICSE</option>
-              <option value="IB">IB</option>
-              <option value="State Board">State Board</option>
-            </select>
+              ✕
+            </button>
           </div>
-
-          {/* Book Title Input */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Book Title *</label>
-            <input
-              type="text"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Enter book title"
-              className="border p-2 rounded w-full max-w-sm"
-              disabled={isUploading}
-            />
-          </div>
-
-          {/* Author Input (Optional) */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Author (Optional)</label>
-            <input
-              type="text"
-              value={author}
-              onChange={e => setAuthor(e.target.value)}
-              placeholder="Enter author name"
-              className="border p-2 rounded w-full max-w-sm"
-              disabled={isUploading}
-            />
-          </div>
-
-          {/* File Picker */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Upload PDF *</label>
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={e => setFile(e.target.files[0])}
-              className="border p-2 rounded w-full max-w-sm"
-              disabled={isUploading}
-            />
-            {file && (
-              <p className="text-sm text-gray-600 mt-1">
-                Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-              </p>
-            )}
-          </div>
-
-          {/* Upload Button */}
-          <button
-            onClick={handleUpload}
-            disabled={isUploading || !file || !title.trim()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {isUploading ? "Processing..." : "Upload & Process Book"}
-          </button>
-
-          {/* Upload Status */}
-          {uploadStatus && (
-            <div className={`mt-3 p-3 rounded ${
-              uploadStatus.includes("❌") ? "bg-red-50 text-red-700" :
-              uploadStatus.includes("⏳") ? "bg-yellow-50 text-yellow-700" :
-              "bg-green-50 text-green-700"
-            }`}>
-              <p className="font-medium">{uploadStatus}</p>
-            </div>
-          )}
-
-          {/* Processing Info */}
-          {isUploading && (
-            <div className="mt-3 text-sm text-gray-600">
-              <p>⚙️ This may take a few minutes for large PDFs...</p>
-              <p>📄 OCR extraction → 📚 Chapter detection → 🧩 Chunking → 🧠 Embeddings</p>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Books Table */}
-      <div className="mt-6">
-        <h3 className="text-lg font-semibold mb-3">Existing Books</h3>
-        {books.length > 0 ? (
-          <Table 
-            columns={["Title", "Class", "Subject", "Author", "Status", "Actions"]} 
-            data={tableData} 
+      {/* Header */}
+      <BooksHeader
+        onUploadBook={() => setShowUploadModal(true)}
+        disabled={!selectedSchool || !selectedClass || !selectedSubject}
+      />
+
+      {/* Statistics */}
+      <BooksStats
+        books={books}
+        filteredBooks={filteredBooks}
+      />
+
+      {/* Filters */}
+      <BooksFilters
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        selectedSchool={selectedSchool}
+        setSelectedSchool={setSelectedSchool}
+        selectedClass={selectedClass}
+        setSelectedClass={setSelectedClass}
+        selectedSubject={selectedSubject}
+        setSelectedSubject={setSelectedSubject}
+        schools={schools}
+        classes={classes}
+        subjects={subjects}
+        filteredBooks={filteredBooks}
+        totalBooks={books.length}
+        clearFilters={clearFilters}
+      />
+
+      {/* Books Content */}
+      {filteredBooks.length === 0 ? (
+        <EmptyState
+          totalBooks={books.length}
+          hasSchoolSelected={!!selectedSchool}
+          hasClassSelected={!!selectedClass}
+          hasSubjectSelected={!!selectedSubject}
+          onUploadBook={() => setShowUploadModal(true)}
+          onSelectSchool={() => {
+            const schoolSelect = document.querySelector('select[name="school"]');
+            schoolSelect?.focus();
+          }}
+        />
+      ) : (
+        <>
+          <BooksGrid
+            books={filteredBooks}
+            onView={handleViewBook}
+            onDelete={handleDeleteClick}
           />
-        ) : (
-          <p className="text-gray-500">
-            {subjectId ? "No books uploaded yet" : "Select a subject to view books"}
-          </p>
-        )}
+          
+          <div className="mt-8">
+            <BooksTable
+              books={filteredBooks}
+              onView={handleViewBook}
+              onDelete={handleDeleteClick}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Modals */}
+      {showUploadModal && (
+        <UploadBookModal
+          onUpload={handleUploadBook}
+          onClose={() => {
+            setShowUploadModal(false);
+            setUploadStatus({ type: "", message: "" });
+          }}
+          uploading={uploading}
+          selectedSchool={selectedSchool}
+          selectedClass={selectedClass}
+          selectedSubject={selectedSubject}
+          schools={schools}
+          classes={classes}
+          subjects={subjects}
+        />
+      )}
+
+      {showViewModal && selectedBook && (
+        <ViewBookModal
+          book={selectedBook}
+          onClose={() => {
+            setShowViewModal(false);
+            setSelectedBook(null);
+          }}
+        />
+      )}
+
+      {showDeleteModal && selectedBook && (
+        <DeleteBookModal
+          book={selectedBook}
+          onDelete={handleDeleteBook}
+          onClose={() => {
+            setShowDeleteModal(false);
+            setSelectedBook(null);
+          }}
+        />
+      )}
+      <div className=" md:-mx-8 -mx-4">
+        <AdminFooter/>
       </div>
     </div>
   );
