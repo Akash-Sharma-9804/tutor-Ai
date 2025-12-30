@@ -9,8 +9,26 @@ exports.signup = async (req, res) => {
     const password = req.body.password;
     const schoolName = req.body.schoolName?.trim();
     const className = String(req.body.className).trim();
-    const age = req.body.age;
     const gender = req.body.gender;
+    const dob = req.body.dob;
+    const phone = req.body.phone;
+    const calculateAge = (dob) => {
+      const birthDate = new Date(dob);
+      const today = new Date();
+
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (
+        monthDiff < 0 ||
+        (monthDiff === 0 && today.getDate() < birthDate.getDate())
+      ) {
+        age--;
+      }
+
+      return age;
+    };
+
+    const age = calculateAge(dob);
 
     // Check if email exists
     const [existing] = await db.query(
@@ -59,9 +77,9 @@ exports.signup = async (req, res) => {
     // Create student
     const [studentResult] = await db.query(
       `INSERT INTO students
-       (name, email, password, school_id, class_id, age, gender)
-       VALUES (?,?,?,?,?,?,?)`,
-      [name, email, hashedPassword, schoolId, classId, age, gender]
+       (name, email, password, school_id, class_id, age, gender, dob, phone)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [name, email, hashedPassword, schoolId, classId, age, gender, dob, phone]
     );
 
     const token = jwt.sign(
