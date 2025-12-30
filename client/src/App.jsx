@@ -103,6 +103,12 @@ import Schools from "./admin/pages/Schools";
 import Classes from "./admin/pages/Classes";
 import SubjectsAdmin from "./admin/pages/Subjects";
 import Books from "./admin/pages/Books";
+<<<<<<< HEAD
+=======
+import Users from "./admin/pages/Users";
+// import BookDetails from "./admin/pages/BookDetails";
+// import Processing from "./admin/pages/Processing";
+>>>>>>> e11b28e31b307192f729c0e7dfb0bab0786ffa6f
 
 export default function App() {
   return (
@@ -143,6 +149,9 @@ export default function App() {
             <Route path="classes" element={<Classes />} />
             <Route path="subjects" element={<SubjectsAdmin />} />
             <Route path="books" element={<Books />} />
+            <Route path="students" element={<Users />} />
+            {/* <Route path="books/:id" element={<BookDetails />} />
+            <Route path="processing" element={<Processing />} /> */}
           </Route>
         </Route>
       </Routes>
