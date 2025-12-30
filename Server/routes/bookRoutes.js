@@ -4,6 +4,6 @@ const bookController = require("../controllers/bookController");
 const authMiddleware = require("../middleware/authMiddleware");
 
 router.get("/", authMiddleware, bookController.getAllBooks);
-router.get("/:subjectId", authMiddleware, bookController.getBooksBySubject);
+router.get("/subject/:subjectId", authMiddleware, bookController.getBooksBySubject);
 
 module.exports = router;

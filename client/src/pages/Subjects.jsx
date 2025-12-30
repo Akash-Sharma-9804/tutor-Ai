@@ -25,6 +25,8 @@ import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import Stats from "../components/SubjectComponents/Stats";
 import Footer from "../components/Footer/Footer";
+import { useNavigate } from "react-router-dom";
+
 
 const SubjectsPage = () => {
   const [activeFilter, setActiveFilter] = useState("all");
@@ -36,6 +38,7 @@ const SubjectsPage = () => {
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [showBooksModal, setShowBooksModal] = useState(false);
   const [loadingBooks, setLoadingBooks] = useState(false);
+const navigate = useNavigate();
 
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -649,71 +652,86 @@ const SubjectsPage = () => {
                     </p>
                   </div>
                 ) : filteredBooks.length === 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="flex flex-col items-center justify-center py-12"
-                  >
-                    <Book className="h-16 w-16 text-gray-400 mb-4" />
-                    <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">
-                      No books available
-                    </p>
-                    <p className="text-gray-500 dark:text-gray-500 text-sm">
-                      Books will be added soon!
-                    </p>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    initial="visible"
-                    animate="visible"
-                    variants={containerVariants}
-                    className="grid grid-cols-1 md:grid-cols-2 gap-4"
-                  >
-                    {filteredBooks.map((book, index) => (
-                      <motion.div
-                        key={book.id}
-                        initial="initial"
-                        animate="animate"
-                        variants={itemVariants}
-                        className="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gradient-to-br from-gray-50 to-white dark:bg-white/5 shadow-md transition-shadow duration-200"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={`h-12 w-12 rounded-lg bg-gradient-to-br ${selectedSubject?.color} flex items-center justify-center flex-shrink-0 shadow-lg`}
-                          >
-                            <Book className="h-6 w-6 text-white" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1 line-clamp-2">
-                              {book.title}
-                            </h4>
-                            <div className="flex items-center gap-2 mt-2">
-                              <motion.a
-                                href={book.pdf_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                whileTap={{ scale: 0.95 }}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-md"
-                              >
-                                <Eye className="h-3 w-3" />
-                                View
-                              </motion.a>
-                              <motion.a
-                                href={book.pdf_url}
-                                download
-                                whileTap={{ scale: 0.95 }}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-medium hover:from-green-700 hover:to-emerald-700 transition-all shadow-md"
-                              >
-                                <Download className="h-3 w-3" />
-                                Download
-                              </motion.a>
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                )}
+  <motion.div
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ opacity: 1, scale: 1 }}
+    className="flex flex-col items-center justify-center py-12"
+  >
+    <Book className="h-16 w-16 text-gray-400 mb-4" />
+    <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">
+      No books available
+    </p>
+    <p className="text-gray-500 dark:text-gray-500 text-sm">
+      Books will be added soon!
+    </p>
+  </motion.div>
+) : (
+  <motion.div
+    initial="visible"
+    animate="visible"
+    variants={containerVariants}
+    className="grid grid-cols-1 md:grid-cols-2 gap-4"
+  >
+    {filteredBooks.map((book, index) => (
+      <motion.div
+        key={book.id}
+        initial="initial"
+        animate="animate"
+        variants={itemVariants}
+        className="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gradient-to-br from-gray-50 to-white dark:bg-white/5 hover:shadow-xl transition-all duration-200 cursor-pointer group"
+        onClick={() => {
+          setShowBooksModal(false);
+          navigate(`/book/${book.id}`);
+        }}
+      >
+        <div className="flex items-start gap-3">
+          <div
+            className={`h-16 w-16 rounded-lg bg-gradient-to-br ${selectedSubject?.color} flex items-center justify-center flex-shrink-0 shadow-lg group-hover:scale-110 transition-transform`}
+          >
+            <Book className="h-8 w-8 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              {book.title}
+            </h4>
+            {book.author && (
+              <p className="text-xs text-gray-500 dark:text-gray-500 mb-2">
+                By {book.author}
+              </p>
+            )}
+            <div className="flex items-center gap-2 mt-3">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center gap-1 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
+              >
+                <BookOpen className="h-4 w-4" />
+                Start Learning
+              </motion.button>
+              <motion.a
+                href={book.pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+              >
+                <Eye className="h-4 w-4" />
+                PDF
+              </motion.a>
+            </div>
+          </div>
+        </div>
+        {book.chapter_count > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              📚 {book.chapter_count} {book.chapter_count === 1 ? 'Chapter' : 'Chapters'} Available
+            </p>
+          </div>
+        )}
+      </motion.div>
+    ))}
+  </motion.div>
+)}
               </div>
             </motion.div>
           </motion.div>
