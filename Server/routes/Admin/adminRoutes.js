@@ -8,9 +8,16 @@ const classController = require("../../controllers/Admin/adminClassController");
 const subjectController = require("../../controllers/Admin/adminSubjectController");
 const bookController = require("../../controllers/Admin/adminBookController");
 const userController = require("../../controllers/Admin/adminStudentController");
+const profileController = require("../../controllers/Admin/adminAuthController");
 const multer = require("multer");
 const upload = multer();
 router.use(adminAuth);
+
+// Admin Profile Routes (Add these)
+router.get("/profile", profileController.getAdminProfile);
+router.put("/profile", profileController.updateAdminProfile);
+router.put("/profile/password", profileController.changePassword);
+router.get("/profile/activity", profileController.getAdminActivity);
 
 // Dashboard
 router.get("/dashboard", dashboardController.getDashboardStats);
@@ -22,6 +29,7 @@ router.post("/schools", schoolController.createSchool);
 router.get("/schools/:id", schoolController.getSchoolById);
 router.put("/schools/:id", schoolController.updateSchool);
 router.delete("/schools/:id", schoolController.deleteSchool);
+router.get("/schools/:id/details", schoolController.getSchoolDetails);
 
 // Classes
 router.get("/classes", classController.listClasses);
@@ -67,5 +75,6 @@ router.post("/students", userController.createUser);
 router.put("/students/:id", userController.updateUser);
 router.put("/students/:id/status", userController.updateUserStatus);
 router.delete("/students/:id", userController.deleteUser);
+router.get("/students/:id/details", userController.getStudentDetails);
 
 module.exports = router;

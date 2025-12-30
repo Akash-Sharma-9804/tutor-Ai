@@ -16,12 +16,13 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+
 const AdminFooter = () => {
   const currentYear = new Date().getFullYear();
 
   // Quick links
   const quickLinks = [
-    { name: "Documentation", href: "#", icon: <ExternalLink className="h-3 w-3" /> },
+    { name: "Documentation", href: "documentation", icon: <ExternalLink className="h-3 w-3" /> },
     { name: "API Reference", href: "#", icon: <ArrowUpRight className="h-3 w-3" /> },
     { name: "System Status", href: "#", icon: <Zap className="h-3 w-3" /> },
     { name: "Changelog", href: "#", icon: <ArrowUpRight className="h-3 w-3" /> },
@@ -214,15 +215,15 @@ const AdminFooter = () => {
 
           {/* Legal Links */}
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
-            <a href="#" className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            <a href="privacy-policy" className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
               Privacy Policy
             </a>
             <span className="text-gray-400">•</span>
-            <a href="#" className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            <a href="terms" className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
               Terms of Service
             </a>
             <span className="text-gray-400">•</span>
-            <a href="#" className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            <a href="cookie-policy" className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
               Cookie Policy
             </a>
             <span className="text-gray-400">•</span>

@@ -463,15 +463,7 @@ exports.getStudentStats = async (req, res) => {
     }
 
     // Get attendance history (you might need to create an attendance table)
-    const [attendanceHistory] = await db.query(`
-      SELECT 
-        DATE(created_at) as date,
-        status
-      FROM attendance_logs 
-      WHERE student_id = ? 
-      ORDER BY created_at DESC 
-      LIMIT 30
-    `, [id]);
+    
 
     // Get recent activities
     const [recentActivities] = await db.query(`
@@ -489,11 +481,8 @@ exports.getStudentStats = async (req, res) => {
       success: true,
       data: {
         student,
-        attendanceHistory,
         recentActivities,
         stats: {
-          totalDays: attendanceHistory.length,
-          presentDays: attendanceHistory.filter(a => a.status === 'present').length,
           recentActivitiesCount: recentActivities.length
         }
       }
@@ -549,3 +538,130 @@ exports.getStudentsByClass = async (req, res) => {
     });
   }
 };
+
+// @desc    Get detailed student information
+// @route   GET /api/students/:id/details
+// @access  Private
+exports.getStudentDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get student basic info with school and class details
+    const [[student]] = await db.query(`
+      SELECT 
+        s.*,
+        sc.id as school_id,
+        sc.name as school_name,
+        sc.board as school_board,
+        sc.country as school_country,
+        sc.state as school_state,
+        c.id as class_id,
+        c.class_name,
+        c.school_id as class_school_id
+      FROM students s
+      LEFT JOIN schools sc ON s.school_id = sc.id
+      LEFT JOIN classes c ON s.class_id = c.id
+      WHERE s.id = ?
+    `, [id]);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found"
+      });
+    }
+
+    // Get student's subjects from their class
+    const [subjects] = await db.query(`
+      SELECT 
+        sub.id,
+        sub.name,
+        sub.created_at
+      FROM subjects sub
+      WHERE sub.class_id = ?
+      ORDER BY sub.name
+    `, [student.class_id]);
+
+    // Get student's books (if any)
+    const [books] = await db.query(`
+      SELECT 
+        b.id,
+        b.title,
+        b.author,
+        b.board,
+        b.subject_id,
+        sub.name as subject_name,
+        b.created_at
+      FROM books b
+      LEFT JOIN subjects sub ON b.subject_id = sub.id
+      WHERE sub.class_id = ?
+      ORDER BY b.created_at DESC
+    `, [student.class_id]);
+
+    
+
+    
+
+    
+
+    // Calculate statistics
+    const totalSubjects = subjects.length;
+    const totalBooks = books.length;
+    
+
+    res.json({
+      success: true,
+      data: {
+        student,
+        school: {
+          id: student.school_id,
+          name: student.school_name,
+          board: student.school_board,
+          country: student.school_country,
+          state: student.school_state,
+          email: student.school_email,
+          phone: student.school_phone
+        },
+        class: {
+          id: student.class_id,
+          name: student.class_name
+        },
+        subjects: {
+          list: subjects,
+          count: totalSubjects
+        },
+        books: {
+          list: books,
+          count: totalBooks
+        },
+        
+        
+        
+        statistics: {
+          days_since_join: Math.floor((new Date() - new Date(student.created_at)) / (1000 * 60 * 60 * 24)),
+          age: student.date_of_birth ? calculateAge(student.date_of_birth) : null
+        }
+      }
+    });
+  } catch (err) {
+    console.error("Error fetching student details:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch student details",
+      error: err.message
+    });
+  }
+};
+
+// Helper function to calculate age
+function calculateAge(dateOfBirth) {
+  const dob = new Date(dateOfBirth);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+  return age;
+}
