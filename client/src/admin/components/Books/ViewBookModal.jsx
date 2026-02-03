@@ -1,4 +1,87 @@
+ 
+import { useEffect, useState } from "react";
+import adminAxios from "../../api/adminAxios";
 import { FaBookOpen, FaSchool, FaChalkboardTeacher, FaUser, FaCalendarAlt, FaExternalLinkAlt, FaTimes, FaFilePdf, FaLayerGroup } from "react-icons/fa";
+
+
+const ChaptersSection = ({ bookId }) => {
+  const [chapters, setChapters] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchChapters = async () => {
+      try {
+        const res = await adminAxios.get(`/books/${bookId}/chapters`);
+        const bookData = res.data.data;
+setChapters(bookData?.chapters || []);
+      } catch (error) {
+        console.error("Error fetching chapters:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (bookId) {
+      fetchChapters();
+    }
+  }, [bookId]);
+
+  if (loading) {
+    return (
+      <div className="mb-6">
+        <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">Chapters</h4>
+        <p className="text-gray-500 dark:text-gray-400">Loading chapters...</p>
+      </div>
+    );
+  }
+
+  if (chapters.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mb-6">
+      <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">
+        Chapters ({chapters.length})
+      </h4>
+      <div className="space-y-3">
+        {chapters.map((chapter) => (
+          <div
+            key={chapter.id}
+            className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 flex items-center justify-between"
+          >
+            <div className="flex-1">
+              <div className="flex items-center mb-1">
+                <span className="inline-flex items-center px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded text-sm font-medium mr-3">
+                  Ch {chapter.chapter_no}
+                </span>
+                <h5 className="font-medium text-gray-800 dark:text-white">
+                  {chapter.chapter_title}
+                </h5>
+              </div>
+              {chapter.total_segments > 0 && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 ml-12">
+                  {chapter.total_segments} segments processed
+                </p>
+              )}
+            </div>
+            {chapter.pdf_url && (
+              <a
+                href={chapter.pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-4 inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-500 dark:to-purple-500 text-white text-sm font-medium rounded-lg hover:from-indigo-700 hover:to-purple-700 dark:hover:from-indigo-600 dark:hover:to-purple-600 transition-all shadow hover:shadow-md"
+              >
+                <FaFilePdf className="mr-2" />
+                Open PDF
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const ViewBookModal = ({ book, onClose }) => {
   const formatDate = (dateString) => {
@@ -26,7 +109,7 @@ const ViewBookModal = ({ book, onClose }) => {
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Book Details</h2>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 cursor-pointer text-black hover:dark:text-black   rounded-full hover:bg-red-300   transition-colors"
             >
               <FaTimes className="text-lg" />
             </button>
@@ -107,13 +190,13 @@ const ViewBookModal = ({ book, onClose }) => {
                     <p className="font-medium text-gray-800 dark:text-white">{formatDate(book.created_at)}</p>
                   </div>
                 </div>
-                <div className="flex items-center">
+                {/* <div className="flex items-center">
                   <FaFilePdf className="text-gray-400 dark:text-gray-500 mr-3 flex-shrink-0" />
                   <div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">File Size</p>
                     <p className="font-medium text-gray-800 dark:text-white">{getFileSize(book.file_size)}</p>
                   </div>
-                </div>
+                </div> */}
                 {book.chapters_count > 0 && (
                   <div className="flex items-center">
                     <FaLayerGroup className="text-gray-400 dark:text-gray-500 mr-3 flex-shrink-0" />
@@ -127,7 +210,7 @@ const ViewBookModal = ({ book, onClose }) => {
             </div>
           </div>
 
-          {book.pdf_url && (
+        {book.pdf_url && (
             <div className="mb-6">
               <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">PDF Document</h4>
               <a
@@ -141,12 +224,15 @@ const ViewBookModal = ({ book, onClose }) => {
               </a>
             </div>
           )}
+
+          {/* Chapters Section */}
+          <ChaptersSection bookId={book.id} />
         </div>
 
         <div className="p-6 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={onClose}
-            className="w-full px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            className="w-full px-6 py-3 cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           >
             Close
           </button>

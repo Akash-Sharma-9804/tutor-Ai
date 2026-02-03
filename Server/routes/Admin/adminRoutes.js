@@ -51,9 +51,12 @@ router.get("/books/:id/chapters", bookController.getBookChapters);
 router.post("/books", bookController.createBook);
 router.post(
   "/books/upload",
-  upload.single("file"),
+  upload.array("chapter_files", 20),
   bookController.uploadAndProcess
 );
+
+// Chapter creation endpoint
+router.post("/chapters/create", bookController.createChapter);
 router.put("/books/:id", bookController.updateBook);
 router.delete("/books/:id", bookController.deleteBook);
 router.delete("/books/:id/force", bookController.forceDeleteBook);

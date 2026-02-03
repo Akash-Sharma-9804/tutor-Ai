@@ -20,6 +20,8 @@ router.get("/chapters/:chapterId/content", bookReaderController.getChapterConten
 
 // Get AI explanation for a section
 router.post("/chapters/:chapterId/explain", bookReaderController.explainSection);
+// Get detailed AI explanation for current segment
+router.post("/chapters/:chapterId/explain-detailed", bookReaderController.explainDetailed);
 
 // Text-to-speech conversion
 router.post("/chapters/:chapterId/tts", bookReaderController.textToSpeech);
@@ -29,6 +31,7 @@ router.post("/chapters/:chapterId/progress", bookReaderController.saveProgress);
 
 // Get reading progress
 router.get("/chapters/:chapterId/progress", bookReaderController.getProgress);
+
 
 module.exports = router;
 

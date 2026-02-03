@@ -107,4 +107,5 @@ async function pushEmbeddingToQdrant(embedding, payload) {
   }
 }
 
-module.exports = { pushEmbeddingToQdrant, ensureQdrantCollection };
+// module.exports = { pushEmbeddingToQdrant, ensureQdrantCollection };
+module.exports = {}; // Qdrant disabled for now

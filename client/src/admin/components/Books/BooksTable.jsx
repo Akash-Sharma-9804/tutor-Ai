@@ -1,6 +1,6 @@
-import { FaBookOpen, FaSchool, FaChalkboardTeacher, FaUser, FaExternalLinkAlt, FaEye, FaTrash } from "react-icons/fa";
+import { FaBookOpen, FaSchool, FaChalkboardTeacher, FaUser, FaExternalLinkAlt, FaEye, FaEdit, FaTrash } from "react-icons/fa";
 
-const BooksTable = ({ books, onView, onDelete }) => {
+const BooksTable = ({ books, onView, onEdit, onDelete }) => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -29,7 +29,7 @@ const BooksTable = ({ books, onView, onDelete }) => {
               <th className="p-4 text-left font-bold text-gray-700 dark:text-gray-300">Author</th>
               <th className="p-4 text-left font-bold text-gray-700 dark:text-gray-300">Class</th>
               <th className="p-4 text-left font-bold text-gray-700 dark:text-gray-300">Subject</th>
-              <th className="p-4 text-left font-bold text-gray-700 dark:text-gray-300">Size</th>
+              {/* <th className="p-4 text-left font-bold text-gray-700 dark:text-gray-300">Size</th> */}
               <th className="p-4 text-left font-bold text-gray-700 dark:text-gray-300">Actions</th>
             </tr>
           </thead>
@@ -70,31 +70,28 @@ const BooksTable = ({ books, onView, onDelete }) => {
                     </span>
                   </div>
                 </td>
-                <td className="p-4">
-                  <span className="inline-flex items-center px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm font-medium">
-                    {book.subject}
-                  </span>
-                </td>
-                <td className="p-4">
-                  <span className="text-gray-700 dark:text-gray-300">
-                    {getFileSize(book.file_size)}
-                  </span>
-                </td>
-                <td className="p-4">
+              <td className="p-4">
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => onView(book)}
-                      className="p-2 text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                      className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                       title="View Details"
                     >
                       <FaEye />
+                    </button>
+                    <button
+                      onClick={() => onEdit(book)}
+                      className="p-2 text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                      title="Edit Book"
+                    >
+                      <FaEdit />
                     </button>
                     {book.pdf_url && (
                       <a
                         href={book.pdf_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                        className="p-2 text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
                         title="Open PDF"
                       >
                         <FaExternalLinkAlt />

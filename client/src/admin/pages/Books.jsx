@@ -1,3 +1,5 @@
+ 
+
 import { useEffect, useState } from "react";
 import adminAxios from "../api/adminAxios";
 import BooksHeader from "../components/Books/BooksHeader";
@@ -6,6 +8,7 @@ import BooksFilters from "../components/Books/BooksFilters";
 import BooksGrid from "../components/Books/BooksGrid";
 import BooksTable from "../components/Books/BooksTable";
 import UploadBookModal from "../components/Books/UploadBookModal";
+
 import DeleteBookModal from "../components/Books/DeleteBookModal";
 import ViewBookModal from "../components/Books/ViewBookModal";
 import EmptyState from "../components/Books/EmptyState";
@@ -26,10 +29,12 @@ const Books = () => {
   const [selectedSubject, setSelectedSubject] = useState("");
   const [selectedBook, setSelectedBook] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [editingBook, setEditingBook] = useState(null);
+   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [uploadStatus, setUploadStatus] = useState({ type: "", message: "" });
-
+ const [existingBook, setExistingBook] = useState(null);
   // Fetch schools
   const fetchSchools = async () => {
     try {
@@ -93,6 +98,18 @@ const Books = () => {
     }
   };
 
+  // Fetch book with chapters for editing
+ // Fetch book with chapters for editing
+  const fetchBookWithChapters = async (bookId) => {
+    try {
+      const res = await adminAxios.get(`/books/${bookId}/chapters`);
+      console.log("📚 Fetched book data:", res.data.data); // Debug log
+      return res.data.data; // Return the actual data object, not the wrapper
+    } catch (error) {
+      console.error("Error fetching book chapters:", error);
+      return null;
+    }
+  };
   // Initial data fetch
   useEffect(() => {
     const initData = async () => {
@@ -123,23 +140,38 @@ const Books = () => {
     }
   }, [selectedSchool, selectedClass]);
 
-  // Fetch books when filters change
+// Fetch books when filters change
   useEffect(() => {
     if (selectedSchool) {
       fetchBooks();
     } else {
       setBooks([]);
       setFilteredBooks([]);
+      setExistingBook(null);
     }
   }, [selectedSchool, selectedClass, selectedSubject, searchTerm]);
 
-  const handleUploadBook = async (formData, file) => {
+  // Check if book exists for current subject
+  useEffect(() => {
+    if (selectedSubject && filteredBooks.length > 0) {
+      // Find book matching current subject
+      const bookForSubject = filteredBooks.find(
+        book => book.subject_id === parseInt(selectedSubject)
+      );
+      setExistingBook(bookForSubject || null);
+    } else {
+      setExistingBook(null);
+    }
+  }, [filteredBooks, selectedSubject]);
+
+  const handleUploadBook = async (formData, files) => {
     setUploading(true);
-    setUploadStatus({ type: "info", message: "📤 Uploading PDF file..." });
+    setUploadStatus({ type: "info", message: "📤 Uploading chapter PDFs..." });
 
     try {
       const uploadFormData = new FormData();
-      uploadFormData.append("file", file);
+      
+      // Append book metadata
       uploadFormData.append("title", formData.title);
       uploadFormData.append("author", formData.author || "Unknown");
       uploadFormData.append("subject_id", selectedSubject);
@@ -148,23 +180,46 @@ const Books = () => {
       uploadFormData.append("board", formData.board);
       uploadFormData.append("class_num", formData.class_num || "1");
       uploadFormData.append("subject_name", formData.subject_name || "Unknown");
+      
+      // Append chapter data as JSON
+      uploadFormData.append("chapters", JSON.stringify(formData.chapters));
+      
+      // Append chaptersToDelete if in edit mode
+      if (formData.isEditMode && formData.chaptersToDelete) {
+        uploadFormData.append("chaptersToDelete", JSON.stringify(formData.chaptersToDelete));
+      }
+      
+      // Append bookId if in edit mode
+      if (formData.isEditMode && formData.bookId) {
+        uploadFormData.append("bookId", formData.bookId);
+        uploadFormData.append("isEditMode", "true");
+      }
+      
+      // Append all chapter PDF files
+      files.forEach((file) => {
+        uploadFormData.append(`chapter_files`, file);
+      });
 
-      setUploadStatus({ type: "info", message: "⏳ Processing PDF with OCR..." });
+      setUploadStatus({ type: "info", message: "⏳ Processing chapters with OCR..." });
 
       const response = await adminAxios.post("/books/upload", uploadFormData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 300000
+        timeout: 600000 // 10 minutes for multiple chapters
       });
+
+      const successMessage = formData.isEditMode
+        ? `✅ Book updated successfully! ${response.data.chapters_created || 0} chapters processed`
+        : `✅ Book uploaded successfully! ${response.data.chapters_created} chapters processed across ${response.data.total_pages} pages`;
 
       setUploadStatus({
         type: "success",
-        message: `✅ Book uploaded successfully! ${response.data.chapters_created} chapters processed across ${response.data.total_pages} pages`
+        message: successMessage
       });
 
       setShowUploadModal(false);
+      setEditingBook(null);
       fetchBooks();
 
-      // Clear success message after 5 seconds
       setTimeout(() => setUploadStatus({ type: "", message: "" }), 5000);
     } catch (error) {
       const errorMsg = error.response?.data?.message || error.message || "Upload failed";
@@ -174,6 +229,38 @@ const Books = () => {
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleEditBook = async (book) => {
+    // Fetch book with chapters
+    const bookWithChapters = await fetchBookWithChapters(book.id);
+    if (bookWithChapters) {
+      setEditingBook(bookWithChapters);
+      setShowUploadModal(true);
+    } else {
+      setUploadStatus({
+        type: "error",
+        message: "❌ Failed to load book chapters"
+      });
+      setTimeout(() => setUploadStatus({ type: "", message: "" }), 3000);
+    }
+  };
+
+  const handleEditChaptersOnly = async () => {
+    if (!existingBook) return;
+    
+    // Fetch book with chapters
+    const bookWithChapters = await fetchBookWithChapters(existingBook.id);
+    if (bookWithChapters) {
+      setEditingBook(bookWithChapters);
+      setShowUploadModal(true);
+    } else {
+      setUploadStatus({
+        type: "error",
+        message: "❌ Failed to load book chapters"
+      });
+      setTimeout(() => setUploadStatus({ type: "", message: "" }), 3000);
     }
   };
 
@@ -241,9 +328,15 @@ const Books = () => {
       )}
 
       {/* Header */}
+    {/* Header */}
       <BooksHeader
-        onUploadBook={() => setShowUploadModal(true)}
+        onUploadBook={() => {
+          setEditingBook(null);
+          setShowUploadModal(true);
+        }}
+        onEditChapters={handleEditChaptersOnly}
         disabled={!selectedSchool || !selectedClass || !selectedSubject}
+        existingBook={existingBook}
       />
 
       {/* Statistics */}
@@ -277,7 +370,10 @@ const Books = () => {
           hasSchoolSelected={!!selectedSchool}
           hasClassSelected={!!selectedClass}
           hasSubjectSelected={!!selectedSubject}
-          onUploadBook={() => setShowUploadModal(true)}
+          onUploadBook={() => {
+            setEditingBook(null);
+            setShowUploadModal(true);
+          }}
           onSelectSchool={() => {
             const schoolSelect = document.querySelector('select[name="school"]');
             schoolSelect?.focus();
@@ -288,6 +384,7 @@ const Books = () => {
           <BooksGrid
             books={filteredBooks}
             onView={handleViewBook}
+            onEdit={handleEditBook}
             onDelete={handleDeleteClick}
           />
           
@@ -295,6 +392,7 @@ const Books = () => {
             <BooksTable
               books={filteredBooks}
               onView={handleViewBook}
+              onEdit={handleEditBook}
               onDelete={handleDeleteClick}
             />
           </div>
@@ -307,6 +405,7 @@ const Books = () => {
           onUpload={handleUploadBook}
           onClose={() => {
             setShowUploadModal(false);
+            setEditingBook(null);
             setUploadStatus({ type: "", message: "" });
           }}
           uploading={uploading}
@@ -316,6 +415,7 @@ const Books = () => {
           schools={schools}
           classes={classes}
           subjects={subjects}
+          book={editingBook}
         />
       )}
 

@@ -102,20 +102,23 @@ exports.getChapterContent = async (req, res) => {
     
     // Get chapter metadata
     const [chapterRows] = await db.query(
-      `SELECT 
-        bc.*,
-        bc.chapter_no as chapter_no,
-        b.title as book_title,
-        b.pdf_url,
-        b.board,
-        b.class_num,
-        s.name as subject_name
-      FROM book_chapters bc
-      JOIN books b ON bc.book_id = b.id
-      JOIN subjects s ON b.subject_id = s.id
-      WHERE bc.id = ?`,
-      [chapterId]
-    );
+  `SELECT 
+    bc.*,
+    bc.chapter_no as chapter_no,
+    bc.content_json_path,
+    bc.segments_json_path,
+    b.title as book_title,
+    b.pdf_url,
+    b.board,
+    b.class_num,
+    s.name as subject_name
+  FROM book_chapters bc
+  JOIN books b ON bc.book_id = b.id
+  JOIN subjects s ON b.subject_id = s.id
+  WHERE bc.id = ?`,
+  [chapterId]
+);
+
     
     if (chapterRows.length === 0) {
       return res.status(404).json({ message: "Chapter not found" });
@@ -133,7 +136,15 @@ exports.getChapterContent = async (req, res) => {
 
     // Fetch content from FTP/external URL
     const contentRes = await axios.get(chapter.content_json_path);
-    const content = contentRes.data;
+const content = contentRes.data;
+
+let segments = [];
+if (chapter.segments_json_path && chapter.segments_json_path !== "null") {
+  console.log("📥 Fetching segments from:", chapter.segments_json_path);
+  const segmentsRes = await axios.get(chapter.segments_json_path);
+  segments = segmentsRes.data.segments || [];
+}
+
     
     // Get previous and next chapter for navigation
     const [prevChapter] = await db.query(
@@ -153,23 +164,26 @@ exports.getChapterContent = async (req, res) => {
     );
 
     res.json({
-      chapter: {
-        id: chapter.id,
-        book_id: chapter.book_id,
-        chapter_no: chapter.chapter_no,
-        chapter_title: chapter.chapter_title,
-        book_title: chapter.book_title,
-        pdf_url: chapter.pdf_url,
-        board: chapter.board,
-        class_num: chapter.class_num,
-        subject: chapter.subject_name
-      },
-      content: content,
-      navigation: {
-        previous: prevChapter[0] || null,
-        next: nextChapter[0] || null
-      }
-    });
+  chapter: {
+    id: chapter.id,
+    book_id: chapter.book_id,
+    chapter_no: chapter.chapter_no,
+    chapter_title: chapter.chapter_title,
+    book_title: chapter.book_title,
+    pdf_url: chapter.pdf_url,
+    board: chapter.board,
+    class_num: chapter.class_num,
+    subject: chapter.subject_name
+  },
+  content,
+  segments,
+
+  navigation: {
+    previous: prevChapter[0] || null,
+    next: nextChapter[0] || null
+  }
+});
+
   } catch (err) {
     console.error("Failed to fetch chapter content:", err.message);
     res.status(500).json({ message: "Failed to fetch chapter content" });
@@ -225,38 +239,21 @@ const chapterContent = contentRes.data;
     }
     
     // Generate explanation using Deepseek
-    const deepseekResponse = await axios.post(
-      "https://api.deepseek.com/v1/chat/completions",
-      {
-        model: "deepseek-chat",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert teacher explaining ${chapter.subject_name} to a Class ${chapter.class_num} student following the ${chapter.board} curriculum. 
+    const geminiResponse = await axios.post(
+  "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent?key=" + process.env.GEMINI_API_KEY,
+  {
+    contents: [{
+      role: "user",
+      parts: [{
+        text: `Explain this in a NEW and simple way like a teacher. Do not repeat old explanation:\n\n${relevantText}`
+      }]
+    }]
+  }
+);
+const explanation = geminiResponse.data.candidates[0].content.parts[0].text;
 
-Explain concepts clearly, use simple language, provide examples, and make learning engaging. Break down complex topics into easy-to-understand parts.
 
-If the student asks a question, answer it thoroughly. If they say they didn't understand, explain it differently with more examples.`
-          },
-          {
-            role: "user",
-            content: question 
-              ? `Context from "${chapter.chapter_title}":\n\n${relevantText}\n\nStudent's question: ${question}`
-              : `Please explain this section from "${chapter.chapter_title}" in a clear and engaging way:\n\n${relevantText}`
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000
-      },
-      {
-        headers: {
-          "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-    
-    const explanation = deepseekResponse.data.choices[0].message.content;
+
     
     res.json({
       explanation,
@@ -283,27 +280,48 @@ exports.textToSpeech = async (req, res) => {
     if (!text) {
       return res.status(400).json({ message: "Text is required" });
     }
+
+    // Clean text for better TTS
+    const cleanText = text
+      .replace(/\*\*/g, '')
+      .replace(/##/g, '')
+      .replace(/^\* /gm, '')
+      .replace(/^- /gm, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\n+/g, ' ')
+      .trim();
     
-    const response = await axios.post(
-      "https://api.deepgram.com/v1/speak?model=aura-asteria-en",
-      {
-        text: text
-      },
-      {
-        headers: {
-          "Authorization": `Token ${process.env.DEEPGRAM_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        responseType: "arraybuffer"
-      }
-    );
-    
-    // Return audio file
-    res.set({
-      "Content-Type": "audio/mpeg",
-      "Content-Length": response.data.length
+      
+    // ✅ Validate API key BEFORE calling Deepgram
+if (!process.env.DEEPGRAM_API_KEY) {
+  console.error("❌ DEEPGRAM_API_KEY is missing in environment variables");
+  return res.status(500).json({ message: "TTS service not configured" });
+}
+
+const response = await axios.post(
+  "https://api.deepgram.com/v1/speak",
+  {
+    text: cleanText
+  },
+  {
+    params: {
+      model: "aura-orpheus-en"
+    },
+    headers: {
+      Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
+      Accept: "audio/mpeg",
+      "Content-Type": "application/json"
+    },
+    responseType: "arraybuffer"
+  }
+);
+
+    // Return audio as base64 for easier frontend handling
+    const audioBase64 = Buffer.from(response.data).toString('base64');
+    res.json({ 
+      audio: audioBase64,
+      mimeType: "audio/mpeg"
     });
-    res.send(response.data);
     
   } catch (err) {
     console.error("TTS failed:", err);
@@ -359,6 +377,99 @@ exports.getProgress = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to fetch progress" });
+  }
+};
+
+/**
+ * POST /api/books/chapters/:chapterId/explain-detailed
+ * Generate detailed AI explanation for current segment
+ */
+exports.explainDetailed = async (req, res) => {
+  try {
+    const { chapterId } = req.params;
+    const { text, context } = req.body;
+    
+    if (!text) {
+      return res.status(400).json({ message: "Text is required" });
+    }
+
+    // Get chapter info for additional context
+    const [chapterRows] = await db.query(
+      `SELECT bc.chapter_title, b.board, b.class_num, s.name as subject_name
+       FROM book_chapters bc
+       JOIN books b ON bc.book_id = b.id
+       JOIN subjects s ON b.subject_id = s.id
+       WHERE bc.id = ?`,
+      [chapterId]
+    );
+    
+    const chapter = chapterRows[0] || {};
+    
+    // Create comprehensive prompt for detailed explanation
+    const prompt = `You are an expert teacher explaining ${chapter.subject_name || 'this subject'} to a Class ${chapter.class_num || ''} student.
+
+**Context:** ${context || chapter.chapter_title || 'N/A'}
+
+**Text to explain:**
+"${text}"
+
+Provide a COMPREHENSIVE, DETAILED explanation that includes:
+
+1. **Simple Summary** (2-3 sentences)
+   - What is this saying in everyday language?
+
+2. **Key Concepts Breakdown**
+   - Break down each important concept or term
+   - Explain WHY each concept matters
+
+3. **Real-World Examples**
+   - Give 2-3 concrete examples students can relate to
+   - Show how this applies in daily life
+
+4. **Common Misconceptions**
+   - What do students often get wrong about this?
+   - Clear up any confusing points
+
+5. **Memory Aids**
+   - Provide mnemonics, analogies, or tricks to remember this
+
+6. **Practice Tips**
+   - How can students test their understanding?
+   - What questions should they ask themselves?
+
+Make it engaging, thorough, and easy to understand. Use analogies and stories where helpful.`;
+
+    const geminiResponse = await axios.post(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" + process.env.GEMINI_API_KEY,
+      {
+        contents: [{
+          role: "user",
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2048,
+        }
+      }
+    );
+
+    const explanation = geminiResponse.data.candidates[0].content.parts[0].text;
+
+    res.json({
+      explanation,
+      context: {
+        chapter_title: chapter.chapter_title,
+        subject: chapter.subject_name,
+        class: chapter.class_num
+      }
+    });
+    
+  } catch (err) {
+    console.error("Failed to generate detailed explanation:", err);
+    res.status(500).json({ 
+      message: "Failed to generate explanation",
+      error: err.message 
+    });
   }
 };
 
