@@ -1,7 +1,7 @@
 const axios = require("axios");
 const path = require("path");
 const { uploadFileToFTP } = require("./uploadToFTP");
-
+console.log("hehe boii");
 const OpenAI = require("openai");
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
