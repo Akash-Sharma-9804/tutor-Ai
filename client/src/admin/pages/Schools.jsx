@@ -12,6 +12,7 @@ import EmptyState from "../components/EmptyState";
 import LoadingSpinner from "../components/LoadingSpinner";
 import SchoolsHeader from "../components/School/SchoolsHeader";
 import AdminFooter from "../layout/AdminFooter";
+import { useNavigate } from "react-router-dom";
 
 const Schools = () => {
   const [schools, setSchools] = useState([]);
@@ -25,6 +26,7 @@ const Schools = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState(null);
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -123,14 +125,17 @@ const Schools = () => {
     }
   };
 
-  const handleViewSchool = async (id) => {
-    try {
-      const res = await adminAxios.get(`/schools/${id}`);
-      setSelectedSchool(res.data.data);
-      setShowViewModal(true);
-    } catch (error) {
-      console.error("Error fetching school details:", error);
-    }
+  // const handleViewSchool = async (id) => {
+  //   try {
+  //     const res = await adminAxios.get(`/schools/${id}`);
+  //     setSelectedSchool(res.data.data);
+  //     setShowViewModal(true);
+  //   } catch (error) {
+  //     console.error("Error fetching school details:", error);
+  //   }
+  // };
+  const handleViewSchool = (id) => {
+    navigate(`/admin/schools/${id}/details`);
   };
 
   const handleEditSchool = (school) => {

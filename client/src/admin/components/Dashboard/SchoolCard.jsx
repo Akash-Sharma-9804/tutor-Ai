@@ -69,7 +69,7 @@ const SchoolCard = ({ school, index, navigate }) => {
 
         {/* View Button */}
         <button
-          onClick={() => navigate(`/admin/schools/${school.school_id}`)}
+          onClick={() => navigate(`/admin/schools/${school.school_id}/details`)}
           className="
             p-2 rounded-lg transition-colors
             text-gray-400 hover:text-blue-600 hover:bg-blue-50

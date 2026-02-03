@@ -1,6 +1,9 @@
-import { FaSchool, FaTrash, FaEdit, FaMapMarkerAlt, FaCalendarAlt, FaEye } from "react-icons/fa";
+import { FaSchool, FaTrash, FaEdit, FaMapMarkerAlt, FaCalendarAlt, FaEye, FaUsers, FaChalkboardTeacher, FaBook } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 const SchoolCard = ({ school, onView, onEdit, onDelete }) => {
+  const navigate = useNavigate(); // Add this hook
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -8,6 +11,11 @@ const SchoolCard = ({ school, onView, onEdit, onDelete }) => {
       month: "short",
       day: "numeric",
     });
+  };
+
+  const handleViewDetails = () => {
+    // Navigate to school details page instead of opening modal
+    navigate(`/admin/schools/${school.id}/details`);
   };
 
   return (
@@ -66,10 +74,43 @@ const SchoolCard = ({ school, onView, onEdit, onDelete }) => {
         </div>
       </div>
 
+      {/* School Stats (if available) */}
+      {school.statistics && (
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="text-center p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+            <div className="flex items-center justify-center mb-1">
+              <FaChalkboardTeacher className="text-blue-500 mr-1 text-sm" />
+              <span className="font-bold text-gray-800 dark:text-white">
+                {school.statistics.total_classes || 0}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Classes</p>
+          </div>
+          <div className="text-center p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+            <div className="flex items-center justify-center mb-1">
+              <FaBook className="text-green-500 mr-1 text-sm" />
+              <span className="font-bold text-gray-800 dark:text-white">
+                {school.statistics.total_subjects || 0}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Subjects</p>
+          </div>
+          <div className="text-center p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+            <div className="flex items-center justify-center mb-1">
+              <FaUsers className="text-purple-500 mr-1 text-sm" />
+              <span className="font-bold text-gray-800 dark:text-white">
+                {school.statistics.total_students || 0}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Students</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center pt-4 border-t border-gray-100 dark:border-gray-700">
         <button
-          onClick={() => onView(school.id)}
-          className="flex items-center text-blue-600 dark:text-blue-400 font-medium hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+          onClick={handleViewDetails} // Changed to use navigation
+          className="flex cursor-pointer items-center text-blue-600 dark:text-blue-400 font-medium hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
         >
           <FaEye className="mr-2" />
           View Details

@@ -852,7 +852,7 @@ const Users = () => {
                       <td className="p-4">
                         <div className="flex items-center space-x-2">
                           <button
-                            onClick={() => navigate(`/admin/users/${user.id}`)}
+                            onClick={() => navigate(`/admin/students/${user.id}/details`)}
                             className="p-2 rounded-lg transition-colors text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30"
                             title="View Details"
                           >
