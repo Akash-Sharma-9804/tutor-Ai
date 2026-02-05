@@ -12,7 +12,14 @@ const adminRoutes = require("./routes/Admin/adminRoutes");
 const app = express();
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  origin: [
+    "https://aitutor.drillingnwk.com",
+    "https://tutor.drillingnwk.com"
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+}));
 app.use(express.json());
 
 // Routes
