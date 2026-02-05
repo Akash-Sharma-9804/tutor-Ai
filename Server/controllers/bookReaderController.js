@@ -406,41 +406,36 @@ exports.explainDetailed = async (req, res) => {
     const chapter = chapterRows[0] || {};
     
     // Create comprehensive prompt for detailed explanation
-    const prompt = `You are an expert teacher explaining ${chapter.subject_name || 'this subject'} to a Class ${chapter.class_num || ''} student.
+    const prompt = `
+You are a clear, engaging teacher helping a learner truly understand a concept.
 
 **Context:** ${context || chapter.chapter_title || 'N/A'}
 
 **Text to explain:**
 "${text}"
 
-Provide a COMPREHENSIVE, DETAILED explanation that includes:
+Explain this in a way that builds REAL understanding, not memorization.
 
-1. **Simple Summary** (2-3 sentences)
-   - What is this saying in everyday language?
+Guidelines:
+- Keep the explanation concise but meaningful
+- Use simple language without sounding childish
+- Focus on the *idea behind the words*
+- Use everyday examples only where they genuinely help
+- Avoid greetings, role-play, or addressing a specific class or age
 
-2. **Key Concepts Breakdown**
-   - Break down each important concept or term
-   - Explain WHY each concept matters
+Structure the response naturally:
+- Start with a short plain-language explanation of what the text is saying
+- Explain the most important ideas one by one
+- Clarify why this information matters in real life
+- End with a short reflection or question that helps the learner think deeper
 
-3. **Real-World Examples**
-   - Give 2-3 concrete examples students can relate to
-   - Show how this applies in daily life
+Do NOT repeat the text verbatim.
+Do NOT use headings unless they add clarity.
+`;
 
-4. **Common Misconceptions**
-   - What do students often get wrong about this?
-   - Clear up any confusing points
-
-5. **Memory Aids**
-   - Provide mnemonics, analogies, or tricks to remember this
-
-6. **Practice Tips**
-   - How can students test their understanding?
-   - What questions should they ask themselves?
-
-Make it engaging, thorough, and easy to understand. Use analogies and stories where helpful.`;
-
+ const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     const geminiResponse = await axios.post(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" + process.env.GEMINI_API_KEY,
+      `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         contents: [{
           role: "user",
