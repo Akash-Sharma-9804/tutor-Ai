@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
 import TeacherAvatar from '../components/TeacherAvatar.jsx';
+import WhiteboardPanel from '../components/WhiteboardPanel.jsx';
 
 const LineByLineReader = () => {
   const utteranceRef = useRef(null);
@@ -66,6 +67,79 @@ const LineByLineReader = () => {
   const [equationStepChars, setEquationStepChars] = useState({});
   const [activeStepUnderline, setActiveStepUnderline] = useState(-1);
   const [explanationWords, setExplanationWords] = useState({});
+const [isFullscreen, setIsFullscreen] = useState(false);
+const fullscreenAttempted = useRef(false);
+
+
+const enterFullscreen = async () => {
+  try {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) {
+      await elem.requestFullscreen();
+    } else if (elem.webkitRequestFullscreen) { /* Safari */
+      await elem.webkitRequestFullscreen();
+    } else if (elem.msRequestFullscreen) { /* IE11 */
+      await elem.msRequestFullscreen();
+    }
+    setIsFullscreen(true);
+  } catch (err) {
+    console.error('Error attempting to enable fullscreen:', err);
+  }
+};
+
+const exitFullscreen = () => {
+  if (document.exitFullscreen) {
+    document.exitFullscreen();
+  } else if (document.webkitExitFullscreen) { /* Safari */
+    document.webkitExitFullscreen();
+  } else if (document.msExitFullscreen) { /* IE11 */
+    document.msExitFullscreen();
+  }
+};
+
+
+const handleFullscreenChange = () => {
+  const isCurrentlyFullscreen = !!(
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.msFullscreenElement
+  );
+  
+  setIsFullscreen(isCurrentlyFullscreen);
+
+  // Navigate back when fullscreen is exited
+  if (!isCurrentlyFullscreen && !loading && fullscreenAttempted.current) {
+    if (chapter?.book_id) {
+      navigate(`/subjects`);
+    } else {
+      navigate(-1);
+    }
+  }
+};
+
+useEffect(() => {
+  // Add fullscreen change listeners
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+  document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+  // Auto-enter fullscreen
+  const timer = setTimeout(() => {
+    if (!fullscreenAttempted.current && !loading) {
+      fullscreenAttempted.current = true;
+      enterFullscreen();
+    }
+  }, 500);
+
+  return () => {
+    clearTimeout(timer);
+    document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+  };
+}, [loading]);
+
+
 
   // Deepgram TTS function
   const speakWithDeepgram = async (text, stepInfo = null, isTeacherBoard = false) => {
@@ -951,8 +1025,30 @@ const LineByLineReader = () => {
       </div>
 
      {/* Mobile Teacher Avatar (BELOW Chapter Info) */}
-      <div className="lg:hidden fixed top-[48px] left-0 right-0 z-40 bg-gradient-to-b from-gray-900 to-gray-800 shadow-lg">
-        <div className="relative" style={{ height: '140px' }}>
+     <div
+  className="
+    lg:hidden
+    fixed top-[42px] left-0 right-0 z-40
+    shadow-lg
+    rounded-t-none        /* mobile + tablet */
+    rounded-b-[15px]      /* mobile + tablet */
+    lg:rounded-[20px]     /* desktop */
+  "
+  style={{
+    background: 'linear-gradient(145deg, #f59e0b, #d97706)',
+    boxShadow:
+      '0 10px 40px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.2)',
+  }}
+>
+
+        <div
+  className="
+    relative
+    h-[160px]     /* mobile */
+    md:h-[220px]  /* tablet */
+  "
+>
+
           <TeacherAvatar isSpeaking={isReading} audioRef={audioRef} />
           {/* Speaking indicator */}
           {isReading && (
@@ -962,6 +1058,14 @@ const LineByLineReader = () => {
             </div>
           )}
         </div>
+           <div className="text-center  ">
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl  p-1 border-2 border-white/20">
+                  <p className="text-white text-xs mb-1" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                    Hi! I'm Andy Your study sidekick! 🚀
+                  </p>
+                 
+                </div>
+              </div>
       </div>
 
       {/* Fixed Header - Hidden on mobile, shown on desktop */}
@@ -970,7 +1074,7 @@ const LineByLineReader = () => {
           <div className="flex items-center justify-between mb-3">
             <button
               onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="flex cursor-pointer items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               <ArrowLeft className="h-5 w-5" />
               <span className="hidden sm:inline">Back to Chapters</span>
@@ -1019,7 +1123,7 @@ const LineByLineReader = () => {
       </div>
 
       {/* Main Content - Two Column Layout */}
-      <div className="w-full py-0 px-0 sm:px-1 lg:px-2 pt-[188px] md:pt-[200px] lg:pt-0">
+      <div className="w-full py-0 px-0 sm:px-1 lg:px-2 pt-[240px] sm:pt-[230px] md:pt-[280px] lg:pt-0">
        <div className="flex flex-col w-full gap-0 lg:gap-2 lg:flex-row lg:h-[calc(100vh-9rem)]">
 
           {/* LEFT SIDEBAR - Teacher + Page Numbers */}
@@ -1099,19 +1203,20 @@ const LineByLineReader = () => {
           </div>
 
           {/* RIGHT COLUMN - Whiteboard (Full Width) */}
-          <div className="relative flex-1 w-full">
+       {/* RIGHT COLUMN - Whiteboard (Full Width) */}
+          <div className="relative flex-1 w-full lg:h-full">
 
             {/* Whiteboard Container */}
-            <div className="flex flex-col h-auto lg:h-full gap-0">
+            <div className="flex flex-col gap-0 h-full">
 
 
               <div
-                className="flex-1 overflow-y-auto custom-scrollbar min-h-[500px] lg:min-h-0"
+                className="flex-1 overflow-y-auto custom-scrollbar min-h-[calc(100vh-220px)] sm:min-h-[calc(100vh-230px)] md:min-h-[calc(100vh-240px)] lg:min-h-0"
                 style={{
                   background: 'linear-gradient(180deg, #e8d4b8 0%, #d4c4a8 50%, #c4b498 100%)'
                 }}
               >
-                <div className="min-h-full relative p-2 sm:p-3 md:p-4 lg:p-6 pb-6">
+                <div className="relative p-2 sm:p-3 md:p-4 lg:p-6 pb-6">
                   {/* Whiteboard Frame - Like a real school board */}
                   <div
                     className="relative"
@@ -1133,7 +1238,7 @@ const LineByLineReader = () => {
                     {/* Whiteboard surface */}
                     <div
                       className="rounded-lg shadow-inner relative flex flex-col
-  min-h-[calc(100vh-280px)] sm:min-h-[calc(100vh-300px)] md:min-h-[65vh] lg:h-[calc(100vh-20rem)]"
+  h-auto lg:h-[calc(100vh-20rem)]"
                       style={{
                         background: '#ffff',
                         boxShadow: 'inset 0 4px 15px rgba(0,0,0,0.15), inset 0 -2px 8px rgba(255,255,255,0.3)',
@@ -1144,11 +1249,11 @@ const LineByLineReader = () => {
                      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-4 md:p-6 pb-12 sm:pb-14">
 
                         {/* Control Buttons - Top Left of Whiteboard */}
-                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-3 mb-3 sm:mb-4 md:mb-6 pb-2 sm:pb-3 md:pb-4 border-b-2 sm:border-b-4 border-slate-600" style={{ borderStyle: 'dashed' }}>
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-2 md:gap-3 mb-3 sm:mb-4 md:mb-6 pb-2 sm:pb-3 md:pb-4 border-b-2 sm:border-b-4 border-slate-600" style={{ borderStyle: 'dashed' }}>
                           <button
                             onClick={isReading ? stopReading : () => readAloud()}
                             disabled={isLoadingAudio}
-                            className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base font-bold transition-all shadow-md border-2 sm:border-3 ${isReading
+                            className={`flex items-center gap-0 sm:gap-2 px-2 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base font-bold transition-all shadow-md border-2 sm:border-3 ${isReading
                               ? 'bg-red-500 hover:bg-red-600 text-white border-red-700'
                               : isLoadingAudio
                                 ? 'bg-gray-400 cursor-not-allowed text-white border-gray-600'
@@ -1176,7 +1281,7 @@ const LineByLineReader = () => {
 
                           <button
                             onClick={toggleAutoPlay}
-                            className={`px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base font-bold transition-all shadow-md border-2 sm:border-3 hover:scale-105 ${autoPlayMode
+                            className={`px-2 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base font-bold transition-all shadow-md border-2 sm:border-3 hover:scale-105 ${autoPlayMode
                               ? 'bg-green-500 text-white border-green-700'
                               : 'bg-slate-300 text-slate-700 hover:bg-slate-400 border-slate-500'
                               }`}
@@ -1190,7 +1295,7 @@ const LineByLineReader = () => {
                             className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base font-bold transition-all shadow-md bg-purple-500 hover:bg-purple-600 text-white hover:scale-105 border-2 sm:border-3 border-purple-700"
                             style={{ fontFamily: 'Comic Sans MS, cursive' }}
                           >
-                            <Sparkles className="h-5 w-5" />
+                            <Sparkles className="h-4 w-4" />
                             <span className="hidden sm:inline">Explain in Detail</span>
                             <span className="sm:hidden">Explain</span>
                           </button>
@@ -1436,7 +1541,7 @@ const LineByLineReader = () => {
                               <div className="p-2 bg-yellow-500 rounded-lg border-2 border-yellow-600 shadow-md">
                                 <Lightbulb className="h-6 w-6 text-white" />
                               </div>
-                              <h2 className="text-xl font-bold text-slate-800 chalk-text">💡 Simple Explanation</h2>
+                              <h2 className="text-sm md:text-xl font-bold text-slate-800 chalk-text">💡 Simple Explanation</h2>
                             </div>
                             <p className="text-sm sm:text-base md:text-lg leading-relaxed text-slate-700 chalk-text" style={{ wordSpacing: '0.15em' }}>
                               {currentSegment.explanation}
@@ -1866,22 +1971,7 @@ const LineByLineReader = () => {
         </div>
 
         {/* Fixed Bottom Navigation */}
-        {/* Mobile Layout - Teacher Avatar Fixed at Top */}
-        <div className="md:hidden fixed top-10 left-0 right-0 z-50 bg-gradient-to-b from-gray-900 to-gray-800 shadow-2xl">
-          <div className="relative aspect-[16/10] max-h-[40vh]">
-            <TeacherAvatar
-              isSpeaking={isReading}
-              audioRef={audioRef}
-            />
-            {/* Back button overlay */}
-            <button
-              onClick={() => navigate(-1)}
-              className="absolute top-4 left-4 p-2 bg-black/30 hover:bg-black/50 rounded-full backdrop-blur-sm transition-all"
-            >
-              <ArrowLeft className="h-5 w-5 text-white" />
-            </button>
-          </div>
-        </div>
+        
 
         {/* Floating buttons removed - controls are in whiteboard */}
 
@@ -2023,7 +2113,7 @@ const LineByLineReader = () => {
             </div>
 
             {/* Chapter Navigation - Hidden on mobile/tablet */}
-            {(navigation.previous || navigation.next) && (
+            {/* {(navigation.previous || navigation.next) && (
               <div className="hidden lg:flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 {navigation.previous ? (
                   <button
@@ -2045,7 +2135,7 @@ const LineByLineReader = () => {
                   </button>
                 )}
               </div>
-            )}
+            )} */}
           </div>
         </div>
       </div>

@@ -47,9 +47,9 @@ navigate("/login", { replace: true });
     { icon: BookOpen, label: 'Subjects', path: '/subjects' },
     { icon: Bot, label: 'AI Tutor', path: '/ai-tutor' },
     { icon: Scan, label: 'Scan & Learn', path: '/scan' },
-    { icon: FileText, label: 'Tests & Quizzes', path: '/tests' },
+    // { icon: FileText, label: 'Tests & Quizzes', path: '/tests' },
     { icon: BarChart3, label: 'Progress', path: '/progress' },
-    { icon: MessageSquare, label: 'Talk with AI', path: '/talk-ai' },
+    // { icon: MessageSquare, label: 'Talk with AI', path: '/talk-ai' },
   ];
 
   const bottomItems = [

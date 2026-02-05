@@ -125,23 +125,23 @@ const TableOfContents = () => {
                 visible: { opacity: 1, y: 0 }
               }}
               onClick={() => openChapter(chapter.id)}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all cursor-pointer group"
+              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 md:p-6 hover:shadow-lg transition-all cursor-pointer group"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4 flex-1">
                   {/* Chapter Number */}
-                  <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <span className="text-white font-bold text-lg">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <span className="text-white font-bold text-xs md:text-lg">
                       {chapter.chapter_no}
                     </span>
                   </div>
                   
                   {/* Chapter Info */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    <h3 className="text-sm md:text-lg font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {chapter.chapter_title}
                     </h3>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-4 text-xs md:text-sm text-gray-600 dark:text-gray-400">
                       <span className="flex items-center gap-1">
                         <Clock className="h-4 w-4" />
                         ~30 min read
@@ -157,7 +157,7 @@ const TableOfContents = () => {
                 </div>
                 
                 {/* Action Button */}
-                <button className="flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg shadow-blue-500/30 group-hover:shadow-xl group-hover:shadow-blue-500/40">
+                <button className="flex text-xs md:text-base items-center gap-2 p-2 md:px-6 md:py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg shadow-blue-500/30 group-hover:shadow-xl group-hover:shadow-blue-500/40">
                   Start Learning
                   <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </button>

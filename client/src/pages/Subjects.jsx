@@ -444,7 +444,7 @@ const navigate = useNavigate();
                     {/* Action Button */}
                     <motion.button
                       whileTap={{ scale: 0.98 }}
-                      className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r ${subject.color} text-white font-semibold shadow-lg transition-shadow duration-200 group`}
+                      className={`w-full flex cursor-pointer items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r ${subject.color} text-white font-semibold shadow-lg transition-shadow duration-200 group`}
                     >
                       <Book className="h-4 w-4" />
                       View Books
@@ -691,7 +691,7 @@ const navigate = useNavigate();
             <Book className="h-8 w-8 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+            <h4 className="font-semibold text-gray-900   mb-1 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
               {book.title}
             </h4>
             {book.author && (
@@ -707,7 +707,7 @@ const navigate = useNavigate();
                 <BookOpen className="h-4 w-4" />
                 Start Learning
               </motion.button>
-              <motion.a
+              {/* <motion.a
                 href={book.pdf_url}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -717,7 +717,7 @@ const navigate = useNavigate();
               >
                 <Eye className="h-4 w-4" />
                 PDF
-              </motion.a>
+              </motion.a> */}
             </div>
           </div>
         </div>
