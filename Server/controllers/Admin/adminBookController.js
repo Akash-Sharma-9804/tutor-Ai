@@ -371,11 +371,27 @@ const updateBookWithChapters = async (req, res, data) => {
           );
 
           // Process new PDF for existing chapter
-        // Upload PDF to FTP first
+       // Get school and subject names for folder structure
+          const [schoolSubjectInfo] = await db.query(
+            `SELECT sc.name as school_name, c.class_name, s.name as subject_name
+             FROM books b
+             JOIN subjects s ON b.subject_id = s.id
+             JOIN classes c ON s.class_id = c.id
+             JOIN schools sc ON c.school_id = sc.id
+             WHERE b.id = ?`,
+            [bookId]
+          );
+
+          const schoolName = schoolSubjectInfo[0]?.school_name || 'Unknown';
+          const classNum = schoolSubjectInfo[0]?.class_name?.match(/\d+/)?.[0] || class_num || '1';
+        const className = `Class ${classNum}`;
+          const subjectNameForPath = schoolSubjectInfo[0]?.subject_name || subject_name;
+
+          // Upload PDF to FTP first
           const ftpRes = await uploadFileToFTP(
             file.buffer,
             `${title}_ch${chapterMeta.chapter_number}_${file.originalname}`,
-            "/books/uploads"
+            `/books/${schoolName}/${className}/${subjectNameForPath}`
           );
 
           // Update chapter PDF URL
@@ -428,11 +444,27 @@ const updateBookWithChapters = async (req, res, data) => {
           const newChapterId = chapterResult.insertId;
           chaptersCreated++;
 
+      // Get school and subject names for folder structure
+           const [schoolSubjectInfo] = await db.query(
+            `SELECT sc.name as school_name, c.class_name, s.name as subject_name
+             FROM books b
+             JOIN subjects s ON b.subject_id = s.id
+             JOIN classes c ON s.class_id = c.id
+             JOIN schools sc ON c.school_id = sc.id
+             WHERE b.id = ?`,
+            [bookId]
+          );
+
+          const schoolName = schoolSubjectInfo[0]?.school_name || 'Unknown';
+          const classNum = schoolSubjectInfo[0]?.class_name?.match(/\d+/)?.[0] || class_num || '1';
+        const className = `Class ${classNum}`;
+          const subjectNameForPath = schoolSubjectInfo[0]?.subject_name || subject_name;
+
         // Upload PDF to FTP first
           const ftpRes = await uploadFileToFTP(
             file.buffer,
             `${title}_ch${chapterMeta.chapter_number}_${file.originalname}`,
-            "/books/uploads"
+            `/books/${schoolName}/${className}/${subjectNameForPath}`
           );
 
           // Update chapter PDF URL
@@ -595,13 +627,28 @@ parsedChapters.length  // Change from chaptersData.length
 
       console.log(`\n📖 Processing Chapter ${chapterMeta.chapter_number}: ${chapterMeta.chapter_title}`);
 
-      try {
+     try {
+        // Get school, class, and subject names for folder structure
+        const [schoolSubjectInfo] = await db.query(
+          `SELECT sc.name as school_name, c.class_name, s.name as subject_name
+           FROM subjects s
+           JOIN classes c ON s.class_id = c.id
+           JOIN schools sc ON c.school_id = sc.id
+           WHERE s.id = ?`,
+          [subject_id]
+        );
+
+        const schoolName = schoolSubjectInfo[0]?.school_name || 'Unknown';
+        const classNum = schoolSubjectInfo[0]?.class_name?.match(/\d+/)?.[0] || class_num || '1';
+        const className = `Class ${classNum}`;
+        const subjectNameForPath = schoolSubjectInfo[0]?.subject_name || subject_name;
+
         // Upload chapter PDF to FTP
-        console.log(`📤 Uploading chapter ${chapterMeta.chapter_number} PDF to FTP...`);
+        console.log(`📤 Uploading chapter ${chapterMeta.chapter_number} PDF to FTP to /${schoolName}/${className}/${subjectNameForPath}...`);
         const ftpRes = await uploadFileToFTP(
           file.buffer,
           `${title}_ch${chapterMeta.chapter_number}_${file.originalname}`,
-          "/books/uploads"
+          `/books/${schoolName}/${className}/${subjectNameForPath}`
         );
         console.log(`✅ Chapter ${chapterMeta.chapter_number} PDF uploaded:`, ftpRes.url);
 // Save chapter with PDF URL

@@ -138,12 +138,29 @@ const navigate = useNavigate();
     }
   };
 
-  const handleSubjectClick = (subject) => {
-    setSelectedSubject(subject);
-    setShowBooksModal(true);
-    fetchBooksBySubject(subject.id);
-  };
+  const handleSubjectClick = async (subject) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/books/subject/${subject.id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      
+      // If books exist, navigate to the first book's TOC
+      if (res.data && res.data.length > 0) {
+        navigate(`/book/${res.data[0].id}`);
+      } else {
+        // If no books, show a message or do nothing
+        console.log("No books available for this subject");
+      }
+    } catch (err) {
+      console.error("Failed to fetch books for subject", err);
+    }
+  };
   const filteredSubjects = subjects.filter((subject) => {
     // Category buttons filter
     const matchesActiveFilter =

@@ -29,26 +29,88 @@ import {
   Bell,
   Camera,
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import Footer from "../components/Footer/Footer";
 
 export default function Profile() {
-  // Student data
-  const student = {
-    name: "Alex Johnson",
-    grade: "Grade 9",
-    studentId: "STU-2024-9876",
-    email: "alex.j@student.edu",
+  // State for student data
+  const [student, setStudent] = useState({
+    name: "Loading...",
+    grade: "...",
+    studentId: "...",
+    email: "...",
     phone: "+1 (555) 123-4567",
     location: "San Francisco, CA",
     joinDate: "January 2023",
     bio: "Passionate learner excelling in Science and Mathematics. Always eager to explore new concepts with AI-powered tools.",
     avatar:
-      "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex&backgroundColor=06b6d4",
+      "https://api.dicebear.com/7.x/avataaars/svg?seed=Default&backgroundColor=06b6d4",
     streak: 14,
     totalHours: 342,
     rank: 12,
     totalStudents: 1564,
-  };
+  });
+  
+  const [loading, setLoading] = useState(true);
+
+  // Fetch student profile from backend
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          console.error("No token found");
+          setLoading(false);
+          return;
+        }
+
+        const res = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/student/me`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+       const profileData = res.data;
+        
+        // Gender-based avatar - use different styles for male/female
+        let avatarUrl;
+        if (profileData.gender === 'Male') {
+          // Male avatar with masculine features
+          avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileData.studentName}&backgroundColor=06b6d4&hair=short01,short02,short03,short04,short05&facialHair=beardMajestic,beardLight,moustacheFancy`;
+        } else {
+          // Female avatar with feminine features
+          avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileData.studentName}&backgroundColor=06b6d4&hair=longButNotTooLong,wavyBob,curly,curvy&facialHair=blank&top=hijab,turban,winterHat1,longHair,curly`;
+        }
+        
+        setStudent({
+          name: profileData.studentName || "Student",
+          grade: `Class ${profileData.className}` || "N/A",
+          studentId: `STU-${profileData.studentId}`,
+          email: profileData.email || "N/A",
+          phone: profileData.phone || "N/A",
+          location: profileData.schoolName || "N/A",
+          age: profileData.age || "N/A",
+          gender: profileData.gender || "N/A",
+          dob: profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : "N/A",
+          joinDate: profileData.created_at ? new Date(profileData.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : "January 2023",
+          bio: "Passionate learner excelling in Science and Mathematics. Always eager to explore new concepts with AI-powered tools.",
+          avatar: avatarUrl,
+          streak: 14,
+          totalHours: 342,
+          rank: 12,
+          totalStudents: 1564,
+        });
+      } catch (err) {
+        console.error("Failed to fetch student profile:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []); // Empty dependency array to prevent multiple fetches
 
   // Subjects with performance
   const subjects = [
@@ -155,6 +217,14 @@ export default function Profile() {
       priority: "low",
     },
   ];
+
+ if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <motion.div

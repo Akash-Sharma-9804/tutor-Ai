@@ -305,7 +305,7 @@ const response = await axios.post(
   },
   {
     params: {
-      model: "aura-orpheus-en"
+      model: "aura-2-mars-en"
     },
     headers: {
       Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,

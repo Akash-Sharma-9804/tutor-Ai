@@ -909,10 +909,7 @@ function detectDiagrams(lines, pageWidth, pageHeight) {
           const webpData = canvas.toDataURL("image/webp", 0.7);
           const imgBuffer = Buffer.from(webpData.split(",")[1], "base64");
 
-          const remoteDir = `/books/class${
-            bookMetadata.class
-          }/${bookMetadata.subject.toLowerCase()}/ch${String(bookMetadata.chapter_number || 1).padStart(2, '0')}/pages`;
-
+        const remoteDir = `/books/${bookMetadata.schoolName}/Class${bookMetadata.className}/${bookMetadata.subjectNameForPath}/ch${bookMetadata.chapterNum}/pages`;
           // Retry logic for FTP upload
           let uploadSuccess = false;
           let retryCount = 0;
@@ -1005,7 +1002,30 @@ async function processBookFromPDF(
       );
     }
 
-    const pdfBase64 = pdfBuffer.toString("base64");
+  const pdfBase64 = pdfBuffer.toString("base64");
+
+    // Get school, class, and subject names for folder structure
+    const [schoolSubjectInfo] = await dbConnection.query(
+      `SELECT sc.name as school_name, c.class_name, s.name as subject_name
+       FROM books b
+       JOIN subjects s ON b.subject_id = s.id
+       JOIN classes c ON s.class_id = c.id
+       JOIN schools sc ON c.school_id = sc.id
+       WHERE b.id = ?`,
+      [bookId]
+    );
+
+    const schoolName = schoolSubjectInfo[0]?.school_name || 'Unknown';
+    const classNum = schoolSubjectInfo[0]?.class_name?.match(/\d+/)?.[0] || bookMetadata.class || '1';
+    const className = `Class ${classNum}`;
+    const subjectNameForPath = schoolSubjectInfo[0]?.subject_name || bookMetadata.subject;
+    const chapterNum = String(bookMetadata.chapter_number || 1).padStart(2, '0');
+
+    // Add folder path info to bookMetadata so nested functions can access it
+    bookMetadata.schoolName = schoolName;
+    bookMetadata.className = className;
+    bookMetadata.subjectNameForPath = subjectNameForPath;
+    bookMetadata.chapterNum = chapterNum;
 
     // Estimate page count (rough: 1 page ≈ 50-100KB)
 // Estimate page count (rough: 1 page ≈ 50-100KB)
@@ -1067,7 +1087,7 @@ const jsonBuffer = Buffer.from(JSON.stringify({ segments }, null, 2));
 const ftpSegRes = await uploadFileToFTP(
   jsonBuffer,
   "segments.json",
-  `/books/class${bookMetadata.class}/${bookMetadata.subject.toLowerCase()}/ch${String(bookMetadata.chapter_number || 1).padStart(2, '0')}`
+  `/books/${bookMetadata.schoolName}/Class${bookMetadata.className}/${bookMetadata.subjectNameForPath}/ch${bookMetadata.chapterNum}`
 );
 
 imageResult.segmentsJsonPath = ftpSegRes.url;
@@ -1269,13 +1289,12 @@ allSections.forEach(section => {
     };
 
     // Upload to FTP
+   // Get school and subject names for folder structure
+   // Upload to FTP
     const contentJsonBuffer = Buffer.from(JSON.stringify(chapterData, null, 2));
-    const chapterNum = String(bookMetadata.chapter_number || 1).padStart(2, '0');
-    const ftpPath = `/books/class${
-      bookMetadata.class
-    }/${bookMetadata.subject.toLowerCase()}/ch${chapterNum}`;
+    const ftpPath = `/books/${bookMetadata.schoolName}/Class${bookMetadata.className}/${bookMetadata.subjectNameForPath}/ch${bookMetadata.chapterNum}`;
 
-    console.log(`💾 Uploading chapter content JSON to FTP...`);
+    console.log(`💾 Uploading chapter content JSON to FTP at ${ftpPath}...`);
     const ftpResult = await uploadFileToFTP(
       contentJsonBuffer,
       "content.json",
