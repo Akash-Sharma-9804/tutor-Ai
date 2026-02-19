@@ -1,0 +1,151 @@
+/* index.css */
+@import "tailwindcss";
+
+/* =====================================================
+   CUSTOM STYLES & DARK MODE CONFIG
+   ===================================================== */
+
+/* Enable class-based dark mode */
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+/* Apply dark mode to HTML when .dark class is present */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body {
+  height: 100%;
+}
+
+/* Remove all manual dark mode CSS - Tailwind will handle it */
+
+/* You can add custom dark mode gradients if needed */
+.dark {
+  background-color: #121212;
+  background-image:
+    radial-gradient(
+      1200px 600px at 70% -10%,
+      rgba(167, 139, 250, 0.12),
+      transparent 60%
+    ),
+    linear-gradient(
+      180deg,
+      #121212 0%,
+      #0e0e0e 100%
+    );
+}
+
+/* Keep scrollbar styles */
+.dark ::-webkit-scrollbar {
+  width: 10px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #121212;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #2c2c2c;
+  border-radius: 6px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes slide-in-top {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-slide-in-top {
+  animation: slide-in-top 0.5s ease-out;
+}
+
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #007BFF;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.hidescrollbar {
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.hidescrollbar::-webkit-scrollbar:vertical {
+  display: none;
+}
+
+.hidescrollbar {
+  scrollbar-width: thin;
+}
+
+.hidescrollbar::-webkit-scrollbar:horizontal {
+  height: 6px;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  /* IE & Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari, Opera */
+}
+
+
+/* Firefox */
+body {
+  scrollbar-width: thin;
+  scrollbar-color: #007BFF transparent;
+}

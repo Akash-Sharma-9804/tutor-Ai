@@ -1,0 +1,784 @@
+const axios = require("axios");
+const pdfParse = require("pdf-parse").default;
+
+// Rate limiting helper
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Convert PDF pages to images using pdfjs-dist (same as bookProcessingService.js)
+ */
+async function convertPDFPagesToImages(pdfBuffer, maxPages = 15) {
+  try {
+    const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
+    const { createCanvas } = require("canvas");
+
+    console.log(`📄 Converting PDF to images...`);
+
+    // Load PDF
+    const pdfData = new Uint8Array(pdfBuffer);
+    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+    
+    const totalPages = Math.min(pdf.numPages, maxPages);
+    
+    console.log(`📄 PDF has ${pdf.numPages} pages, converting ${totalPages} to images...`);
+
+    const pages = [];
+
+    // Convert each page to image
+    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      try {
+        console.log(`🖼️  Converting page ${pageNum}/${totalPages} to image...`);
+
+        const page = await pdf.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 2 }); // 2x scale for better quality
+
+        // Create canvas
+        const canvas = createCanvas(viewport.width, viewport.height);
+        const ctx = canvas.getContext("2d");
+
+        // Render PDF page to canvas
+        await page.render({ 
+          canvasContext: ctx, 
+          viewport 
+        }).promise;
+
+        // Convert canvas to base64 JPEG
+        const imageDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        const base64Image = imageDataUrl.split(',')[1]; // Remove data:image/jpeg;base64, prefix
+
+        pages.push({
+          pageNumber: pageNum,
+          imageData: base64Image,
+          mimeType: 'image/jpeg'
+        });
+
+        console.log(`✅ Page ${pageNum} converted (${Math.round(base64Image.length / 1024)}KB)`);
+
+      } catch (pageError) {
+        console.error(`❌ Failed to convert page ${pageNum}:`, pageError.message);
+        pages.push({
+          pageNumber: pageNum,
+          error: pageError.message,
+          imageData: null
+        });
+      }
+    }
+
+    return pages;
+
+  } catch (error) {
+    console.error("❌ PDF to image conversion failed:", error.message);
+    throw new Error(`Failed to convert PDF to images: ${error.message}`);
+  }
+}
+
+/**
+ * Retry function with exponential backoff
+ */
+async function retryWithBackoff(fn, maxRetries = 2, initialDelay = 3000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i < maxRetries - 1) {
+        const waitTime = initialDelay * Math.pow(2, i);
+        console.log(
+          `⏳ Retrying in ${waitTime / 1000}s... (Attempt ${i + 2}/${maxRetries + 1})`
+        );
+        await delay(waitTime);
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
+/**
+ * ENHANCED: Parse Gemini response with detailed error handling
+ */
+function parseGeminiResponse(response, pageNumber) {
+  // Log the full response structure for debugging
+  console.log(`🔍 Response structure for page ${pageNumber}:`, JSON.stringify({
+    hasCandidates: !!response.data?.candidates,
+    candidatesLength: response.data?.candidates?.length,
+    hasContent: !!response.data?.candidates?.[0]?.content,
+    hasParts: !!response.data?.candidates?.[0]?.content?.parts,
+    finishReason: response.data?.candidates?.[0]?.finishReason,
+    safetyRatings: response.data?.candidates?.[0]?.safetyRatings,
+  }, null, 2));
+
+  // Check for safety/content filtering
+  if (response.data?.candidates?.[0]?.finishReason) {
+    const finishReason = response.data.candidates[0].finishReason;
+    
+    if (finishReason === 'SAFETY') {
+      const safetyRatings = response.data.candidates[0].safetyRatings || [];
+      const blockedCategories = safetyRatings
+        .filter(r => r.blocked)
+        .map(r => r.category)
+        .join(', ');
+      
+      throw new Error(
+        `Content blocked by safety filters (${blockedCategories || 'unspecified'}). ` +
+        `This page may contain content that triggered safety protocols. ` +
+        `Try rephrasing or using a different image.`
+      );
+    }
+    
+    if (finishReason === 'RECITATION') {
+      throw new Error(
+        `Content blocked due to recitation concerns. ` +
+        `The page may contain copyrighted material or exam questions.`
+      );
+    }
+
+    if (finishReason === 'MAX_TOKENS') {
+      throw new Error(
+        `Response exceeded maximum token limit. ` +
+        `Try processing fewer questions or splitting the page.`
+      );
+    }
+
+    if (finishReason !== 'STOP' && finishReason !== 'FINISH_REASON_UNSPECIFIED') {
+      console.warn(`⚠️  Unusual finish reason: ${finishReason}`);
+    }
+  }
+
+  // Check response structure
+  if (!response.data?.candidates || response.data.candidates.length === 0) {
+    console.error('❌ No candidates in response:', JSON.stringify(response.data, null, 2));
+    throw new Error(
+      `No response generated by Gemini. ` +
+      `This may be due to content filters or API issues. ` +
+      `Please try again or contact support.`
+    );
+  }
+
+  const candidate = response.data.candidates[0];
+
+  if (!candidate.content?.parts || candidate.content.parts.length === 0) {
+    console.error('❌ No content parts in response:', JSON.stringify(candidate, null, 2));
+    
+    // Check if there's a prompt feedback (another type of blocking)
+    if (response.data.promptFeedback?.blockReason) {
+      const blockReason = response.data.promptFeedback.blockReason;
+      throw new Error(
+        `Request blocked: ${blockReason}. ` +
+        `The content in this page may have triggered safety filters.`
+      );
+    }
+    
+    throw new Error(
+      `Empty response from Gemini. ` +
+      `This page may contain content that cannot be processed. ` +
+      `Finish reason: ${candidate.finishReason || 'unknown'}`
+    );
+  }
+
+  // Extract text from parts
+  const aiResponse = candidate.content.parts
+    .map((part) => part.text || "")
+    .join("\n")
+    .trim();
+
+  if (!aiResponse || aiResponse.length < 10) {
+    throw new Error(
+      `Response too short (${aiResponse.length} characters). ` +
+      `The model may not have generated sufficient content.`
+    );
+  }
+
+  return aiResponse;
+}
+
+/**
+ * Process a single page with Gemini AI WITH CONTEXT from previous page
+ * This handles questions that span multiple pages
+ */
+async function processSinglePageWithContext(
+  pageData,
+  previousPageData,
+  studentClass,
+  pageNumber,
+  totalPages,
+  fileType = 'image',
+  mimeType = 'image/jpeg'
+) {
+  try {
+    console.log(`\n📄 Processing page ${pageNumber}/${totalPages} with context...`);
+
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is not set in environment variables");
+    }
+
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp';
+
+    const pagePrompt = `You are a warm, encouraging tutor helping a Class ${studentClass} student with their homework. Your goal is to teach, not just solve.
+
+📚 PAGE CONTEXT:
+- This is page ${pageNumber} of ${totalPages} in the document
+- You are seeing BOTH page ${pageNumber - 1} (for context) AND page ${pageNumber} (current page)
+- The previous page is shown first for reference in case questions continue across pages
+- ONLY answer questions that appear on page ${pageNumber} (the second image)
+- If a question on page ${pageNumber} seems incomplete, check the previous page for the beginning
+
+🎯 RESPONSE FORMAT - ADAPT BASED ON QUESTION TYPE:
+
+For MATHEMATICAL/NUMERICAL problems (calculations, equations, formulas, numerical answers):
+
+****Question [Number]:** [Provide a clear, slightly rephrased version of the question. Do not copy it word-for-word from the image to avoid safety filters.]oth pages if split]
+
+**Note:** [If this is an advanced topic, mention which class level it's typically taught in]
+
+**Given:**
+- [List what information is provided]
+
+**To Find:**
+- [Clearly state what needs to be calculated or proven]
+
+**Solution:**
+
+**Step 1:** [First step with detailed explanation]
+[Explain WHY this step is needed and the concept behind it]
+
+**Step 2:** [Next step with clear reasoning]
+[Show the calculation/logic in detail]
+
+**Step 3:** [Continue with all necessary steps]
+...
+
+**Final Answer:**
+[Present the answer clearly, boxed if numerical: $\\boxed{answer}$]
+
+---
+
+For THEORY/DEFINITION/CONCEPTUAL questions (no calculations needed):
+
+****Question [Number]:** [Provide a clear, slightly rephrased version of the question. Do not copy it word-for-word from the image to avoid safety filters.]oth pages if split]
+
+**Note:** [If this is an advanced topic, mention which class level it's typically taught in]
+
+**Answer:**
+[Provide a clear, comprehensive explanation of the concept]
+
+[Include relevant examples, descriptions, or context to help understanding]
+
+---
+
+⚠️ CRITICAL INSTRUCTIONS:
+1. DO NOT include any greeting message - go straight to Question 1
+2. ONLY answer questions visible on PAGE ${pageNumber} (the second image)
+3. If a question starts on previous page and continues on current page, read the FULL question from both images
+4. If a question's options (a, b, c, d) are split across pages, combine them
+5. IDENTIFY question type: Is it mathematical/numerical OR theory/conceptual?
+6. For MATH problems: Use full step-by-step format with Given/To Find/Solution steps
+7. For THEORY questions: Use direct Answer format WITHOUT unnecessary steps
+8. ANSWER ALL QUESTIONS on page ${pageNumber} - do not stop until complete
+9. Use warm, encouraging language throughout
+10. Use proper mathematical notation with $ for LaTeX (e.g., $\\frac{a}{b}$, $\\sqrt{x}$, $\\pi$)
+11. Number questions exactly as they appear on page ${pageNumber}
+12. Separate questions with horizontal rules (---)
+13. This is educational homework help - focus on teaching and explaining concepts clearly
+
+📝 FORMATTING STANDARDS:
+- Bold for section headers (**Step 1:**, **Answer:**, **Final Answer:**)
+- For math: Use proper fractions $\\frac{numerator}{denominator}$ and symbols
+- For math: Box final answers $\\boxed{result}$
+- Keep theory answers concise but complete
+- DO NOT include "Key Concepts" or "Key Points" sections
+
+Now analyze page ${pageNumber} (the second image) and help this Class ${studentClass} student learn:`;
+
+    // Build parts array with both images
+    const parts = [
+      { text: pagePrompt },
+      {
+        inline_data: {
+          mime_type: mimeType,
+          data: previousPageData
+        }
+      },
+      { text: `⬆️ Above is page ${pageNumber - 1} (for context only)\n\n⬇️ Below is page ${pageNumber} (ANSWER QUESTIONS FROM THIS PAGE):` },
+      {
+        inline_data: {
+          mime_type: mimeType,
+          data: pageData
+        }
+      }
+    ];
+
+    const requestPayload = {
+      contents: [
+        {
+          role: "user",
+          parts: parts
+        }
+      ],
+      generationConfig: {
+        temperature: 0.4,
+        topK: 32,
+        topP: 0.95,
+        maxOutputTokens: 16384,
+      },
+      safetySettings: [
+        {
+          category: "HARM_CATEGORY_HARASSMENT",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_HATE_SPEECH",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+          threshold: "BLOCK_NONE"
+        }
+      ]
+    };
+
+    console.log(`🔧 Calling Gemini API for page ${pageNumber} with context...`);
+
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      requestPayload,
+      {
+        headers: { "Content-Type": "application/json" },
+        timeout: 120000,
+      }
+    );
+
+    // Use enhanced response parser
+    const aiResponse = parseGeminiResponse(response, pageNumber);
+
+    console.log(`✅ Page ${pageNumber} processed with context (${aiResponse.length} characters)`);
+
+    return {
+      pageNumber,
+      response: aiResponse,
+      success: true
+    };
+
+  } catch (error) {
+    console.error(`❌ Page ${pageNumber} with context failed:`, error.message);
+    
+    // If it's a Gemini API error, include more context
+    if (error.response) {
+      console.error(`API Error Status: ${error.response.status}`);
+      console.error(`API Error Data:`, JSON.stringify(error.response.data, null, 2));
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Process a single page with Gemini AI
+ * Uses the SAME model and approach as bookProcessingService
+ */
+async function processSinglePage(
+  pageData,
+  studentClass,
+  pageNumber,
+  totalPages,
+  fileType = 'image',
+  mimeType = 'image/jpeg'
+) {
+  try {
+    console.log(`\n📄 Processing page ${pageNumber}/${totalPages}...`);
+
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is not set in environment variables");
+    }
+
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp';
+
+    const pagePrompt = `You are a warm, encouraging tutor helping a Class ${studentClass} student with their homework. Your goal is to teach, not just solve.
+
+📚 PAGE INFO:
+- This is page ${pageNumber} of ${totalPages}
+- Answer ALL questions visible on this page
+
+🎯 RESPONSE FORMAT - ADAPT BASED ON QUESTION TYPE:
+
+For MATHEMATICAL/NUMERICAL problems (calculations, equations, formulas, numerical answers):
+
+**Question [Number]:** [Write the exact question]
+
+**Note:** [If this is an advanced topic, mention which class level it's typically taught in]
+
+**Given:**
+- [List what information is provided]
+
+**To Find:**
+- [Clearly state what needs to be calculated or proven]
+
+**Solution:**
+
+**Step 1:** [First step with detailed explanation]
+[Explain WHY this step is needed and the concept behind it]
+
+**Step 2:** [Next step with clear reasoning]
+[Show the calculation/logic in detail]
+
+**Step 3:** [Continue with all necessary steps]
+...
+
+**Final Answer:**
+[Present the answer clearly, boxed if numerical: $\\boxed{answer}$]
+
+---
+
+For THEORY/DEFINITION/CONCEPTUAL questions (no calculations needed):
+
+**Question [Number]:** [Write the exact question]
+
+**Note:** [If this is an advanced topic, mention which class level it's typically taught in]
+
+**Answer:**
+[Provide a clear, comprehensive explanation of the concept]
+
+[Include relevant examples, descriptions, or context to help understanding]
+
+---
+
+⚠️ CRITICAL INSTRUCTIONS:
+1. DO NOT include any greeting message - go straight to Question 1
+2. ANSWER ALL QUESTIONS on this page - do not stop until complete
+3. IDENTIFY question type: Is it mathematical/numerical OR theory/conceptual?
+4. For MATH problems: Use full step-by-step format with Given/To Find/Solution steps
+5. For THEORY questions: Use direct Answer format WITHOUT unnecessary steps
+6. Use warm, encouraging language throughout
+7. Use proper mathematical notation with $ for LaTeX (e.g., $\\frac{a}{b}$, $\\sqrt{x}$, $\\pi$)
+8. Number questions exactly as they appear on the page
+9. Separate questions with horizontal rules (---)
+10. This is educational homework help - focus on teaching and explaining concepts clearly
+
+📝 FORMATTING STANDARDS:
+- Bold for section headers (**Step 1:**, **Answer:**, **Final Answer:**)
+- For math: Use proper fractions $\\frac{numerator}{denominator}$ and symbols
+- For math: Box final answers $\\boxed{result}$
+- Keep theory answers concise but complete
+- DO NOT include "Key Concepts" or "Key Points" sections
+
+Now analyze this page and help this Class ${studentClass} student learn:`;
+
+    const requestPayload = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: pagePrompt },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: pageData
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.4,
+        topK: 32,
+        topP: 0.95,
+        maxOutputTokens: 16384,
+      },
+      safetySettings: [
+        {
+          category: "HARM_CATEGORY_HARASSMENT",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_HATE_SPEECH",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+          threshold: "BLOCK_NONE"
+        }
+      ]
+    };
+
+    console.log(`🔧 Calling Gemini API for page ${pageNumber}...`);
+
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      requestPayload,
+      {
+        headers: { "Content-Type": "application/json" },
+        timeout: 120000,
+      }
+    );
+
+    // Use enhanced response parser
+    const aiResponse = parseGeminiResponse(response, pageNumber);
+
+    console.log(`✅ Page ${pageNumber} processed (${aiResponse.length} characters)`);
+
+    return {
+      pageNumber,
+      response: aiResponse,
+      success: true
+    };
+
+  } catch (error) {
+    console.error(`❌ Page ${pageNumber} failed:`, error.message);
+    
+    // If it's a Gemini API error, include more context
+    if (error.response) {
+      console.error(`API Error Status: ${error.response.status}`);
+      console.error(`API Error Data:`, JSON.stringify(error.response.data, null, 2));
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Process scanned homework/documents using Gemini AI
+ * PDFs: Converts to images page-by-page so diagrams are visible (max 15 pages)
+ * Images: Single page processing
+ */
+async function processHomeworkWithGemini(
+  fileBuffer,
+  fileType,
+  studentClass,
+  totalPages = 1
+) {
+  try {
+    console.log(`📚 Processing homework for Class ${studentClass}...`);
+
+    const isPDF = fileType.toLowerCase() === 'pdf';
+    
+    if (isPDF) {
+      console.log(`📑 PDF detected - converting pages to images for diagram support...`);
+      
+      // ENFORCE 15 PAGE LIMIT
+      const MAX_PAGES = 15;
+      const pages = await convertPDFPagesToImages(fileBuffer, MAX_PAGES);
+      const actualPages = Math.min(pages.length, MAX_PAGES);
+
+      if (pages.length > MAX_PAGES) {
+        console.log(`⚠️  PDF has ${pages.length} pages, processing only first ${MAX_PAGES} pages`);
+      }
+
+      console.log(`📄 Processing ${actualPages} pages...`);
+
+      const pageResults = [];
+      
+      for (let i = 0; i < actualPages; i++) {
+        const page = pages[i];
+        
+        // Skip pages that failed to convert
+        if (!page.imageData) {
+          console.warn(`⚠️  Skipping page ${page.pageNumber} - conversion failed`);
+          pageResults.push({
+            pageNumber: page.pageNumber,
+            response: `Could not convert page ${page.pageNumber} to image.`,
+            success: false,
+            error: page.error || 'Conversion failed'
+          });
+          continue;
+        }
+        
+        // Process page with retry
+        let result;
+        try {
+          // For first page: process normally
+          // For subsequent pages: include previous page for context to handle split questions
+          if (i === 0) {
+            // First page - no context needed
+            result = await retryWithBackoff(
+              () => processSinglePage(
+                page.imageData,
+                studentClass,
+                page.pageNumber,
+                actualPages,
+                'pdf',
+                page.mimeType
+              ),
+              2, // maxRetries
+              3000 // initialDelay
+            );
+          } else {
+            // Subsequent pages - include previous page for context
+            const previousPage = pages[i - 1];
+            if (previousPage.imageData) {
+              result = await retryWithBackoff(
+                () => processSinglePageWithContext(
+                  page.imageData,
+                  previousPage.imageData,
+                  studentClass,
+                  page.pageNumber,
+                  actualPages,
+                  'pdf',
+                  page.mimeType
+                ),
+                2, // maxRetries
+                3000 // initialDelay
+              );
+            } else {
+              // Previous page failed, process current page without context
+              result = await retryWithBackoff(
+                () => processSinglePage(
+                  page.imageData,
+                  studentClass,
+                  page.pageNumber,
+                  actualPages,
+                  'pdf',
+                  page.mimeType
+                ),
+                2, // maxRetries
+                3000 // initialDelay
+              );
+            }
+          }
+        } catch (error) {
+          console.error(`❌ All attempts failed for page ${page.pageNumber}:`, error.message);
+          result = {
+            pageNumber: page.pageNumber,
+            response: `Unable to process this page.\n\n**Error:** ${error.message}\n\n**Possible reasons:**\n- Content may have triggered safety filters\n- Image quality issues\n- API rate limiting\n\n**Suggestion:** Try uploading this page separately or contact support.`,
+            success: false,
+            error: error.message
+          };
+        }
+        
+        pageResults.push(result);
+        
+        // Delay between pages to respect rate limits
+        if (i < actualPages - 1) {
+          await delay(2000); // 2 second delay between pages
+        }
+      }
+
+      // Combine all page responses
+      const successfulPages = pageResults.filter(r => r.success).length;
+      const failedPages = pageResults.filter(r => !r.success).length;
+      
+      const greetingMessage = actualPages > 1 
+        ? `Hello there! It's great that you're working on these problems. I'll help you understand each one step-by-step. We'll go through all ${actualPages} pages together. Don't worry if some questions seem difficult - I'll explain the concepts clearly!\n\n`
+        : `Hello there! It's great that you're working on these problems. I'll help you understand each one step-by-step. Don't worry if any questions seem difficult - I'll explain the concepts clearly!\n\n`;
+
+      const combinedResponse = pageResults
+        .map((result, index) => {
+          const separator = '='.repeat(80);
+          const pageContent = result.response;
+          
+          // Add greeting only before first page
+          const greeting = index === 0 ? greetingMessage : '';
+          
+          if (result.success) {
+            return `${greeting}${separator}\n📄 PAGE ${result.pageNumber}\n${separator}\n\n${pageContent}`;
+          } else {
+            return `${greeting}${separator}\n📄 PAGE ${result.pageNumber} - PROCESSING ERROR\n${separator}\n\n${pageContent}`;
+          }
+        })
+        .join('\n\n');
+
+      console.log(`✅ Processed ${successfulPages}/${actualPages} pages successfully`);
+      if (failedPages > 0) {
+        console.warn(`⚠️  ${failedPages} page(s) failed to process`);
+      }
+
+      const headerNote = pages.length > MAX_PAGES 
+        ? `⚠️ NOTE: PDF has ${pages.length} pages. Processed first ${MAX_PAGES} pages only.\n\n`
+        : failedPages > 0
+        ? `⚠️ NOTE: ${failedPages} page(s) could not be processed. See individual page errors below.\n\n`
+        : '';
+
+      return {
+        success: successfulPages > 0, // Success if at least one page processed
+        response: `📚 HOMEWORK HELP - ${actualPages} PAGE(S)\n\n${headerNote}${combinedResponse}`,
+        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
+        pages_processed: actualPages,
+        successful_pages: successfulPages,
+        failed_pages: failedPages,
+        total_pages_in_pdf: pages.length > MAX_PAGES ? pages.length : actualPages,
+      };
+
+    } else {
+      // Images: process as single page
+      console.log(`🖼️ Image detected - processing as single page...`);
+      
+      const base64Data = fileBuffer.toString("base64");
+      
+      let result;
+      try {
+        result = await retryWithBackoff(
+          () => processSinglePage(
+            base64Data,
+            studentClass,
+            1,
+            1,
+            'image',
+            'image/jpeg'
+          ),
+          2, // maxRetries
+          3000 // initialDelay
+        );
+      } catch (error) {
+        result = {
+          pageNumber: 1,
+          response: `Unable to process this image.\n\n**Error:** ${error.message}\n\n**Possible reasons:**\n- Content may have triggered safety filters\n- Image quality issues\n- API rate limiting\n\n**Suggestion:** Try a different image or contact support.`,
+          success: false,
+          error: error.message
+        };
+      }
+
+      const greetingMessage = `Hello there! It's great that you're working on these problems. I'll help you understand each one step-by-step. Don't worry if any questions seem difficult - I'll explain the concepts clearly!\n\n`;
+
+      return {
+        success: result.success,
+        response: result.success 
+          ? `${greetingMessage}${result.response}`
+          : result.response,
+        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
+        pages_processed: 1,
+        successful_pages: result.success ? 1 : 0,
+        failed_pages: result.success ? 0 : 1,
+      };
+    }
+
+  } catch (error) {
+    console.error("❌ Homework processing failed:", error.message);
+
+    if (error.response?.status === 429) {
+      throw new Error("Rate limit exceeded. Please try again in a few moments.");
+    }
+
+    if (error.response?.status === 403) {
+      throw new Error("API access forbidden. Please check your API key.");
+    }
+
+    if (error.response?.status === 400) {
+      throw new Error("Invalid request. Please check the file format and content.");
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Process homework with retry logic
+ */
+async function processHomeworkWithRetry(
+  fileBuffer,
+  fileType,
+  studentClass,
+  totalPages
+) {
+  return processHomeworkWithGemini(fileBuffer, fileType, studentClass, totalPages);
+}
+
+module.exports = {
+  processHomeworkWithGemini,
+  processHomeworkWithRetry,
+};

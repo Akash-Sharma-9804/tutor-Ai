@@ -1,0 +1,98 @@
+import { FaChalkboardTeacher, FaSchool, FaUsers, FaEye, FaEdit, FaTrash } from "react-icons/fa";
+
+const ClassesTable = ({ classes, onView, onEdit, onDelete }) => {
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+        <h3 className="text-lg font-bold text-gray-800 dark:text-white">All Classes</h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800">
+              <th className="p-4 text-left font-bold text-gray-700 dark:text-gray-300">Class Name</th>
+              <th className="p-4 text-left font-bold text-gray-700 dark:text-gray-300">School</th>
+              <th className="p-4 text-left font-bold text-gray-700 dark:text-gray-300">Students</th>
+              <th className="p-4 text-left font-bold text-gray-700 dark:text-gray-300">Created</th>
+              <th className="p-4 text-left font-bold text-gray-700 dark:text-gray-300">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {classes.map((classItem) => (
+              <tr
+                key={classItem.id}
+                className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              >
+                <td className="p-4">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg mr-3">
+                      <FaChalkboardTeacher className="text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <span className="font-bold text-gray-800 dark:text-white">
+                      {classItem.class_name}
+                    </span>
+                  </div>
+                </td>
+                <td className="p-4">
+                  <div className="flex items-center">
+                    <FaSchool className="text-gray-400 dark:text-gray-500 mr-2 flex-shrink-0" />
+                    <span className="text-gray-700 dark:text-gray-300 truncate max-w-[150px]">
+                      {classItem.school_name || "Not assigned"}
+                    </span>
+                  </div>
+                </td>
+                <td className="p-4">
+                  <span className="inline-flex items-center px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm font-medium">
+                    <FaUsers className="mr-1" />
+                    {classItem.student_count || 0}
+                  </span>
+                </td>
+                <td className="p-4">
+                  <span className="text-gray-700 dark:text-gray-300">
+                    {formatDate(classItem.created_at)}
+                  </span>
+                </td>
+                <td className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => onView(classItem)}
+                      className="p-2 text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                      title="View Details"
+                    >
+                      <FaEye />
+                    </button>
+                    <button
+                      onClick={() => onEdit(classItem)}
+                      className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      onClick={() => onDelete(classItem)}
+                      className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      title="Delete"
+                    >
+                      <FaTrash />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+export default ClassesTable;
