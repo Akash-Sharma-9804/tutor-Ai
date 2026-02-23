@@ -446,8 +446,14 @@ QUALITY REQUIREMENTS:
           generationConfig: {
   temperature: 0.2,
   topP: 0.9,
-  maxOutputTokens: 8192
+  maxOutputTokens: 16384
 },
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+          ],
 
 
         },
@@ -538,6 +544,21 @@ cleanedOutput = cleanedOutput.replace(
   throw new Error("MODEL_RETURNED_INCOMPLETE_JSON");
 }
 
+// 🔥 Pre-sanitize: fix unescaped control characters inside JSON string values
+// This handles raw newlines, tabs, and backslashes that break JSON.parse
+function sanitizeJsonString(str) {
+  // Fix unescaped newlines/tabs inside string values only
+  // Replace literal newlines inside quoted strings with \n
+  return str.replace(/"((?:[^"\\]|\\.)*)"/gs, (match, inner) => {
+    const fixed = inner
+      .replace(/\r\n/g, '\\n')
+      .replace(/\r/g, '\\n')
+      .replace(/\n/g, '\\n')
+      .replace(/\t/g, '\\t');
+    return `"${fixed}"`;
+  });
+}
+
 let chunkData;
 try {
   chunkData = JSON.parse(cleanedOutput);
@@ -546,11 +567,18 @@ try {
 
   let fixed = cleanedOutput;
 
-  // 🛠️ Auto-fix common JSON issues
-  fixed = fixed.replace(/,\s*}/g, "}"); // trailing commas
-  fixed = fixed.replace(/,\s*]/g, "]"); // trailing commas in arrays
+  // 🛠️ Step 1: Sanitize unescaped newlines inside string values
+  try {
+    fixed = sanitizeJsonString(fixed);
+  } catch(sanitizeErr) {
+    // ignore sanitize error, continue with original
+  }
 
-  // Close missing brackets if needed
+  // 🛠️ Step 2: Auto-fix common JSON structural issues
+  fixed = fixed.replace(/,\s*}/g, "}"); // trailing commas before }
+  fixed = fixed.replace(/,\s*]/g, "]"); // trailing commas before ]
+
+  // 🛠️ Step 3: Close missing brackets if needed
   const openBraces = (fixed.match(/{/g) || []).length;
   const closeBraces = (fixed.match(/}/g) || []).length;
   const openBrackets = (fixed.match(/\[/g) || []).length;
@@ -746,7 +774,11 @@ async function convertPDFPagesSequential(pdfBuffer, bookMetadata) {
   const { createCanvas } = require("canvas");
 
   const pdfData = new Uint8Array(pdfBuffer);
-  const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+  const pdf = await pdfjsLib.getDocument({ 
+    data: pdfData,
+    useSystemFonts: true,
+    disableFontFace: false,
+  }).promise;
 
   const uploadedPages = [];
   const BATCH_SIZE = 5; // Process 5 pages at a time in parallel
@@ -909,7 +941,7 @@ function detectDiagrams(lines, pageWidth, pageHeight) {
           const webpData = canvas.toDataURL("image/webp", 0.7);
           const imgBuffer = Buffer.from(webpData.split(",")[1], "base64");
 
-        const remoteDir = `/books/${bookMetadata.schoolName}/Class${bookMetadata.className}/${bookMetadata.subjectNameForPath}/ch${bookMetadata.chapterNum}/pages`;
+        const remoteDir = `/books/${bookMetadata.schoolName}/${bookMetadata.className}/${bookMetadata.subjectNameForPath}/ch${bookMetadata.chapterNum}/pages`;
           // Retry logic for FTP upload
           let uploadSuccess = false;
           let retryCount = 0;
@@ -1087,7 +1119,7 @@ const jsonBuffer = Buffer.from(JSON.stringify({ segments }, null, 2));
 const ftpSegRes = await uploadFileToFTP(
   jsonBuffer,
   "segments.json",
-  `/books/${bookMetadata.schoolName}/Class${bookMetadata.className}/${bookMetadata.subjectNameForPath}/ch${bookMetadata.chapterNum}`
+  `/books/${bookMetadata.schoolName}/${bookMetadata.className}/${bookMetadata.subjectNameForPath}/ch${bookMetadata.chapterNum}`
 );
 
 imageResult.segmentsJsonPath = ftpSegRes.url;
@@ -1145,17 +1177,17 @@ const chunkSections = await processPageChunk(
 
   // Retry for both RETRY_CHUNK and INVALID_JSON_FROM_MODEL errors
   if (chunkError.message === "RETRY_CHUNK" || chunkError.message === "INVALID_JSON_FROM_MODEL") {
-    console.log("🔁 Retrying chunk with safer mode...");
+    console.log("🔁 Retrying chunk with same prompt (attempt 2)...");
 
     try {
+      // First retry: use same full prompt (retryMode=false) to preserve segment count
       const retrySections = await processPageChunk(
-  pageData.pageText,
-  chunk.startPage,
-  bookMetadata,
-  i + 1,
-  true // retry mode
-);
-
+        pageData.pageText,
+        chunk.startPage,
+        bookMetadata,
+        i + 1,
+        false // keep full prompt on first retry
+      );
 
       retrySections.forEach(section => allSections.push(section));
       console.log(`✅ Retry succeeded for chunk ${i + 1}`);
@@ -1167,23 +1199,43 @@ const chunkSections = await processPageChunk(
       }
       continue;
     } catch (retryError) {
-      console.error(`❌ Retry also failed for chunk ${i + 1}:`, retryError.message);
-      console.log("⚠️ Creating fallback content for this page...");
-      
-      // Create fallback content
-      const fallbackSection = {
-        heading: `Content from Page ${chunk.startPage}`,
-        page_range: [chunk.startPage, chunk.startPage],
-        content: [
-          {
-            type: "text",
-            text: pageData.pageText?.substring(0, 500).trim() || "Page content available",
-            explanation: "This page requires manual review. Automated processing encountered difficulties."
-          }
-        ]
-      };
-      allSections.push(fallbackSection);
-      continue;
+      console.error(`❌ Retry (attempt 2) failed for chunk ${i + 1}:`, retryError.message);
+      console.log("🔁 Retrying chunk with safer mode (attempt 3)...");
+
+      // Second retry: now use safer/simplified retryMode=true as last resort
+      try {
+        const retrySections2 = await processPageChunk(
+          pageData.pageText,
+          chunk.startPage,
+          bookMetadata,
+          i + 1,
+          true // safer mode only on last retry
+        );
+
+        retrySections2.forEach(section => allSections.push(section));
+        console.log(`✅ Safe-mode retry succeeded for chunk ${i + 1}`);
+
+        if (i < chunks.length - 1) {
+          console.log("⏳ Waiting 2 seconds before next chunk...");
+          await delay(2000);
+        }
+        continue;
+      } catch (retryError2) {
+       // Create fallback content
+        const fallbackSection = {
+          heading: `Content from Page ${chunk.startPage}`,
+          page_range: [chunk.startPage, chunk.startPage],
+          content: [
+            {
+              type: "text",
+              text: pageData.pageText?.substring(0, 500).trim() || "Page content available",
+              explanation: "This page requires manual review. Automated processing encountered difficulties."
+            }
+          ]
+        };
+        allSections.push(fallbackSection);
+        continue;
+      }
     }
   }
 
@@ -1292,7 +1344,7 @@ allSections.forEach(section => {
    // Get school and subject names for folder structure
    // Upload to FTP
     const contentJsonBuffer = Buffer.from(JSON.stringify(chapterData, null, 2));
-    const ftpPath = `/books/${bookMetadata.schoolName}/Class${bookMetadata.className}/${bookMetadata.subjectNameForPath}/ch${bookMetadata.chapterNum}`;
+    const ftpPath = `/books/${bookMetadata.schoolName}/${bookMetadata.className}/${bookMetadata.subjectNameForPath}/ch${bookMetadata.chapterNum}`;
 
     console.log(`💾 Uploading chapter content JSON to FTP at ${ftpPath}...`);
     const ftpResult = await uploadFileToFTP(

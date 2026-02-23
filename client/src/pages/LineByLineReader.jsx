@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 
 import { useParams, useNavigate } from 'react-router-dom';
@@ -69,6 +68,7 @@ const LineByLineReader = () => {
   const [explanationWords, setExplanationWords] = useState({});
 const [isFullscreen, setIsFullscreen] = useState(false);
 const fullscreenAttempted = useRef(false);
+const [showExitDialog, setShowExitDialog] = useState(false);
 
 
 const enterFullscreen = async () => {
@@ -109,10 +109,20 @@ const handleFullscreenChange = () => {
 
   // Navigate back when fullscreen is exited
   if (!isCurrentlyFullscreen && !loading && fullscreenAttempted.current) {
-    if (chapter?.book_id) {
-      navigate(`/subjects`);
+    // Check if device is mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                     (window.innerWidth <= 1024);
+    
+    if (isMobile) {
+      // On mobile, show exit confirmation dialog
+      setShowExitDialog(true);
     } else {
-      navigate(-1);
+      // On desktop, navigate back to table of contents
+      if (chapter?.book_id) {
+        navigate(`/subjects`);
+      } else {
+        navigate(-1);
+      }
     }
   }
 };
@@ -922,6 +932,21 @@ useEffect(() => {
     }
   };
 
+
+  const handleExitClass = () => {
+    setShowExitDialog(false);
+    if (chapter?.book_id) {
+      navigate(`/subjects`);
+    } else {
+      navigate(-1);
+    }
+  };
+
+  const handleReturnToFullscreen = async () => {
+    setShowExitDialog(false);
+    await enterFullscreen();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -1496,19 +1521,31 @@ useEffect(() => {
                                 </div>
                                 <div className="prose prose-slate max-w-none">
                                   {currentSegment.solution.split('\n').map((line, idx) => {
-                                    // Check if it's a numbered step or bullet point
-                                    if (line.trim().match(/^\d+\./)) {
+                                    const renderInline = (text) => {
+                                      const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+                                      return parts.map((part, i) => {
+                                        if (part.startsWith('**') && part.endsWith('**'))
+                                          return <strong key={i}>{part.slice(2, -2)}</strong>;
+                                        if (part.startsWith('*') && part.endsWith('*'))
+                                          return <em key={i}>{part.slice(1, -1)}</em>;
+                                        return part;
+                                      });
+                                    };
+                                    // Bullet point: starts with *   (asterisk + spaces, not inline)
+                                    if (line.trim().match(/^\*\s+\S/) || line.trim().match(/^\*\s*\*\*/) ) {
+                                      const content = line.trim().replace(/^\*\s*/, '');
                                       return (
-                                        <div key={idx} className="mb-3 pl-4">
-                                          <p className="text-base text-slate-700 chalk-text font-semibold">{line}</p>
+                                        <div key={idx} className="mb-2 pl-8 flex gap-2">
+                                          <span className="text-slate-500 mt-1">•</span>
+                                          <p className="text-sm text-slate-600 chalk-text">{renderInline(content)}</p>
                                         </div>
                                       );
                                     }
-                                    // Check if it's a sub-point (starts with *)
-                                    if (line.trim().startsWith('*')) {
+                                    // Numbered step
+                                    if (line.trim().match(/^\d+\./)) {
                                       return (
-                                        <div key={idx} className="mb-2 pl-8">
-                                          <p className="text-sm text-slate-600 chalk-text">{line.replace('*', '•')}</p>
+                                        <div key={idx} className="mb-3 pl-4">
+                                          <p className="text-base text-slate-700 chalk-text font-semibold">{renderInline(line)}</p>
                                         </div>
                                       );
                                     }
@@ -1516,7 +1553,7 @@ useEffect(() => {
                                     if (line.trim()) {
                                       return (
                                         <p key={idx} className="text-base text-slate-700 chalk-text mb-2 leading-relaxed">
-                                          {line}
+                                          {renderInline(line)}
                                         </p>
                                       );
                                     }
@@ -2077,7 +2114,7 @@ useEffect(() => {
               <button
                 onClick={goToPreviousSegment}
                 disabled={currentPageIndex === 0 && currentSegmentIndex === 0}
-                className="flex items-center justify-center gap-1.5 px-4 md:px-6 py-2.5 md:py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md min-w-[80px] md:min-w-[100px]"
+                className="flex cursor-pointer items-center justify-center gap-1.5 px-4 md:px-6 py-2.5 md:py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md min-w-[80px] md:min-w-[100px]"
               >
                 <ChevronLeft className="h-5 w-5" />
                 <span className="text-sm md:text-base">Prev</span>
@@ -2105,7 +2142,7 @@ useEffect(() => {
                   currentPageIndex === (chapterData?.sections?.length || 0) - 1 &&
                   currentSegmentIndex === (currentSection?.content?.length || 0) - 1
                 }
-                className="flex items-center justify-center gap-1.5 px-4 md:px-6 py-2.5 md:py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg min-w-[80px] md:min-w-[100px]"
+                className="flex cursor-pointer items-center justify-center gap-1.5 px-4 md:px-6 py-2.5 md:py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg min-w-[80px] md:min-w-[100px]"
               >
                 <span className="text-sm md:text-base">Next</span>
                 <ChevronRight className="h-5 w-5" />
@@ -2139,6 +2176,42 @@ useEffect(() => {
           </div>
         </div>
       </div>
+
+      {/* Mobile Exit Dialog with Black Screen */}
+      {showExitDialog && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black">
+          <div className="bg-gray-900 border-2 border-red-500 rounded-2xl p-8 max-w-md mx-4 shadow-2xl">
+            <div className="text-center">
+              <div className="mb-6">
+                <div className="mx-auto w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
+                  <X className="h-8 w-8 text-red-500" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  Exit Class?
+                </h2>
+                <p className="text-gray-400">
+                  If you exit now, you'll leave the current learning session and return to the table of contents.
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={handleReturnToFullscreen}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg"
+                >
+                  Continue Learning
+                </button>
+                <button
+                  onClick={handleExitClass}
+                  className="w-full py-4 px-6 bg-gray-800 text-gray-300 rounded-xl font-semibold hover:bg-gray-700 transition-all border border-gray-700"
+                >
+                  Exit to Table of Contents
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         /* Mobile specific styles */

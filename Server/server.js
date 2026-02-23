@@ -1,60 +1,4 @@
-// require("dotenv").config();
-// const express = require("express");
-// const cors = require("cors");
-// const http = require('http');
-// const { initializeWebSocket } = require('./config/websocket_setup');
-
-// const authRoutes = require("./routes/authRoutes");
-// const dataRoutes = require("./routes/dataRoutes");
-// const studentRoutes = require("./routes/studentRoutes");
-// const subjectRoutes = require("./routes/subjectRoutes");
-// const bookRoutes = require("./routes/bookReader");
-// const adminAuthRoutes = require("./routes/Admin/adminAuthRoutes");
-// const adminRoutes = require("./routes/Admin/adminRoutes");
-// const scanRoutes = require('./routes/ScanRoutes');
-// const chatRoutes = require('./routes/ChatRoutes');
-// const app = express();
-
-// // Create HTTP server
-// const server = http.createServer(app);
-// // Initialize WebSocket AFTER creating server
-// initializeWebSocket(server, app);
-
-// // Middlewares
-// app.use(cors({
-//   origin: [
-//     "https://aitutor.drillingnwk.com",
-//     "https://tutor.drillingnwk.com",
-//     "http://localhost:4000",
-//     "http://localhost:5173"
-//   ],
-//   credentials: true,
-//   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-// }));
-// app.use(express.json());
-
-// // Routes
-// app.use("/api/admin/auth", adminAuthRoutes);
-// app.use("/api/admin", adminRoutes);
-// app.use("/api/auth", authRoutes);
-// app.use("/api/data", dataRoutes);
-// app.use("/api/student", studentRoutes);
-// app.use("/api/subjects", subjectRoutes);
-// app.use("/api/books", bookRoutes);
-// app.use('/api/scans', scanRoutes);
-// app.use('/api/chat', chatRoutes);
-
-// // Health check
-// app.get("/", (req, res) => {
-//   res.send("AI Tutor Backend is running 🚀");
-// });
-
-// // Start server
-// const PORT = process.env.PORT || 4000;
-// app.listen(PORT, () => {
-//   console.log(`Server running on port ${PORT}`);
-// });
-
+ 
 
 require("dotenv").config();
 const express = require("express");
@@ -71,6 +15,7 @@ const adminAuthRoutes = require("./routes/Admin/adminAuthRoutes");
 const adminRoutes = require("./routes/Admin/adminRoutes");
 const scanRoutes = require('./routes/ScanRoutes');
 const chatRoutes = require('./routes/ChatRoutes');
+const schoolRoutes = require('./routes/schoolRoutes');
 const app = express();
 
 // Create HTTP server
@@ -102,7 +47,7 @@ app.use("/api/subjects", subjectRoutes);
 app.use("/api/books", bookRoutes);
 app.use('/api/scans', scanRoutes);
 app.use('/api/chat', chatRoutes);
-
+app.use("/api/school", schoolRoutes);
 // Health check
 app.get("/", (req, res) => {
   res.send("AI Tutor Backend is running 🚀");

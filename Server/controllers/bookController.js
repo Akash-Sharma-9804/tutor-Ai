@@ -16,7 +16,25 @@ exports.getAllBooks = async (req, res) => {
 exports.getBooksBySubject = async (req, res) => {
   try {
     const { subjectId } = req.params;
-     
+    const studentId = req.studentId;
+
+    // Check if student is class 11/12; if yes, verify they selected this subject
+    const [[student]] = await db.query(
+      `SELECT c.class_name FROM students s JOIN classes c ON s.class_id = c.id WHERE s.id = ?`,
+      [studentId]
+    );
+    const isUpperSecondary = student && /^(11|12)(\s*[\(\s]*(Science|Arts|Commerce)[\)]*)?$/i.test(student.class_name?.trim());
+
+    if (isUpperSecondary) {
+      const [access] = await db.query(
+        `SELECT 1 FROM student_subjects WHERE student_id = ? AND subject_id = ?`,
+        [studentId, subjectId]
+      );
+      if (access.length === 0) {
+        return res.status(403).json({ message: "You have not selected this subject" });
+      }
+    }
+
     const [books] = await db.query(
       `SELECT 
         b.id,

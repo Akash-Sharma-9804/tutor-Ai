@@ -25,8 +25,10 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
 export default function Signup() {
+ 
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -40,10 +42,18 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [schools, setSchools] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hoverStates, setHoverStates] = useState({});
   const [currentFeature, setCurrentFeature] = useState(0);
   const [formSubmitted, setFormSubmitted] = useState(false);
+
+  // Subject selection for class 11 & 12
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState(null);
+  const UPPER_SECONDARY_CLASSES = /^(11|12)(\s*[\(\s]*(Science|Arts|Commerce)[\)]*)?$/i;
+  const isUpperSecondary = UPPER_SECONDARY_CLASSES.test(form.className?.trim());
 
   // Floating animation elements
   const [floatingElements] = useState([
@@ -126,16 +136,29 @@ export default function Signup() {
 
   useEffect(() => {
     axios
-      .get(`${import.meta.env.VITE_BACKEND_URL}/api/data/schools`)
+      .get(`${API_BASE_URL}/api/data/schools`)
       .then((res) => setSchools(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
-    // Calculate password strength
     const strength = calculatePasswordStrength(form.password);
     setPasswordStrength(strength);
   }, [form.password]);
+
+  // Auto-fetch subjects when a class 11/12 is selected
+  useEffect(() => {
+    if (selectedClassId && isUpperSecondary) {
+      setSelectedSubjectIds([]); // reset selection on class change
+      axios
+        .get(`${API_BASE_URL}/api/subjects/class/${selectedClassId}`)
+        .then((res) => setAvailableSubjects(res.data))
+        .catch(() => setAvailableSubjects([]));
+    } else {
+      setAvailableSubjects([]);
+      setSelectedSubjectIds([]);
+    }
+  }, [selectedClassId]);
 
   const calculatePasswordStrength = (password) => {
     let strength = 0;
@@ -160,32 +183,49 @@ export default function Signup() {
     return "Strong";
   };
 
+  
+
   const handleSignup = async (e) => {
     e.preventDefault();
+
+    // Block signup if class 11/12 and no subjects selected
+    if (isUpperSecondary && selectedSubjectIds.length === 0) {
+      alert("Please select at least one subject before signing up.");
+      return;
+    }
+
     setIsLoading(true);
-
     try {
-      // Add success animation
+      // 1. Signup — creates account and returns token
+      const res = await axios.post(`${API_BASE_URL}/api/auth/signup`, form);
+      const token = res.data.token;
+
+      // 2. If class 11/12, save subjects immediately using the token
+      if (isUpperSecondary && selectedSubjectIds.length > 0) {
+        await axios.post(
+          `${API_BASE_URL}/api/subjects/student/select`,
+          { subjectIds: selectedSubjectIds },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+
+      // 3. Done — show success and redirect
       setFormSubmitted(true);
-
-      await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/signup`,
-        form
-      );
-
-      // Success animation before redirect
       await new Promise((resolve) => setTimeout(resolve, 1500));
       window.location.href = "/login";
     } catch {
-      // Error animation
       formRef.current.classList.add("animate-shake");
-      setTimeout(() => {
-        formRef.current.classList.remove("animate-shake");
-      }, 500);
+      setTimeout(() => formRef.current.classList.remove("animate-shake"), 500);
       alert("Signup failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const toggleSubject = (id) => {
+    setSelectedSubjectIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
   };
 
   const handleHover = (element, isHovering) => {
@@ -439,7 +479,7 @@ export default function Signup() {
             </div>
 
             {/* Compact Form */}
-            <form className="space-y-5" onSubmit={handleSignup}>
+            <form className="space-y-5" onSubmit={handleSignup}  >
               {/* Personal Information */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-stagger-children">
                 <div className="animate-slide-in-right delay-100">
@@ -546,9 +586,17 @@ export default function Signup() {
                     </div>
                     <select
                       value={form.schoolName}
-                      onChange={(e) =>
-                        setForm({ ...form, schoolName: e.target.value })
-                      }
+                      onChange={(e) => {
+                        const selectedSchool = schools.find(s => s.name === e.target.value);
+                        setForm({ ...form, schoolName: e.target.value, className: "" });
+                        setClasses([]);
+                        if (selectedSchool) {
+                          axios
+                            .get(`${API_BASE_URL}/api/school/${selectedSchool.id}`)
+                            .then((res) => setClasses(Array.isArray(res.data) ? res.data : res.data.data || []))
+                            .catch((err) => console.error(err));
+                        }
+                      }}
                       className="w-full pl-10 pr-3 py-2.5 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none text-sm appearance-none bg-white transition-all duration-300 hover:border-indigo-300"
                       required
                     >
@@ -570,26 +618,72 @@ export default function Signup() {
                   </label>
                   <div className="relative group">
                     <select
-                      value={form.className}
-                      onChange={(e) =>
-                        setForm({ ...form, className: e.target.value })
-                      }
-                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none text-sm appearance-none bg-white transition-all duration-300 hover:border-indigo-300"
+                      value={selectedClassId || ""}
+                      onChange={(e) => {
+                        const selectedCls = classes.find(c => String(c.id) === e.target.value);
+                        setSelectedClassId(e.target.value);
+                        setForm({ ...form, className: selectedCls ? selectedCls.class_name : "" });
+                      }}
+                      disabled={!form.schoolName}
+                      className={`w-full px-3 py-2.5 border-2 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none text-sm appearance-none transition-all duration-300 ${
+                        !form.schoolName
+                          ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                          : "bg-white border-gray-200 hover:border-indigo-300"
+                      }`}
                       required
                     >
-                      <option value="">Select class</option>
-                      {[4, 5, 6, 7, 8, 9, 10, 11, 12].map((grade) => (
-                        <option key={grade} value={grade}>
-                          Class {grade}
+                      <option value="">
+                        {form.schoolName ? "Select class" : "Select a school first"}
+                      </option>
+                      {classes.map((cls) => (
+                        <option key={cls.id} value={cls.id}>
+                          {cls.class_name}
                         </option>
                       ))}
-                      <option value="college">College/University</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                       <ChevronRight className="h-4 w-4 text-gray-400 rotate-90 group-focus-within:text-indigo-500 transition-colors" />
                     </div>
                   </div>
                 </div>
+                {/* Subject Selection — shown inline when class 11/12 selected */}
+                {isUpperSecondary && availableSubjects.length > 0 && (
+                  <div className="col-span-full animate-fade-in-up">
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <BookOpen className="w-3 h-3" />
+                      Select Your Subjects *
+                      <span className="text-xs text-red-500 font-normal">(required)</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {availableSubjects.map((subject) => {
+                        const isSelected = selectedSubjectIds.includes(subject.id);
+                        return (
+                          <button
+                            key={subject.id}
+                            type="button"
+                            onClick={() => toggleSubject(subject.id)}
+                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200 ${
+                              isSelected
+                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                : "border-gray-200 bg-white text-gray-600 hover:border-indigo-300"
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                              isSelected ? "border-indigo-500 bg-indigo-500" : "border-gray-300"
+                            }`}>
+                              {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
+                            </div>
+                            <span className="text-xs font-medium">{subject.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selectedSubjectIds.length === 0 && (
+                      <p className="text-xs text-red-400 mt-1">Please select at least one subject to continue.</p>
+                    )}
+                  </div>
+                )}
+
                 <div className="animate-slide-in-right delay-600">
                   <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <Mail className="w-3 h-3" />
@@ -729,6 +823,8 @@ export default function Signup() {
                 )}
               </button>
             </form>
+
+             
 
             {/* Divider */}
             <div className="my-6 flex items-center animate-fade-in delay-900">

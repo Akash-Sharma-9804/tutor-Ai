@@ -599,6 +599,21 @@ exports.uploadAndProcess = async (req, res) => {
 
     // Create book record first
     console.log("💾 Creating book record...");
+
+    // 🛡️ Prevent duplicate book creation (e.g. from double-submit)
+    const [recentDuplicate] = await db.query(
+      `SELECT id FROM books 
+       WHERE subject_id = ? AND title = ? AND created_at > NOW() - INTERVAL 30 SECOND`,
+      [subject_id, title]
+    );
+    if (recentDuplicate.length > 0) {
+      console.log(`⚠️ Duplicate book detected (ID: ${recentDuplicate[0].id}), skipping create.`);
+      return res.status(409).json({
+        success: false,
+        message: "A book with this title is already being processed. Please wait."
+      });
+    }
+
     const [insertResult] = await db.query(
       `INSERT INTO books (subject_id, title, author, board, class_num, status, chapters_count) 
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -693,16 +708,29 @@ if (existingChapter.length > 0) {
 
         // Process this chapter
         console.log(`🚀 Processing chapter ${chapterMeta.chapter_number} with book processing service...`);
-        const processRes = await processBookFromPDF(
+        
+        // 🔥 Run processing in background - don't await, respond to client immediately
+        processBookFromPDF(
           ftpRes.url,
           bookId,
           chapterMetadata,
           db
-        );
+        ).then(processRes => {
+          console.log(`✅ Chapter ${chapterMeta.chapter_number} background processing complete: ${processRes?.pages_processed} pages`);
+          // Update book status to active when done
+          db.query(
+            `UPDATE books SET status = 'active' WHERE id = ?`,
+            [bookId]
+          ).catch(err => console.error('Failed to update book status:', err));
+        }).catch(err => {
+          console.error(`❌ Background processing failed for chapter ${chapterMeta.chapter_number}:`, err.message);
+          db.query(
+            `UPDATE books SET status = 'error' WHERE id = ?`,
+            [bookId]
+          ).catch(() => {});
+        });
 
-        totalPages += processRes.total_pages || 0;
         chaptersCreated++;
-        console.log(`✅ Chapter ${chapterMeta.chapter_number} processed: ${processRes.total_pages} pages`);
 
       } catch (error) {
         console.error(`❌ Failed to process chapter ${chapterMeta.chapter_number}:`, error);
@@ -710,25 +738,25 @@ if (existingChapter.length > 0) {
       }
     }
 
-    // Update book status and chapter count
+    // Update book status to processing (background job is running)
     await db.query(
       `UPDATE books SET status = ?, chapters_count = ? WHERE id = ?`,
-      ["active", chaptersCreated, bookId]
+      ["processing", chaptersCreated, bookId]
     );
 
-    console.log(`\n🎉 Book processing complete!`);
+    console.log(`\n📤 Book upload complete, processing in background!`);
     console.log(`   📚 Book ID: ${bookId}`);
-    // console.log(`   📖 Chapters: ${chaptersCreated}/${chaptersData.length}`);
-    console.log(`   📄 Total Pages: ${totalPages}`);
 
+    // ✅ Respond immediately - processing continues in background
     res.status(201).json({
       success: true,
-      message: "Book uploaded and processed successfully",
+      message: "Book uploaded successfully! Processing content in background.",
       data: {
         book_id: bookId,
         title: title,
         chapters_created: chaptersCreated,
-        total_pages: totalPages
+        total_pages: 0,
+        status: "processing"
       }
     });
 
