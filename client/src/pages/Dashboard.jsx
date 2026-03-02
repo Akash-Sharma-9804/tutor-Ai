@@ -82,9 +82,9 @@ const Dashboard = () => {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="px-0 sm:px-6 lg:px-8 pt-6 space-y-6 text-gray-900 dark:text-white"
+      className="px-0 sm:px-6 lg:px-8 pt-8 space-y-6 text-gray-900 dark:text-white"
     >
-      <TopHeader student={student} />
+      {/* <TopHeader student={student} /> */}
       <HeroBox student={student} />
       <QuickStats subjects={subjects} />
       <CourseSection subjects={subjects} student={student} />

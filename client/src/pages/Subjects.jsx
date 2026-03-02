@@ -38,7 +38,13 @@ const SubjectsPage = () => {
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [showBooksModal, setShowBooksModal] = useState(false);
   const [loadingBooks, setLoadingBooks] = useState(false);
-const navigate = useNavigate();
+  const [isUpperSecondary, setIsUpperSecondary] = useState(false);
+  const [showEditSubjects, setShowEditSubjects] = useState(false);
+  const [allClassSubjects, setAllClassSubjects] = useState([]);
+  const [editSelectedIds, setEditSelectedIds] = useState([]);
+  const [savingSubjects, setSavingSubjects] = useState(false);
+  const [studentClassId, setStudentClassId] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -88,6 +94,27 @@ const navigate = useNavigate();
     };
 
     fetchSubjects();
+  }, []);
+
+  // Fetch student class info to check if 11/12
+  useEffect(() => {
+    const fetchStudentClass = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/student/me`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const className = res.data.className || "";
+        const upper = /^(11|12)(\s*[\(\s]*(Science|Arts|Commerce)[\)]*)?$/i.test(className.trim());
+        setIsUpperSecondary(upper);
+        setStudentClassId(res.data.classId || null);
+      } catch (err) {
+        console.error("Failed to fetch student class", err);
+      }
+    };
+    fetchStudentClass();
   }, []);
 
   useEffect(() => {
@@ -259,6 +286,74 @@ const navigate = useNavigate();
     },
   };
 
+  const openEditSubjects = async () => {
+    const token = localStorage.getItem("token");
+    if (!studentClassId) return;
+    try {
+      // Fetch all subjects for their class
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/subjects/class/${studentClassId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setAllClassSubjects(res.data);
+      // Pre-select currently selected subjects
+      setEditSelectedIds(subjects.map((s) => s.id));
+      setShowEditSubjects(true);
+    } catch (err) {
+      console.error("Failed to load subjects for edit", err);
+    }
+  };
+
+  const toggleEditSubject = (id) => {
+    setEditSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
+  };
+
+  const saveEditedSubjects = async () => {
+    if (editSelectedIds.length === 0) {
+      alert("Please select at least one subject.");
+      return;
+    }
+    setSavingSubjects(true);
+    const token = localStorage.getItem("token");
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/subjects/student/select`,
+        { subjectIds: editSelectedIds },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setShowEditSubjects(false);
+      // Refresh subjects list
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const mappedSubjects = res.data.map((sub, index) => ({
+        id: sub.id,
+        name: sub.name,
+        instructor: "AI Tutor",
+        students: 100 + index * 25,
+        progress: 30 + index * 10,
+        rating: 4.7,
+        color: ["from-blue-500 to-cyan-500","from-purple-500 to-pink-500","from-green-500 to-emerald-500","from-orange-500 to-amber-500","from-rose-500 to-red-500","from-indigo-500 to-violet-500"][index % 6],
+        status: "In Progress",
+        nextLesson: "AI Guided Lesson",
+        totalLessons: 40,
+        completedLessons: Math.floor((30 + index * 10) * 0.4),
+        difficulty: "Intermediate",
+        category: "Science",
+        enrollmentDate: "2024-02-01",
+        upcomingDeadline: "In 3 days",
+      }));
+      setSubjects(mappedSubjects);
+    } catch (err) {
+      alert("Failed to save subjects. Please try again.");
+    } finally {
+      setSavingSubjects(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -277,13 +372,26 @@ const navigate = useNavigate();
               Manage and track your enrolled courses
             </p>
           </div>
-          <motion.div whileTap={{ scale: 0.95 }} className="mt-4 lg:mt-0">
-            <button className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40">
-              <BookOpen className="h-4 w-4" />
-              Browse All Books
-              <Sparkles className="h-4 w-4" />
-            </button>
-          </motion.div>
+          <div className="flex items-center gap-3 mt-4 lg:mt-0">
+            {isUpperSecondary && (
+              <motion.div whileTap={{ scale: 0.95 }}>
+                <button
+                  onClick={openEditSubjects}
+                  className="inline-flex cursor-pointer items-center gap-2 px-4 py-3 rounded-xl bg-white dark:bg-gray-800 border border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400 font-medium hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all shadow-sm"
+                >
+                  <Filter className="h-4 w-4" />
+                  Edit My Subjects
+                </button>
+              </motion.div>
+            )}
+            <motion.div whileTap={{ scale: 0.95 }}>
+              <button className="inline-flex items-center cursor-pointer gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40">
+                <BookOpen className="h-4 w-4" />
+                Browse All Books
+                <Sparkles className="h-4 w-4" />
+              </button>
+            </motion.div>
+          </div>
         </div>
 
         {/* Stats Grid */}
@@ -754,6 +862,86 @@ const navigate = useNavigate();
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Edit Subjects Modal */}
+      <AnimatePresence>
+        {showEditSubjects && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowEditSubjects(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#14141f] rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-white/10 overflow-hidden"
+            >
+              {/* Modal Header */} 
+              <div className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Edit My Subjects</h2>
+                  <p className="text-indigo-100 text-sm mt-1">Update the subjects you study</p>
+                </div>
+                <button
+                  onClick={() => setShowEditSubjects(false)}
+                  className="h-9 w-9 cursor-pointer rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-all"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Subject Checkboxes */}
+              <div className="p-6">
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {allClassSubjects.map((subject) => {
+                    const isSelected = editSelectedIds.includes(subject.id);
+                    return (
+                      <button
+                        key={subject.id}
+                        type="button"
+                        onClick={() => toggleEditSubject(subject.id)}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all duration-200 ${
+                          isSelected
+                            ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                            : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-indigo-300"
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                          isSelected ? "border-indigo-500 bg-indigo-500" : "border-gray-300 dark:border-gray-500"
+                        }`}>
+                          {isSelected && <Star className="w-3 h-3 text-white" />}
+                        </div>
+                        <span className="text-sm font-medium">{subject.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {editSelectedIds.length === 0 && (
+                  <p className="text-xs text-red-400 mb-4 text-center">Select at least one subject.</p>
+                )}
+
+                <button
+                  onClick={saveEditedSubjects}
+                  disabled={savingSubjects || editSelectedIds.length === 0}
+                  className="w-full cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 rounded-xl font-semibold transition-all disabled:opacity-60"
+                >
+                  {savingSubjects ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Saving...
+                    </span>
+                  ) : "Save Subjects"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="  md:-mx-8 -mx-4">
         <Footer />
       </div>

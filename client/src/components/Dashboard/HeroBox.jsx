@@ -24,7 +24,7 @@ const HeroBox = ({student}) => {
         }}
         className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#8a9ceb] via-[#FFFFED] to-[#3EF4A1] dark:from-blue-900/30 dark:via-blue-500/30 dark:to-blue-900/30"
       >
-        <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 sm:p-8 ">
+        <div className="relative  grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 sm:p-8 ">
           {/* Left Content */}
           <div className="space-y-5 flex flex-col justify-center">
             <div className="flex items-center gap-2 flex-wrap">
@@ -37,8 +37,11 @@ const HeroBox = ({student}) => {
             </div>
 
             <div>
+              
               <h1 className="text-3xl sm:text-4xl font-bold leading-tight text-gray-900 dark:text-white mb-2">
-                Welcome to Your <br />
+                Welcome <span className="text-yellow-200">
+                {student?.studentName.split(" ")[0]}! 🎉
+              </span> to Your <br />
                 <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 dark:from-purple-400 dark:via-pink-400 dark:to-blue-400 bg-clip-text text-transparent">
                   Personal Learning Hub
                 </span>
@@ -82,11 +85,11 @@ const HeroBox = ({student}) => {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2">
+            <div className="flex   sm:flex-row items-start sm:items-center gap-3 pt-2">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition text-white font-semibold shadow-lg shadow-purple-500/30"
+                className="inline-flex text-xs sm:text-base items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition text-white font-semibold shadow-lg shadow-purple-500/30"
               >
                 Start Learning Today
                 <ArrowRight className="h-4 w-4" />
@@ -94,7 +97,7 @@ const HeroBox = ({student}) => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white/60 dark:bg-white/10 hover:bg-white/80 dark:hover:bg-white/20 backdrop-blur-sm transition text-gray-900 dark:text-gray-100 font-semibold border border-gray-200 dark:border-gray-800/60"
+                className="inline-flex text-xs sm:text-base  items-center gap-2 px-6 py-3 rounded-xl bg-white/60 dark:bg-white/10 hover:bg-white/80 dark:hover:bg-white/20 backdrop-blur-sm transition text-gray-900 dark:text-gray-100 font-semibold border border-gray-200 dark:border-gray-800/60"
               >
                 <BookOpen className="h-4 w-4" />
                 Browse Subjects

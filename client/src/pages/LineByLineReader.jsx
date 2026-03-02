@@ -1338,78 +1338,78 @@ useEffect(() => {
 
                               {/* 📊 DIAGRAM LAYOUT - Two columns: Image (left) + Description (right) */}
                               {(currentSegment?.type === "diagram" ||
-                                currentSegment?.type === "diagram_concept" ||
-                                currentSegment?.type === "diagram_reference") && (() => {
-                                  // Find the page image from segments based on page or page_number
-                                  const pageNum = currentSegment.page || currentSegment.page_number || currentPdfPage;
-                                  const pageSeg = segments.find(s => s.page === pageNum);
+  currentSegment?.type === "diagram_concept" ||
+  currentSegment?.type === "diagram_reference") && (() => {
+    // ✅ NEW: Use image_url directly from segment (Mistral OCR pipeline)
+    // Falls back to old pageSeg.image_path for backwards compatibility
+    const diagramImageUrl = currentSegment.image_url
+      || ((() => {
+        const pageNum = currentSegment.page || currentSegment.page_number || currentPdfPage;
+        const pageSeg = segments.find(s => s.page === pageNum);
+        return pageSeg?.image_path ? `${import.meta.env.VITE_CDN_URL}${pageSeg.image_path}` : null;
+      })());
 
-                                  if (!pageSeg?.image_path) {
-                                    console.log('No page image found for page:', pageNum);
-                                    return null;
-                                  }
+    return (
+      <div className="mb-6">
+        {/* Two-column layout for diagrams */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+          {/* LEFT: Diagram Image */}
+          <div className="order-1">
+            <div className="bg-white rounded-2xl shadow-lg p-3 border-4 border-purple-400 max-h-[400px] overflow-y-auto custom-scrollbar">
+              {(currentSegment.title || currentSegment.reference) && (
+                <p className="text-center mb-2 text-sm font-semibold text-purple-700 bg-purple-50 py-2 rounded-lg sticky top-0 z-10">
+                  📍 {currentSegment.title || currentSegment.reference}
+                </p>
+              )}
+              {diagramImageUrl ? (
+                <img
+                  src={diagramImageUrl}
+                  alt={currentSegment.title || currentSegment.reference || "Diagram"}
+                  className="w-full rounded-lg shadow-xl object-contain"
+                  onError={(e) => {
+                    console.error('Diagram image failed to load:', diagramImageUrl);
+                    e.target.style.display = 'none';
+                    e.target.nextSibling && (e.target.nextSibling.style.display = 'flex');
+                  }}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-48 text-purple-400 bg-purple-50 rounded-lg border-2 border-dashed border-purple-300">
+                  <span className="text-4xl mb-2">📊</span>
+                  <p className="text-sm text-purple-500 text-center px-4">
+                    {currentSegment.title || "Diagram"}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
 
-                                  return (
-                                    <div className="mb-6">
-                                      {/* Two-column layout for diagrams */}
-                                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-                                        {/* LEFT: Scrollable Image */}
-                                        <div className="order-1">
-                                          <div className="bg-white rounded-2xl shadow-lg p-3 border-4 border-purple-400 max-h-[350px] overflow-y-auto custom-scrollbar">
-                                            {(currentSegment.title || currentSegment.reference) && (
-                                              <p className="text-center mb-2 text-sm font-semibold text-purple-700 bg-purple-50 py-2 rounded-lg sticky top-0 z-10">
-                                                📍 {currentSegment.title || currentSegment.reference}
-                                              </p>
-                                            )}
-                                            <img
-                                              src={`${import.meta.env.VITE_CDN_URL}${pageSeg.image_path}`}
-                                              alt={currentSegment.reference || "Diagram"}
-                                              className="w-full rounded-lg shadow-xl"
-                                              onError={(e) => {
-                                                console.error('Diagram page image failed to load:', pageSeg.image_path);
-                                                e.target.style.display = 'none';
-                                              }}
-                                            />
-                                          </div>
-                                        </div>
-
-                                        {/* RIGHT: Description */}
-                                        <div className="order-2">
-                                          {(currentSegment.description || currentSegment.explanation) && (
-                                            <div className="bg-purple-100 rounded-2xl shadow-lg p-4 sm:p-6 border-4 border-purple-400 max-h-[350px] overflow-y-auto custom-scrollbar" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
-                                              <div className="flex items-center gap-3 mb-4">
-                                                <div className="p-2 bg-purple-500 rounded-lg border-2 border-purple-600 shadow-md">
-                                                  <Lightbulb className="h-6 w-6 text-white" />
-                                                </div>
-                                                <h2 className="text-xl font-bold text-slate-800 chalk-text">💡 Understanding the Diagram</h2>
-                                              </div>
-                                              {currentSegment.description && (
-                                                <p className="text-xs sm:text-sm leading-relaxed text-slate-700 chalk-text mb-4" style={{ wordSpacing: '0.15em' }}>
-                                                  {currentSegment.description}
-                                                </p>
-                                              )}
-
-                                              {/* {!currentSegment.description && currentSegment.explanation && (
-  <p className="text-base sm:text-sm leading-relaxed text-slate-700 chalk-text mb-4" style={{ wordSpacing: '0.15em' }}>
-    {currentSegment.explanation}
-  </p>
-)} */}
-
-                                              {/* Show detailed explanation option for diagrams too */}
-                                              {showExplanation && currentSegment.explanation && (
-                                                <div className="mt-4 pt-4 border-t-2 border-purple-300">
-                                                  <p className="text-xs sm:text-base text-slate-600 italic chalk-text">
-                                                    💭 {currentSegment.explanation}
-                                                  </p>
-                                                </div>
-                                              )}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
+          {/* RIGHT: Explanation */}
+          <div className="order-2">
+            {(currentSegment.description || currentSegment.explanation) && (
+              <div className="bg-purple-100 rounded-2xl shadow-lg p-4 sm:p-6 border-4 border-purple-400 max-h-[400px] overflow-y-auto custom-scrollbar" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-purple-500 rounded-lg border-2 border-purple-600 shadow-md">
+                    <Lightbulb className="h-6 w-6 text-white" />
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-800 chalk-text">💡 Understanding the Diagram</h2>
+                </div>
+                {currentSegment.description && (
+                  <p className="text-xs sm:text-sm leading-relaxed text-slate-700 chalk-text mb-4" style={{ wordSpacing: '0.15em' }}>
+                    {currentSegment.description}
+                  </p>
+                )}
+                {currentSegment.explanation && (
+                  <p className="text-xs sm:text-base leading-relaxed text-slate-700 chalk-text" style={{ wordSpacing: '0.15em' }}>
+                    {currentSegment.explanation}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  })()}
 
                               {/* Show subheading if this segment is a subheading */}
                               {currentSegment?.type === 'subheading' && (
@@ -1485,7 +1485,7 @@ useEffect(() => {
                                       ) : (
                                         currentSegment?.type === 'equation'
                                           ? currentSegment?.equation
-                                          : currentSegment?.text || currentSegment?.problem || currentSegment?.reference || ''
+                                          : currentSegment?.text || currentSegment?.problem || currentSegment?.reference || currentSegment?.title || ''
                                       )}
                                     </p>
                                   )}
@@ -1569,7 +1569,7 @@ useEffect(() => {
 
 
                         {/* Explanation Card - Whiteboard Style */}
-                        {showExplanation && currentSegment?.explanation && currentSegment?.type !== 'diagram' && (
+                        {showExplanation && currentSegment?.explanation && currentSegment?.type !== 'diagram' && currentSegment?.type !== 'diagram_concept' && currentSegment?.type !== 'diagram_reference' && (
                           <div
                             className="bg-yellow-100 rounded-2xl shadow-lg p-2   border-4 border-yellow-400 transform transition-all duration-300 mb-6 animate-chalkWrite"
                             style={{ fontFamily: 'Comic Sans MS, cursive' }}

@@ -16,7 +16,8 @@ exports.getStudentProfile = async (req, res) => {
     s.gender,
     s.created_at,
     sch.name AS schoolName,
-    c.class_name AS className
+    c.class_name AS className,
+    s.class_id AS classId
   FROM students s
   JOIN schools sch ON s.school_id = sch.id
   JOIN classes c ON s.class_id = c.id
