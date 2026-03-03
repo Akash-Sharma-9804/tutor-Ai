@@ -28,18 +28,31 @@ const TableOfContents = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      
+
       const res = await axios.get(
         `${import.meta.env.VITE_BACKEND_URL}/api/books/${bookId}/chapters`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       setBook(res.data.book);
       setChapters(res.data.chapters);
-      
-      // Load progress for all chapters
-      // This would require a new API endpoint to get all progress for a book
-      
+
+      // Load real progress summary for this book
+      const progressRes = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/books/${bookId}/progress-summary`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Build a map of chapterId -> progress info
+      const progressMap = {};
+      progressRes.data.chapters?.forEach(ch => {
+        progressMap[ch.id] = {
+          percentage: ch.percent,
+          completedSegments: ch.completedSegments,
+          totalSegments: ch.totalSegments,
+        };
+      });
+      setProgress(progressMap);
     } catch (err) {
       console.error("Failed to load chapters:", err);
     } finally {
@@ -146,19 +159,54 @@ const TableOfContents = () => {
                         <Clock className="h-4 w-4" />
                         ~30 min read
                       </span>
-                      {progress[chapter.id] && (
-                        <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                          <CheckCircle className="h-4 w-4" />
-                          {progress[chapter.id].percentage}% Complete
-                        </span>
-                      )}
+                      {progress[chapter.id] ? (
+                        progress[chapter.id].percentage === 100 ? (
+                          <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-semibold">
+                            <CheckCircle className="h-4 w-4" />
+                            Completed
+                          </span>
+                        ) : progress[chapter.id].percentage > 0 ? (
+                          <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                            <Circle className="h-4 w-4" />
+                            {progress[chapter.id].percentage}% Complete
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-gray-400">
+                            <Circle className="h-4 w-4" />
+                            Not started
+                          </span>
+                        )
+                      ) : null}
                     </div>
+                    {/* Progress bar */}
+                    {progress[chapter.id] && (
+                      <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden w-full max-w-xs">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            progress[chapter.id].percentage === 100
+                              ? "bg-green-500"
+                              : "bg-gradient-to-r from-blue-500 to-purple-500"
+                          }`}
+                          style={{ width: `${progress[chapter.id].percentage}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
-                
+
                 {/* Action Button */}
-                <button className="flex text-xs md:text-base items-center gap-2 p-2 md:px-6 md:py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg shadow-blue-500/30 group-hover:shadow-xl group-hover:shadow-blue-500/40">
-                  Start Learning
+                <button className={`flex text-xs md:text-base items-center gap-2 p-2 md:px-6 md:py-3 rounded-lg text-white font-medium transition-all shadow-lg group-hover:shadow-xl ${
+                  progress[chapter.id]?.percentage === 100
+                    ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-green-500/30"
+                    : progress[chapter.id]?.percentage > 0
+                    ? "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-orange-500/30"
+                    : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-blue-500/30"
+                }`}>
+                  {progress[chapter.id]?.percentage === 100
+                    ? "Review"
+                    : progress[chapter.id]?.percentage > 0
+                    ? "Continue"
+                    : "Start Learning"}
                   <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>

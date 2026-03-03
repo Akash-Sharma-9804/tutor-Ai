@@ -17,7 +17,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 
-const CourseSection = ({ subjects, student }) => {
+const CourseSection = ({ subjects, student, stats }) => {
   // Subject icons mapping with better visuals
   const subjectIcons = {
     Mathematics: {
@@ -242,19 +242,25 @@ const CourseSection = ({ subjects, student }) => {
 
                       {/* Interactive Elements */}
                       <div className="flex justify-between items-center mt-4">
-                        <motion.button
+                      <motion.button
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-semibold flex items-center gap-2 shadow-lg"
+                          className={`px-4 py-2 rounded-lg text-white text-sm font-semibold flex items-center gap-2 shadow-lg bg-gradient-to-r ${
+                            progress === 100
+                              ? "from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+                              : progress > 0
+                              ? "from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
+                              : "from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                          }`}
                         >
                           <Brain className="w-4 h-4" />
-                          Continue
+                          {progress === 100 ? "Review" : progress > 0 ? "Continue" : "Start Learning"}
                         </motion.button>
 
                         <div className="flex items-center gap-3">
                           <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                            <Flame className="w-3 h-3" />
-                            {Math.floor(Math.random() * 5) + 1} day streak
+                            <Flame className="w-3 h-3 text-orange-500" />
+                            {subject.completedSegments > 0 ? `${Math.min(subject.completedSegments, 30)} day streak` : "Not started"}
                           </span>
                           <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                         </div>
@@ -301,15 +307,19 @@ const CourseSection = ({ subjects, student }) => {
               <div className="relative">
                 <p className="text-sm opacity-90">Study Time Today</p>
                 <div className="flex items-end justify-between mt-2">
-                  <p className="text-4xl font-bold">4.2h</p>
+                  <p className="text-4xl font-bold">
+                    {stats ? `${stats.studyHours.today}h` : "—"}
+                  </p>
                   <div className="text-right">
                     <div className="flex items-center gap-2 text-sm">
                       <Target className="w-4 h-4" />
-                      Goal: 3h
+                      Total: {stats ? `${stats.studyHours.total}h` : "—"}
                     </div>
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/20 text-sm mt-2">
-                      <Award className="w-3 h-3" /> Goal achieved!
-                    </span>
+                    {stats?.studyHours.today >= 3 && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/20 text-sm mt-2">
+                        <Award className="w-3 h-3" /> Goal achieved!
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -328,10 +338,10 @@ const CourseSection = ({ subjects, student }) => {
                   </p>
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  12
+                  {stats ? stats.lessons.total : "—"}
                 </p>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  +2 this week
+                  +{stats ? stats.lessons.thisWeek : 0} this week
                 </p>
               </motion.div>
 
@@ -362,26 +372,32 @@ const CourseSection = ({ subjects, student }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm opacity-90">Weekly Streak</p>
-                  <p className="text-2xl font-bold mt-1">7 Days</p>
+                  <p className="text-2xl font-bold mt-1">
+                    {stats ? `${stats.streak.current} Day${stats.streak.current !== 1 ? 's' : ''}` : "—"}
+                  </p>
                 </div>
                 <motion.div
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
                   className="text-3xl"
                 >
-                  🔥
+                  {stats?.streak.current > 0 ? "🔥" : "💤"}
                 </motion.div>
               </div>
               <div className="flex gap-1 mt-3">
-                {[...Array(7)].map((_, i) => (
+                {(stats?.streak.weekDays || [...Array(7)].map((_, i) => ({
+                  label: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i],
+                  active: false
+                }))).map((day, i) => (
                   <motion.div
                     key={i}
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: i * 0.1 }}
-                    className="flex-1 h-2 bg-white/30 rounded-full overflow-hidden"
+                    className="flex-1 flex flex-col items-center gap-1"
                   >
-                    <div className="h-full bg-white rounded-full"></div>
+                    <div className={`w-full h-2 rounded-full overflow-hidden ${day.active ? 'bg-white' : 'bg-white/30'}`} />
+                    <span className="text-[9px] text-white/70">{day.label}</span>
                   </motion.div>
                 ))}
               </div>

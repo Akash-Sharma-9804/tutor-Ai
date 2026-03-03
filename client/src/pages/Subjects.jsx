@@ -51,36 +51,36 @@ const SubjectsPage = () => {
       const token = localStorage.getItem("token");
       if (!token) return;
 
+      const colors = [
+        "from-blue-500 to-cyan-500",
+        "from-purple-500 to-pink-500",
+        "from-green-500 to-emerald-500",
+        "from-orange-500 to-amber-500",
+        "from-rose-500 to-red-500",
+        "from-indigo-500 to-violet-500",
+      ];
+
       try {
+        // Single API call — replaces 10+ calls
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
+          `${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects-with-progress`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
-        console.log("Fetched subjects:", res.data);
-        // 🔥 MAP REAL SUBJECTS INTO UI SHAPE (KEY PART)
+
         const mappedSubjects = res.data.map((sub, index) => ({
           id: sub.id,
           name: sub.name,
-
-          // UI-required fields (TEMP defaults)
           instructor: "AI Tutor",
           students: 100 + index * 25,
-          progress: 30 + index * 10,
+          progress: sub.progress || 0,
           rating: 4.7,
-          color: [
-            "from-blue-500 to-cyan-500",
-            "from-purple-500 to-pink-500",
-            "from-green-500 to-emerald-500",
-            "from-orange-500 to-amber-500",
-            "from-rose-500 to-red-500",
-            "from-indigo-500 to-violet-500",
-          ][index % 6],
-          status: "In Progress",
+          color: colors[index % colors.length],
+          status: sub.progress === 0 ? "Not Started" : sub.progress === 100 ? "Completed" : "In Progress",
           nextLesson: "AI Guided Lesson",
-          totalLessons: 40,
-          completedLessons: Math.floor((30 + index * 10) * 0.4),
+          totalLessons: sub.totalSegments || 0,
+          completedLessons: sub.completedSegments || 0,
+          totalSegments: sub.totalSegments || 0,
+          completedSegments: sub.completedSegments || 0,
           difficulty: "Intermediate",
           category: "Science",
           enrollmentDate: "2024-02-01",
@@ -325,8 +325,9 @@ const SubjectsPage = () => {
       );
       setShowEditSubjects(false);
       // Refresh subjects list
+      const colors = ["from-blue-500 to-cyan-500","from-purple-500 to-pink-500","from-green-500 to-emerald-500","from-orange-500 to-amber-500","from-rose-500 to-red-500","from-indigo-500 to-violet-500"];
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects-with-progress`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const mappedSubjects = res.data.map((sub, index) => ({
@@ -334,13 +335,15 @@ const SubjectsPage = () => {
         name: sub.name,
         instructor: "AI Tutor",
         students: 100 + index * 25,
-        progress: 30 + index * 10,
+        progress: sub.progress || 0,
         rating: 4.7,
-        color: ["from-blue-500 to-cyan-500","from-purple-500 to-pink-500","from-green-500 to-emerald-500","from-orange-500 to-amber-500","from-rose-500 to-red-500","from-indigo-500 to-violet-500"][index % 6],
-        status: "In Progress",
+        color: colors[index % colors.length],
+        status: sub.progress === 0 ? "Not Started" : sub.progress === 100 ? "Completed" : "In Progress",
         nextLesson: "AI Guided Lesson",
-        totalLessons: 40,
-        completedLessons: Math.floor((30 + index * 10) * 0.4),
+        totalLessons: sub.totalSegments || 0,
+        completedLessons: sub.completedSegments || 0,
+        totalSegments: sub.totalSegments || 0,
+        completedSegments: sub.completedSegments || 0,
         difficulty: "Intermediate",
         category: "Science",
         enrollmentDate: "2024-02-01",

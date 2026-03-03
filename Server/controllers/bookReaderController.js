@@ -421,10 +421,11 @@ exports.getProgress = async (req, res) => {
     const totalTimeSeconds = segments.reduce((sum, s) => sum + (s.time_spent_seconds || 0), 0);
 
     res.json({
-      lastPosition: progress[0] || null,
+      lastPosition: progress[0] || null,   // has paragraph_id field
       completedSegments,
       totalSegments: segments.length,
       totalTimeSeconds,
+      hasProgress: !!progress[0],
     });
   } catch (err) {
     console.error(err);

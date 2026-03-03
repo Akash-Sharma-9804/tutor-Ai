@@ -417,13 +417,6 @@ useEffect(() => {
 
   useEffect(() => {
     loadChapterContent();
-
-    // Save progress when student leaves the page
-    return () => {
-      if (chapterData) {
-        saveSegmentProgress(currentSegmentIndex, currentPageIndex);
-      }
-    };
   }, [chapterId]);
 
   useEffect(() => {
@@ -453,32 +446,53 @@ useEffect(() => {
       setLoading(true);
       const token = localStorage.getItem("token");
 
-      const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/books/chapters/${chapterId}/content`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      // Fetch content and saved progress in parallel
+      const [contentRes, progressRes] = await Promise.all([
+        axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/books/chapters/${chapterId}/content`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        ),
+        axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/books/chapters/${chapterId}/progress`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        ).catch(() => ({ data: null })),
+      ]);
 
-      setChapter(res.data.chapter);
-      // setPdfURL(res.data.chapter.pdf_url);
-      setChapterData(res.data.content);
-      setNavigation(res.data.navigation);
+      setChapter(contentRes.data.chapter);
+      setChapterData(contentRes.data.content);
+      setNavigation(contentRes.data.navigation);
 
-      // Set initial PDF page if available
-      if (res.data.content?.sections?.[0]?.content?.[0]?.page_number) {
-        setCurrentPdfPage(res.data.content.sections[0].content[0].page_number);
-      }
-
-      // Fetch segments.json (image map)
-      // Build page → image map from BACKEND
       const imageMap = {};
-      (res.data.segments || []).forEach(seg => {
+      (contentRes.data.segments || []).forEach(seg => {
         imageMap[seg.page] = seg.image_path;
       });
-
       setPageImages(imageMap);
-      setSegments(res.data.segments || []);
+      setSegments(contentRes.data.segments || []);
 
-
+      // Restore last position from saved progress
+      const savedProgress = progressRes.data;
+      if (savedProgress?.lastPosition?.paragraph_id) {
+        // paragraph_id is stored as "pageX_segY"
+        const match = savedProgress.lastPosition.paragraph_id.match(/^page(\d+)_seg(\d+)$/);
+        if (match) {
+          const savedPage = parseInt(match[1]);
+          const savedSeg = parseInt(match[2]);
+          const sections = contentRes.data.content?.sections || [];
+          // Validate the saved position still exists in the content
+          if (savedPage < sections.length && savedSeg < (sections[savedPage]?.content?.length || 0)) {
+            setCurrentPageIndex(savedPage);
+            setCurrentSegmentIndex(savedSeg);
+            console.log(`▶️ Resuming from page ${savedPage}, segment ${savedSeg}`);
+          }
+        }
+      } else {
+        // No saved progress — start from beginning
+        setCurrentPageIndex(0);
+        setCurrentSegmentIndex(0);
+        if (contentRes.data.content?.sections?.[0]?.content?.[0]?.page_number) {
+          setCurrentPdfPage(contentRes.data.content.sections[0].content[0].page_number);
+        }
+      }
 
     } catch (err) {
       console.error("Failed to load chapter:", err);

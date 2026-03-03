@@ -13,6 +13,7 @@ import DashboardAdditionalSection from "../components/Dashboard/DashboardAdditio
 const Dashboard = () => {
   const [student, setStudent] = useState(null);
   const [subjects, setSubjects] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const hasFetched = useRef(false);
 
@@ -29,69 +30,24 @@ const Dashboard = () => {
         setLoadingDashboard(true);
 
         // Fetch student profile and subjects in parallel
-        const [profileRes, subjectsRes] = await Promise.all([
+        const [profileRes, subjectsRes, statsRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/student/me`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects`, {
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects-with-progress`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subjects/dashboard-stats`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
 
         setStudent(profileRes.data);
-        const rawSubjects = subjectsRes.data;
-
-        // Set subjects immediately so UI renders fast
-        setSubjects(rawSubjects.map(s => ({ ...s, progress: 0, progressLoaded: false })));
-
-        // Then enrich with progress in background — one subject at a time to avoid burst
-        const enriched = [];
-        for (const subject of rawSubjects) {
-          try {
-            const booksRes = await axios.get(
-              `${import.meta.env.VITE_BACKEND_URL}/api/books/subject/${subject.id}`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            const books = booksRes.data;
-
-            if (books.length === 0) {
-              enriched.push({ ...subject, progress: 0, progressLoaded: true });
-              continue;
-            }
-
-            const summaries = await Promise.all(
-              books.map(book =>
-                axios.get(
-                  `${import.meta.env.VITE_BACKEND_URL}/api/books/${book.id}/progress-summary`,
-                  { headers: { Authorization: `Bearer ${token}` } }
-                ).then(r => r.data)
-              )
-            );
-
-            // Sum ALL segments across ALL chapters/books for this subject
-            let totalSegments = 0;
-            let completedSegments = 0;
-            summaries.forEach(summary => {
-              summary.chapters?.forEach(ch => {
-                totalSegments += ch.totalSegments || 0;
-                completedSegments += ch.completedSegments || 0;
-              });
-            });
-
-            const realProgress = totalSegments > 0
-              ? Math.round((completedSegments / totalSegments) * 100)
-              : 0;
-
-            enriched.push({ ...subject, progress: realProgress, progressLoaded: true });
-          } catch {
-            enriched.push({ ...subject, progress: 0, progressLoaded: true });
-          }
-
-          // Update subjects progressively as each one finishes
-          setSubjects([...enriched, ...rawSubjects.slice(enriched.length).map(s => ({ ...s, progress: 0, progressLoaded: false }))]);
-        }
-
-        setSubjects(enriched);
+        setStats(statsRes.data);
+        setSubjects(subjectsRes.data.map(s => ({
+          ...s,
+          progressLoaded: true,
+        })));
       } catch (error) {
         console.error("❌ Dashboard fetch failed:", error);
       } finally {
@@ -111,8 +67,8 @@ const Dashboard = () => {
     >
     
       <HeroBox student={student} />
-      <QuickStats subjects={subjects} />
-      <CourseSection subjects={subjects} student={student} />
+      <QuickStats subjects={subjects} stats={stats} />
+      <CourseSection subjects={subjects} student={student} stats={stats} />
       <DashboardAdditionalSection />
       <div className="  md:-mx-8 -mx-4">
         <Footer />
