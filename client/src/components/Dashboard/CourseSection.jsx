@@ -136,7 +136,7 @@ const CourseSection = ({ subjects, student }) => {
             ) : (
               subjects.map((subject, index) => {
                 const subjectData = getSubjectData(subject.name);
-                const progress = Math.floor(Math.random() * 100); // Replace with real progress
+                const progress = subject.progress || 0;
 
                 return (
                   <motion.div

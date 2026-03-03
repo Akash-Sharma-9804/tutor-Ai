@@ -163,6 +163,26 @@ if (chapter.segments_json_path && chapter.segments_json_path !== "null") {
       [chapter.book_id, chapter.chapter_no]
     );
 
+    // Count actual readable segments from content (what student navigates through)
+    // These match the page0_seg0, page0_seg1... IDs saved in reading_progress_segments
+    let readableSegmentCount = 0;
+    if (content?.sections) {
+      content.sections.forEach((section, pageIdx) => {
+        if (Array.isArray(section.content)) {
+          readableSegmentCount += section.content.length;
+        }
+      });
+    }
+
+    // Always sync total_segments from content (source of truth)
+    if (readableSegmentCount > 0 && chapter.total_segments !== readableSegmentCount) {
+      await db.query(
+        `UPDATE book_chapters SET total_segments = ? WHERE id = ?`,
+        [readableSegmentCount, chapterId]
+      );
+      chapter.total_segments = readableSegmentCount;
+    }
+
     res.json({
   chapter: {
     id: chapter.id,
@@ -336,9 +356,10 @@ const response = await axios.post(
 exports.saveProgress = async (req, res) => {
   try {
     const { chapterId } = req.params;
-    const { paragraph_id, page_number } = req.body;
-    const userId = req.user.id; // From auth middleware
+    const { paragraph_id, page_number, segment_id, time_spent_seconds, completed } = req.body;
+    const userId = req.studentId; // From auth middleware
     
+    // Save to reading_progress (bookmark/last position)
     await db.query(
       `INSERT INTO reading_progress 
        (user_id, chapter_id, paragraph_id, page_number, last_read_at)
@@ -349,7 +370,21 @@ exports.saveProgress = async (req, res) => {
        last_read_at = NOW()`,
       [userId, chapterId, paragraph_id, page_number]
     );
-    
+
+    // Also save segment-level progress if segment_id provided
+    if (segment_id !== undefined && segment_id !== null) {
+      await db.query(
+        `INSERT INTO reading_progress_segments
+         (user_id, chapter_id, segment_id, page_number, completed, time_spent_seconds)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+         completed = GREATEST(completed, VALUES(completed)),
+         time_spent_seconds = time_spent_seconds + VALUES(time_spent_seconds),
+         last_read_at = NOW()`,
+        [userId, chapterId, segment_id, page_number || 1, completed ? 1 : 0, time_spent_seconds || 0]
+      );
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -364,16 +399,33 @@ exports.saveProgress = async (req, res) => {
 exports.getProgress = async (req, res) => {
   try {
     const { chapterId } = req.params;
-    const userId = req.user.id;
-    
+    const userId = req.studentId;
+
+    // Get last position
     const [progress] = await db.query(
       `SELECT paragraph_id, page_number, last_read_at
        FROM reading_progress
        WHERE user_id = ? AND chapter_id = ?`,
       [userId, chapterId]
     );
-    
-    res.json(progress[0] || null);
+
+    // Get per-segment completion
+    const [segments] = await db.query(
+      `SELECT segment_id, page_number, completed, time_spent_seconds
+       FROM reading_progress_segments
+       WHERE user_id = ? AND chapter_id = ?`,
+      [userId, chapterId]
+    );
+
+    const completedSegments = segments.filter(s => s.completed).map(s => s.segment_id);
+    const totalTimeSeconds = segments.reduce((sum, s) => sum + (s.time_spent_seconds || 0), 0);
+
+    res.json({
+      lastPosition: progress[0] || null,
+      completedSegments,
+      totalSegments: segments.length,
+      totalTimeSeconds,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to fetch progress" });
@@ -465,6 +517,139 @@ Do NOT use headings unless they add clarity.
       message: "Failed to generate explanation",
       error: err.message 
     });
+  }
+};
+
+/**
+ * GET /api/books/:bookId/progress-summary
+ * Get per-chapter completion % for a book (used on Dashboard)
+ */
+exports.getBookProgressSummary = async (req, res) => {
+  try {
+    const { bookId } = req.params;
+    const userId = req.studentId;
+
+    // Get all chapters with their total_segments count stored on the chapter row
+    const [chapters] = await db.query(
+      `SELECT id, chapter_no, chapter_title, total_segments
+       FROM book_chapters WHERE book_id = ? ORDER BY chapter_no ASC`,
+      [bookId]
+    );
+
+    if (chapters.length === 0) return res.json({ chapters: [], overallPercent: 0 });
+
+    const chapterIds = chapters.map(c => c.id);
+    const placeholders = chapterIds.map(() => '?').join(',');
+
+    // Only get THIS student's completed segments
+    const [completedCounts] = await db.query(
+      `SELECT chapter_id, COUNT(DISTINCT segment_id) as completed
+       FROM reading_progress_segments
+       WHERE user_id = ? AND chapter_id IN (${placeholders}) AND completed = 1
+       GROUP BY chapter_id`,
+      [userId, ...chapterIds]
+    );
+
+    const completedMap = Object.fromEntries(
+      completedCounts.map(r => [r.chapter_id, r.completed])
+    );
+
+    const chaptersWithProgress = chapters.map(ch => {
+      const total = ch.total_segments || 0;
+      const done = completedMap[ch.id] || 0;
+      const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+      return {
+        id: ch.id,
+        chapter_no: ch.chapter_no,
+        chapter_title: ch.chapter_title,
+        completedSegments: done,
+        totalSegments: total,
+        percent
+      };
+    });
+
+    // Only count chapters that have segments for overall %
+    const chaptersWithContent = chaptersWithProgress.filter(c => c.totalSegments > 0);
+    const overallPercent = chaptersWithContent.length > 0
+      ? Math.round(chaptersWithProgress.reduce((s, c) => s + c.percent, 0) / chaptersWithProgress.length)
+      : 0;
+
+    res.json({ chapters: chaptersWithProgress, overallPercent });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch progress summary" });
+  }
+};
+
+/**
+ * POST /api/books/chapters/:chapterId/backfill-segments
+ * One-time call to populate total_segments from segments JSON
+ */
+exports.backfillSegmentCount = async (req, res) => {
+  try {
+    const { chapterId } = req.params;
+    const [rows] = await db.query(
+      `SELECT content_json_path FROM book_chapters WHERE id = ?`, [chapterId]
+    );
+    if (!rows[0]?.content_json_path) return res.json({ skipped: true, reason: "no content_json_path" });
+
+    const contentRes = await axios.get(rows[0].content_json_path);
+    const content = contentRes.data;
+
+    // Count readable segments (matches page0_seg0 naming used in progress tracking)
+    let count = 0;
+    if (content?.sections) {
+      content.sections.forEach(section => {
+        if (Array.isArray(section.content)) count += section.content.length;
+      });
+    }
+
+    await db.query(
+      `UPDATE book_chapters SET total_segments = ? WHERE id = ?`, [count, chapterId]
+    );
+    res.json({ chapterId, total_segments: count });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.backfillAllSegments = async (req, res) => {
+  try {
+    const { bookId } = req.params;
+    const [chapters] = await db.query(
+      `SELECT id, content_json_path FROM book_chapters WHERE book_id = ?`,
+      [bookId]
+    );
+
+    const results = [];
+    for (const ch of chapters) {
+      try {
+        if (!ch.content_json_path) {
+          results.push({ id: ch.id, skipped: true, reason: "no content_json_path" });
+          continue;
+        }
+        const contentRes = await axios.get(ch.content_json_path);
+        const content = contentRes.data;
+        let count = 0;
+        if (content?.sections) {
+          content.sections.forEach(section => {
+            if (Array.isArray(section.content)) count += section.content.length;
+          });
+        }
+        // Force update always, regardless of existing value
+        await db.query(
+          `UPDATE book_chapters SET total_segments = ? WHERE id = ?`,
+          [count, ch.id]
+        );
+        results.push({ id: ch.id, old_total: ch.total_segments, new_total: count });
+      } catch (err) {
+        results.push({ id: ch.id, error: err.message });
+      }
+    }
+
+    res.json({ bookId, results });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
 

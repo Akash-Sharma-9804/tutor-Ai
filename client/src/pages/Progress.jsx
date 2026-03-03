@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+import axios from "axios";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -33,20 +35,74 @@ import Footer from "../components/Footer/Footer";
 import GitHubContributionHeatmap from "../components/ProgressComponent/GitHubContributionHeatmap";
 
 export default function Progress() {
-  // Overall progress data
-  const overallProgress = {
-    completion: 78,
-    avgScore: 88,
-    timeSpent: 342,
-    streak: 14,
-    rank: 12,
-    improvement: "+12%",
-  };
+  const [subjectProgress, setSubjectProgress] = useState([]);
+  const [overallProgress, setOverallProgress] = useState({
+    completion: 0, timeSpent: 0, streak: 0,
+  });
+  const [loadingProgress, setLoadingProgress] = useState(true);
 
- 
+  useEffect(() => {
+    const fetchProgress = async () => {
+      try {
+        const token = localStorage.getItem("token");
 
-  // Subject progress data
-  const subjectProgress = [
+        // Fetch subjects
+        const subjectsRes = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const subjects = subjectsRes.data;
+
+        // For each subject, fetch its books, then progress-summary per book
+        const progressData = await Promise.all(
+          subjects.map(async (subject) => {
+            const booksRes = await axios.get(
+              `${import.meta.env.VITE_BACKEND_URL}/api/books/subject/${subject.id}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const books = booksRes.data;
+
+            const bookProgresses = await Promise.all(
+              books.map(async (book) => {
+                const res = await axios.get(
+                  `${import.meta.env.VITE_BACKEND_URL}/api/books/${book.id}/progress-summary`,
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+                return res.data.overallPercent || 0;
+              })
+            );
+
+            const avgProgress = bookProgresses.length > 0
+              ? Math.round(bookProgresses.reduce((a, b) => a + b, 0) / bookProgresses.length)
+              : 0;
+
+            return {
+              name: subject.name,
+              progress: avgProgress,
+              score: avgProgress, // use progress as proxy until quiz scores exist
+              trend: "up",
+              improvement: "",
+            };
+          })
+        );
+
+        const avgCompletion = progressData.length > 0
+          ? Math.round(progressData.reduce((s, sp) => s + sp.progress, 0) / progressData.length)
+          : 0;
+
+        setSubjectProgress(progressData);
+        setOverallProgress({ completion: avgCompletion, timeSpent: 0, streak: 0 });
+      } catch (err) {
+        console.error("Failed to fetch progress:", err);
+      } finally {
+        setLoadingProgress(false);
+      }
+    };
+    fetchProgress();
+  }, []);
+
+  // Subject progress data (legacy shape kept for render compat below)
+  const _subjectProgress = [
     {
       name: "Mathematics",
       score: 92,

@@ -29,8 +29,17 @@ router.post("/chapters/:chapterId/tts", bookReaderController.textToSpeech);
 // Save reading progress
 router.post("/chapters/:chapterId/progress", bookReaderController.saveProgress);
 
-// Get reading progress
+// Get reading progress for a chapter
 router.get("/chapters/:chapterId/progress", bookReaderController.getProgress);
+
+// One-time: backfill total_segments for a single chapter
+router.post("/chapters/:chapterId/backfill-segments", bookReaderController.backfillSegmentCount);
+
+// One-time: backfill total_segments for ALL chapters in a book
+router.post("/:bookId/backfill-all-segments", bookReaderController.backfillAllSegments);
+
+// Get per-chapter progress summary for a whole book (Dashboard use)
+router.get("/:bookId/progress-summary", bookReaderController.getBookProgressSummary);
 
 
 module.exports = router;

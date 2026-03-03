@@ -1,6 +1,6 @@
 // pages/Dashboard.jsx - Fixed for Light Mode
 
-import { React, useEffect, useState } from "react";
+import { React, useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import TopHeader from "../components/Dashboard/TopHeader";
@@ -12,69 +12,94 @@ import DashboardAdditionalSection from "../components/Dashboard/DashboardAdditio
 
 const Dashboard = () => {
   const [student, setStudent] = useState(null);
-
   const [subjects, setSubjects] = useState([]);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
-    const fetchSubjects = async () => {
+    // Prevent double-fetch from React StrictMode or re-renders
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+
+    const fetchDashboardData = async () => {
       try {
         const token = localStorage.getItem("token");
+        if (!token) return;
 
-        if (!token) {
-          console.warn("⚠️ No token found, skipping subjects fetch");
-          return;
+        setLoadingDashboard(true);
+
+        // Fetch student profile and subjects in parallel
+        const [profileRes, subjectsRes] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/student/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        setStudent(profileRes.data);
+        const rawSubjects = subjectsRes.data;
+
+        // Set subjects immediately so UI renders fast
+        setSubjects(rawSubjects.map(s => ({ ...s, progress: 0, progressLoaded: false })));
+
+        // Then enrich with progress in background — one subject at a time to avoid burst
+        const enriched = [];
+        for (const subject of rawSubjects) {
+          try {
+            const booksRes = await axios.get(
+              `${import.meta.env.VITE_BACKEND_URL}/api/books/subject/${subject.id}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const books = booksRes.data;
+
+            if (books.length === 0) {
+              enriched.push({ ...subject, progress: 0, progressLoaded: true });
+              continue;
+            }
+
+            const summaries = await Promise.all(
+              books.map(book =>
+                axios.get(
+                  `${import.meta.env.VITE_BACKEND_URL}/api/books/${book.id}/progress-summary`,
+                  { headers: { Authorization: `Bearer ${token}` } }
+                ).then(r => r.data)
+              )
+            );
+
+            // Sum ALL segments across ALL chapters/books for this subject
+            let totalSegments = 0;
+            let completedSegments = 0;
+            summaries.forEach(summary => {
+              summary.chapters?.forEach(ch => {
+                totalSegments += ch.totalSegments || 0;
+                completedSegments += ch.completedSegments || 0;
+              });
+            });
+
+            const realProgress = totalSegments > 0
+              ? Math.round((completedSegments / totalSegments) * 100)
+              : 0;
+
+            enriched.push({ ...subject, progress: realProgress, progressLoaded: true });
+          } catch {
+            enriched.push({ ...subject, progress: 0, progressLoaded: true });
+          }
+
+          // Update subjects progressively as each one finishes
+          setSubjects([...enriched, ...rawSubjects.slice(enriched.length).map(s => ({ ...s, progress: 0, progressLoaded: false }))]);
         }
 
-        console.log("📡 Fetching subjects...");
-
-        const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        console.log("✅ Subjects fetched:", response.data);
-        setSubjects(response.data);
+        setSubjects(enriched);
       } catch (error) {
-        console.error("❌ Failed to fetch subjects:", error);
+        console.error("❌ Dashboard fetch failed:", error);
+      } finally {
+        setLoadingDashboard(false);
       }
     };
 
-    fetchSubjects();
-  }, []);
-
-  useEffect(() => {
-    const fetchStudentProfile = async () => {
-      try {
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-          console.warn("⚠️ No token found, skipping student profile fetch");
-          return;
-        }
-
-        console.log("📡 Fetching student profile...");
-
-        const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/student/me`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        console.log("✅ Student profile fetched:", response.data);
-        setStudent(response.data);
-      } catch (error) {
-        console.error("❌ Failed to fetch student profile:", error);
-      }
-    };
-
-    fetchStudentProfile();
+    fetchDashboardData();
   }, []);
 
   return (
@@ -84,7 +109,7 @@ const Dashboard = () => {
       transition={{ duration: 0.5, ease: "easeOut" }}
       className="px-0 sm:px-6 lg:px-8 pt-8 space-y-6 text-gray-900 dark:text-white"
     >
-      {/* <TopHeader student={student} /> */}
+    
       <HeroBox student={student} />
       <QuickStats subjects={subjects} />
       <CourseSection subjects={subjects} student={student} />

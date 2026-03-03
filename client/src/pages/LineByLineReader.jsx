@@ -57,6 +57,7 @@ const LineByLineReader = () => {
   const audioRef = useRef(null);
 
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const segmentStartTime = useRef(Date.now());
 
   const [highlightedWordIndex, setHighlightedWordIndex] = useState(-1);
   const [currentWords, setCurrentWords] = useState([]);
@@ -416,6 +417,13 @@ useEffect(() => {
 
   useEffect(() => {
     loadChapterContent();
+
+    // Save progress when student leaves the page
+    return () => {
+      if (chapterData) {
+        saveSegmentProgress(currentSegmentIndex, currentPageIndex);
+      }
+    };
   }, [chapterId]);
 
   useEffect(() => {
@@ -500,14 +508,50 @@ useEffect(() => {
     currentSegment = nextSegment;
   }
 
+  const saveSegmentProgress = async (segmentIdx, pageIdx) => {
+    try {
+      const token = localStorage.getItem("token");
+      const seg = chapterData?.sections?.[pageIdx]?.content?.[segmentIdx];
+      if (!seg) return;
+
+      const timeSpent = Math.round((Date.now() - segmentStartTime.current) / 1000);
+      const segmentId = seg.id || seg.segment_id || `page${pageIdx}_seg${segmentIdx}`;
+      const pageNumber = chapterData?.sections?.[pageIdx]?.page_range?.[0] || pageIdx + 1;
+
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/books/chapters/${chapterId}/progress`,
+        {
+          paragraph_id: segmentId,
+          page_number: pageNumber,
+          segment_id: segmentId,
+          time_spent_seconds: timeSpent,
+          completed: 1,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (err) {
+      console.error("Progress save failed:", err);
+    }
+  };
+
+  const isLastSegment = () => {
+    const isLastSeg = currentSegmentIndex >= currentSection.content.length - 1;
+    const isLastPage = currentPageIndex >= (chapterData?.sections?.length || 0) - 1;
+    return isLastSeg && isLastPage;
+  };
+
   const goToNextSegment = () => {
+    // Save progress for segment being left
+    saveSegmentProgress(currentSegmentIndex, currentPageIndex);
+    segmentStartTime.current = Date.now();
+
     if (currentSegmentIndex < currentSection.content.length - 1) {
       setCurrentSegmentIndex(currentSegmentIndex + 1);
     } else if (currentPageIndex < (chapterData?.sections?.length || 0) - 1) {
       setCurrentPageIndex(currentPageIndex + 1);
       setCurrentSegmentIndex(0);
     }
-    setShowDetailedExplanation(false); // Reset detailed explanation
+    setShowDetailedExplanation(false);
   };
 
   const goToPreviousSegment = () => {
