@@ -45,53 +45,73 @@ export default function Progress() {
     const fetchProgress = async () => {
       try {
         const token = localStorage.getItem("token");
+        const headers = { Authorization: `Bearer ${token}` };
 
-        // Fetch subjects
-        const subjectsRes = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        // Single efficient call replacing the old N+1 subject/book/progress calls
+        const [subjectsRes, statsRes] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects-with-progress`, { headers }),
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subjects/dashboard-stats`, { headers }),
+        ]);
+
         const subjects = subjectsRes.data;
+        const stats = statsRes.data;
 
-        // For each subject, fetch its books, then progress-summary per book
-        const progressData = await Promise.all(
-          subjects.map(async (subject) => {
-            const booksRes = await axios.get(
-              `${import.meta.env.VITE_BACKEND_URL}/api/books/subject/${subject.id}`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            const books = booksRes.data;
-
-            const bookProgresses = await Promise.all(
-              books.map(async (book) => {
-                const res = await axios.get(
-                  `${import.meta.env.VITE_BACKEND_URL}/api/books/${book.id}/progress-summary`,
-                  { headers: { Authorization: `Bearer ${token}` } }
-                );
-                return res.data.overallPercent || 0;
-              })
-            );
-
-            const avgProgress = bookProgresses.length > 0
-              ? Math.round(bookProgresses.reduce((a, b) => a + b, 0) / bookProgresses.length)
-              : 0;
-
-            return {
-              name: subject.name,
-              progress: avgProgress,
-              score: avgProgress, // use progress as proxy until quiz scores exist
-              trend: "up",
-              improvement: "",
-            };
-          })
-        );
+        const progressData = subjects.map((subject) => ({
+          name: subject.name,
+          progress: subject.progress,
+          score: subject.progress,
+          trend: "up",
+          improvement: "",
+          totalChapters: subject.totalChapters,
+          completedSegments: subject.completedSegments,
+          totalSegments: subject.totalSegments,
+        }));
 
         const avgCompletion = progressData.length > 0
           ? Math.round(progressData.reduce((s, sp) => s + sp.progress, 0) / progressData.length)
           : 0;
 
         setSubjectProgress(progressData);
-        setOverallProgress({ completion: avgCompletion, timeSpent: 0, streak: 0 });
+        setOverallProgress({
+          completion: avgCompletion,
+          avgScore: avgCompletion,
+          improvement: stats.lessons.thisWeek > 0 ? `+${stats.lessons.thisWeek} lessons` : "—",
+          timeSpent: stats.studyHours.total,
+          streak: stats.streak.current,
+          rank: null,
+          todayHours: stats.studyHours.today,
+          weekHours: stats.studyHours.thisWeek,
+          weekDays: stats.streak.weekDays,
+          lessonsTotal: stats.lessons.total,
+          lessonsThisWeek: stats.lessons.thisWeek,
+        });
+
+        // Build timeDistribution from real subject data
+        const totalSegs = subjects.reduce((sum, s) => sum + (s.totalSegments || 0), 0);
+        const colors = [
+          "bg-gradient-to-r from-blue-500 to-cyan-500",
+          "bg-gradient-to-r from-purple-500 to-pink-500",
+          "bg-gradient-to-r from-green-500 to-emerald-500",
+          "bg-gradient-to-r from-lime-500 to-green-500",
+          "bg-gradient-to-r from-orange-500 to-yellow-500",
+          "bg-gradient-to-r from-red-500 to-pink-500",
+        ];
+        const dist = subjects.map((s, i) => ({
+          subject: s.name,
+          hours: totalSegs > 0 ? Math.round((s.totalSegments / totalSegs) * 100) : 0,
+          color: colors[i % colors.length],
+        }));
+        setTimeDistribution(dist);
+
+        // Build weeklyComparison from streak weekDays
+        const weekly = (stats.streak.weekDays || []).map((d) => ({
+          day: d.label,
+          hours: d.active ? stats.studyHours.thisWeek / 7 : 0,
+          score: d.active ? avgCompletion : 0,
+          active: d.active,
+        }));
+        setWeeklyComparison(weekly);
+
       } catch (err) {
         console.error("Failed to fetch progress:", err);
       } finally {
@@ -100,6 +120,9 @@ export default function Progress() {
     };
     fetchProgress();
   }, []);
+
+  const [timeDistribution, setTimeDistribution] = useState([]);
+  const [weeklyComparison, setWeeklyComparison] = useState([]);
 
   // Subject progress data (legacy shape kept for render compat below)
   const _subjectProgress = [
@@ -157,34 +180,7 @@ export default function Progress() {
     { month: "Jun", score: 91, hours: 42 },
   ];
 
-  // Study time distribution
-  const timeDistribution = [
-    {
-      subject: "Mathematics",
-      hours: 85,
-      color: "bg-gradient-to-r from-blue-500 to-cyan-500",
-    },
-    {
-      subject: "Physics",
-      hours: 72,
-      color: "bg-gradient-to-r from-purple-500 to-pink-500",
-    },
-    {
-      subject: "Chemistry",
-      hours: 65,
-      color: "bg-gradient-to-r from-green-500 to-emerald-500",
-    },
-    {
-      subject: "Biology",
-      hours: 58,
-      color: "bg-gradient-to-r from-lime-500 to-green-500",
-    },
-    {
-      subject: "Others",
-      hours: 62,
-      color: "bg-gradient-to-r from-orange-500 to-yellow-500",
-    },
-  ];
+ 
 
   // Milestones achieved
   const milestones = [
@@ -254,16 +250,7 @@ export default function Progress() {
     },
   ];
 
-  // Weekly progress comparison
-  const weeklyComparison = [
-    { day: "Mon", hours: 4.2, score: 85 },
-    { day: "Tue", hours: 5.1, score: 88 },
-    { day: "Wed", hours: 3.8, score: 82 },
-    { day: "Thu", hours: 4.5, score: 90 },
-    { day: "Fri", hours: 3.2, score: 78 },
-    { day: "Sat", hours: 6.0, score: 92 },
-    { day: "Sun", hours: 2.8, score: 80 },
-  ];
+ 
 
   return (
     <motion.div
@@ -694,8 +681,7 @@ export default function Progress() {
                     </h2>
                   </div>
                   <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Total:{" "}
-                    {timeDistribution.reduce((sum, t) => sum + t.hours, 0)}h
+                    {overallProgress.lessonsTotal ?? 0} segments total
                   </span>
                 </div>
 
@@ -733,7 +719,7 @@ export default function Progress() {
                       </p>
                     </div>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      4.2h
+                      {overallProgress.todayHours ?? "—"}h
                     </p>
                   </div>
                 </div>

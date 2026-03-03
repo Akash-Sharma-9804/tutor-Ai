@@ -165,6 +165,14 @@ exports.getSubjectsWithProgress = async (req, res) => {
       subjectProgress[subjectId].completedSegments += completedMap[ch.chapter_id] || 0;
     });
 
+    // Count total chapters per subject
+    const chapterCountBySubject = {};
+    subjectIds.forEach(id => { chapterCountBySubject[id] = 0; });
+    chapterTotals.forEach(ch => {
+      const subjectId = bookToSubject[ch.book_id];
+      if (subjectId) chapterCountBySubject[subjectId] = (chapterCountBySubject[subjectId] || 0) + 1;
+    });
+
     // Step 7: Build final response
     const result = subjects.map(s => {
       const prog = subjectProgress[s.id] || { totalSegments: 0, completedSegments: 0 };
@@ -177,6 +185,7 @@ exports.getSubjectsWithProgress = async (req, res) => {
         progress: percent,
         totalSegments: prog.totalSegments,
         completedSegments: prog.completedSegments,
+        totalChapters: chapterCountBySubject[s.id] || 0,
       };
     });
 

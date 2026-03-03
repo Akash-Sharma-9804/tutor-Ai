@@ -77,7 +77,8 @@ const SubjectsPage = () => {
           color: colors[index % colors.length],
           status: sub.progress === 0 ? "Not Started" : sub.progress === 100 ? "Completed" : "In Progress",
           nextLesson: "AI Guided Lesson",
-          totalLessons: sub.totalSegments || 0,
+          totalChapters: sub.totalChapters || 0,
+          totalLessons: sub.totalChapters || 0,  // Stats component reads totalLessons
           completedLessons: sub.completedSegments || 0,
           totalSegments: sub.totalSegments || 0,
           completedSegments: sub.completedSegments || 0,

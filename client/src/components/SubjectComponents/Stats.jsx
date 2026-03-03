@@ -6,10 +6,11 @@ const Stats = ({ subjects }) => {
   const totalProgress =
     subjects.reduce((sum, subject) => sum + subject.progress, 0) /
     subjects.length;
-  const totalLessons = subjects.reduce(
-    (sum, subject) => sum + subject.totalLessons,
+  const totalChapters = subjects.reduce(
+    (sum, subject) => sum + (subject.totalChapters || 0),
     0
   );
+  const subjectsStarted = subjects.filter(s => s.progress > 0).length;
   const containerVariants = {
     visible: {
       transition: {
@@ -48,8 +49,8 @@ const Stats = ({ subjects }) => {
           darkBorder: "dark:border-purple-500/20",
         },
         {
-          label: "Total Lessons",
-          value: totalLessons,
+          label: "Total Chapters",
+          value: totalChapters,
           icon: <Clock className="h-5 w-5" />,
           accent: "text-green-600 dark:text-green-400",
           gradient:
@@ -59,8 +60,8 @@ const Stats = ({ subjects }) => {
           darkBorder: "dark:border-green-500/20",
         },
         {
-          label: "Achievements",
-          value: "12",
+          label: "In Progress",
+          value: `${subjectsStarted} / ${subjects.length}`,
           icon: <Award className="h-5 w-5" />,
           accent: "text-orange-600 dark:text-orange-400",
           gradient:

@@ -65,25 +65,24 @@ export default function Profile() {
           return;
         }
 
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/student/me`,
-          { 
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const headers = { Authorization: `Bearer ${token}` };
 
-       const profileData = res.data;
-        
-        // Gender-based avatar - use different styles for male/female
+        const [profileRes, statsRes, subjectsRes] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/student/me`, { headers }),
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subjects/dashboard-stats`, { headers }),
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects-with-progress`, { headers }),
+        ]);
+
+        const profileData = profileRes.data;
+        const stats = statsRes.data;
+
         let avatarUrl;
         if (profileData.gender === 'Male') {
-          // Male avatar with masculine features
           avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileData.studentName}&backgroundColor=06b6d4&hair=short01,short02,short03,short04,short05&facialHair=beardMajestic,beardLight,moustacheFancy`;
         } else {
-          // Female avatar with feminine features
           avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileData.studentName}&backgroundColor=06b6d4&hair=longButNotTooLong,wavyBob,curly,curvy&facialHair=blank&top=hijab,turban,winterHat1,longHair,curly`;
         }
-        
+
         setStudent({
           name: profileData.studentName || "Student",
           grade: `Class ${profileData.className}` || "N/A",
@@ -94,14 +93,26 @@ export default function Profile() {
           age: profileData.age || "N/A",
           gender: profileData.gender || "N/A",
           dob: profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : "N/A",
-          joinDate: profileData.created_at ? new Date(profileData.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : "January 2023",
-          bio: "Passionate learner excelling in Science and Mathematics. Always eager to explore new concepts with AI-powered tools.",
+          joinDate: profileData.created_at ? new Date(profileData.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : "N/A",
+          bio: "Passionate learner exploring new concepts with AI-powered tools.",
           avatar: avatarUrl,
-          streak: 14,
-          totalHours: 342,
-          rank: 12,
-          totalStudents: 1564,
+          streak: stats.streak.current,
+          totalHours: stats.studyHours.total,
+          lessonsTotal: stats.lessons.total,
+          rank: null, // not available from backend yet
         });
+
+        // Map real subjects with progress
+        const mappedSubjects = subjectsRes.data.map((s, i) => ({
+          name: s.name,
+          score: s.progress,
+          progress: s.progress,
+          totalChapters: s.totalChapters,
+          color: SUBJECT_COLORS[i % SUBJECT_COLORS.length],
+          icon: SUBJECT_ICONS[i % SUBJECT_ICONS.length],
+        }));
+        setSubjects(mappedSubjects);
+
       } catch (err) {
         console.error("Failed to fetch student profile:", err);
       } finally {
@@ -110,113 +121,53 @@ export default function Profile() {
     };
 
     fetchProfile();
-  }, []); // Empty dependency array to prevent multiple fetches
+  }, []);
 
-  // Subjects with performance
-  const subjects = [
-    {
-      name: "Mathematics",
-      score: 92,
-      progress: 85,
-      color: "from-blue-500 to-cyan-500",
-      icon: "➗",
-    },
-    {
-      name: "Physics",
-      score: 88,
-      progress: 78,
-      color: "from-purple-500 to-pink-500",
-      icon: "⚛️",
-    },
-    {
-      name: "Chemistry",
-      score: 91,
-      progress: 82,
-      color: "from-green-500 to-emerald-500",
-      icon: "🧪",
-    },
-    {
-      name: "Biology",
-      score: 85,
-      progress: 75,
-      color: "from-lime-500 to-green-500",
-      icon: "🧬",
-    },
-    {
-      name: "English",
-      score: 87,
-      progress: 80,
-      color: "from-orange-500 to-yellow-500",
-      icon: "📚",
-    },
-    {
-      name: "History",
-      score: 83,
-      progress: 70,
-      color: "from-rose-500 to-red-500",
-      icon: "🏛️",
-    },
+  const [subjects, setSubjects] = useState([]);
+
+  const SUBJECT_COLORS = [
+    "from-blue-500 to-cyan-500",
+    "from-purple-500 to-pink-500",
+    "from-green-500 to-emerald-500",
+    "from-lime-500 to-green-500",
+    "from-orange-500 to-yellow-500",
+    "from-rose-500 to-red-500",
   ];
-
-  // Recent achievements
+  const SUBJECT_ICONS = ["📖", "🔬", "🧪", "🧬", "📚", "🏛️", "➗", "⚛️", "🌍", "💻"];
+  // Dynamic achievements derived from real stats
   const achievements = [
-    {
-      title: "Math Master",
-      desc: "Scored 100% in 5 consecutive quizzes",
-      icon: <Trophy className="h-5 w-5" />,
-      date: "2 days ago",
-      color: "bg-gradient-to-r from-yellow-500 to-amber-500",
-    },
-    {
-      title: "Fast Learner",
-      desc: "Completed 20 AI lessons in a week",
-      icon: <Zap className="h-5 w-5" />,
-      date: "1 week ago",
-      color: "bg-gradient-to-r from-blue-500 to-cyan-500",
-    },
-    {
-      title: "Study Streak",
-      desc: "14 days of consistent learning",
+    student.streak >= 7 && {
+      title: `${student.streak}-Day Streak`,
+      desc: `${student.streak} days of consistent learning`,
       icon: <TrendingUp className="h-5 w-5" />,
       date: "Today",
       color: "bg-gradient-to-r from-purple-500 to-pink-500",
     },
-    {
-      title: "AI Partner",
-      desc: "Solved 100+ AI practice problems",
-      icon: <Brain className="h-5 w-5" />,
-      date: "3 days ago",
+    student.lessonsTotal >= 10 && {
+      title: "Active Learner",
+      desc: `Completed ${student.lessonsTotal} lessons so far`,
+      icon: <Zap className="h-5 w-5" />,
+      date: "Ongoing",
+      color: "bg-gradient-to-r from-blue-500 to-cyan-500",
+    },
+    student.totalHours >= 1 && {
+      title: `${student.totalHours}h Studied`,
+      desc: "Total reading time logged on the platform",
+      icon: <Clock className="h-5 w-5" />,
+      date: "All time",
       color: "bg-gradient-to-r from-green-500 to-emerald-500",
     },
-  ];
+    subjects.length > 0 && {
+      title: "Multi-Subject",
+      desc: `Enrolled in ${subjects.length} subject${subjects.length > 1 ? "s" : ""}`,
+      icon: <BookOpen className="h-5 w-5" />,
+      date: "Active",
+      color: "bg-gradient-to-r from-yellow-500 to-amber-500",
+    },
+  ].filter(Boolean);
 
-  // Upcoming deadlines
-  const deadlines = [
-    {
-      title: "Physics Mid-term",
-      subject: "Physics",
-      date: "Mar 15",
-      priority: "high",
-    },
-    {
-      title: "Math Assignment",
-      subject: "Mathematics",
-      date: "Mar 18",
-      priority: "medium",
-    },
-    {
-      title: "Chemistry Lab Report",
-      subject: "Chemistry",
-      date: "Mar 20",
-      priority: "medium",
-    },
-    {
-      title: "English Essay",
-      subject: "English",
-      date: "Mar 22",
-      priority: "low",
-    },
-  ];
+  // Deadlines — no backend yet, show empty state
+  const deadlines = [];
 
  if (loading) {
     return (
@@ -310,7 +261,7 @@ export default function Profile() {
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {student.totalHours}h
+                          {student.totalHours ?? 0}h
                         </p>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
                           Study Time
@@ -326,7 +277,7 @@ export default function Profile() {
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {student.streak}
+                          {student.streak ?? 0}
                         </p>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
                           Day Streak
@@ -342,10 +293,10 @@ export default function Profile() {
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          #{student.rank}
+                          {student.lessonsTotal ?? 0}
                         </p>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Class Rank
+                          Lessons Done
                         </p>
                       </div>
                     </div>
@@ -602,11 +553,16 @@ export default function Profile() {
                   </h2>
                 </div>
                 <span className="text-sm px-3 py-1 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-semibold">
-                  4 Pending
+                  {deadlines.length} Pending
                 </span>
               </div>
 
               <div className="space-y-4">
+                {deadlines.length === 0 && (
+                  <p className="text-center text-gray-400 dark:text-gray-500 py-6 text-sm">
+                    No upcoming deadlines
+                  </p>
+                )}
                 {deadlines.map((deadline, index) => (
                   <motion.div
                     key={index}
