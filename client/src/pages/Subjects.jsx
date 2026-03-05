@@ -44,6 +44,12 @@ const SubjectsPage = () => {
   const [editSelectedIds, setEditSelectedIds] = useState([]);
   const [savingSubjects, setSavingSubjects] = useState(false);
   const [studentClassId, setStudentClassId] = useState(null);
+  const [showAllBooksModal, setShowAllBooksModal] = useState(false);
+  const [allClassBooks, setAllClassBooks] = useState([]);
+  const [allBooksClassName, setAllBooksClassName] = useState("");
+  const [loadingAllBooks, setLoadingAllBooks] = useState(false);
+  const [allBooksSearch, setAllBooksSearch] = useState("");
+  const [allBooksSubjectFilter, setAllBooksSubjectFilter] = useState("all");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -142,6 +148,26 @@ const SubjectsPage = () => {
 
     fetchBooks();
   }, []);
+
+
+  const fetchAllClassBooks = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    setLoadingAllBooks(true);
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/books/class/all`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setAllClassBooks(res.data.books || []);
+      setAllBooksClassName(res.data.class_name || "");
+    } catch (err) {
+      console.error("Failed to fetch all class books", err);
+      setAllClassBooks([]);
+    } finally {
+      setLoadingAllBooks(false);
+    }
+  };
 
   // Fetch books for a specific subject
   const fetchBooksBySubject = async (subjectId) => {
@@ -376,20 +402,23 @@ const SubjectsPage = () => {
               Manage and track your enrolled courses
             </p>
           </div>
-          <div className="flex items-center gap-3 mt-4 lg:mt-0">
+          <div className={`mt-4 lg:mt-0 ${isUpperSecondary ? "grid grid-cols-2 lg:flex" : "flex"} items-center gap-3`}>
             {isUpperSecondary && (
-              <motion.div whileTap={{ scale: 0.95 }}>
+              <motion.div whileTap={{ scale: 0.95 }} className="w-full lg:w-auto">
                 <button
                   onClick={openEditSubjects}
-                  className="inline-flex cursor-pointer items-center gap-2 px-4 py-3 rounded-xl bg-white dark:bg-gray-800 border border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400 font-medium hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all shadow-sm"
+                  className="w-full lg:w-auto inline-flex cursor-pointer items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white dark:bg-gray-800 border border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400 font-medium hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all shadow-sm"
                 >
                   <Filter className="h-4 w-4" />
                   Edit My Subjects
                 </button>
               </motion.div>
             )}
-            <motion.div whileTap={{ scale: 0.95 }}>
-              <button className="inline-flex items-center cursor-pointer gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40">
+            <motion.div whileTap={{ scale: 0.95 }} className="w-full lg:w-auto">
+              <button
+                onClick={() => { fetchAllClassBooks(); setShowAllBooksModal(true); }}
+                className="w-full lg:w-auto inline-flex items-center justify-center cursor-pointer gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40"
+              >
                 <BookOpen className="h-4 w-4" />
                 Browse All Books
                 <Sparkles className="h-4 w-4" />
@@ -556,7 +585,7 @@ const SubjectsPage = () => {
                           {subject.totalLessons}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Lessons
+                          Chapter
                         </p>
                       </div>
                       <div className="text-center p-2 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-blue-900/30 dark:to-blue-900/30 border border-green-200 dark:border-transparent">
@@ -866,6 +895,269 @@ const SubjectsPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* All Books Modal */}
+      <AnimatePresence>
+        {showAllBooksModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6"
+            onClick={() => setShowAllBooksModal(false)}
+          >
+            <motion.div
+              variants={modalVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0f0f18] rounded-3xl shadow-2xl w-full max-w-6xl max-h-[92vh] overflow-hidden border border-gray-100 dark:border-white/8 flex flex-col"
+            >
+              {/* ── Header ── */}
+              <div className="relative flex-shrink-0 bg-gradient-to-br from-indigo-600 via-blue-600 to-purple-700 px-6 pt-6 pb-5 overflow-hidden">
+                {/* decorative blobs */}
+                <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute bottom-0 left-1/3 w-24 h-24 bg-purple-400/20 rounded-full blur-xl pointer-events-none" />
+
+                {/* top row: title + close */}
+                <div className="relative z-10 flex items-start justify-between mb-5">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center">
+                        <BookOpen className="h-4 w-4 text-white" />
+                      </div>
+                      <h2 className="text-xl font-bold text-white tracking-tight">Library</h2>
+                    </div>
+                    <p className="text-white/60 text-xs font-medium">
+                      {allBooksClassName && <span className="text-white/80 font-semibold">{allBooksClassName}</span>}
+                      {allBooksClassName && " · "}
+                      {allClassBooks.length} book{allClassBooks.length !== 1 ? "s" : ""} across {[...new Set(allClassBooks.map(b => b.subject_name))].length} subjects
+                    </p>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowAllBooksModal(false)}
+                    className="h-9 w-9 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-all"
+                  >
+                    <X className="h-4 w-4" />
+                  </motion.button>
+                </div>
+
+                {/* search + filter row */}
+                <div className="relative z-10 flex gap-2">
+                  <div className="flex-1 relative">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                    <input
+                      type="text"
+                      placeholder="Search by title or author…"
+                      value={allBooksSearch}
+                      onChange={(e) => setAllBooksSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/15 backdrop-blur-sm text-white placeholder-white/40 border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/40 text-sm"
+                    />
+                  </div>
+                  <select
+                    value={allBooksSubjectFilter}
+                    onChange={(e) => setAllBooksSubjectFilter(e.target.value)}
+                    className="px-3 py-2.5 rounded-xl bg-white/15 backdrop-blur-sm text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/40 text-sm min-w-[130px]"
+                  >
+                    <option value="all" className="text-gray-900 bg-white">All Subjects</option>
+                    {[...new Set(allClassBooks.map((b) => b.subject_name))].map((sub) => (
+                      <option key={sub} value={sub} className="text-gray-900 bg-white">{sub}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* ── Subject pill tabs ── */}
+              {!loadingAllBooks && allClassBooks.length > 0 && (
+                <div className="flex-shrink-0 flex items-center gap-2 px-6 py-3 border-b border-gray-100 dark:border-white/6 overflow-x-auto scrollbar-none bg-white dark:bg-[#0f0f18]">
+                  <button
+                    onClick={() => setAllBooksSubjectFilter("all")}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                      allBooksSubjectFilter === "all"
+                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-900/40"
+                        : "bg-gray-100 dark:bg-white/8 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/12"
+                    }`}
+                  >
+                    All
+                  </button>
+                  {[...new Set(allClassBooks.map((b) => b.subject_name))].map((sub) => {
+                    const color = subjects.find((s) => s.name === sub)?.color || "from-blue-500 to-purple-500";
+                    return (
+                      <button
+                        key={sub}
+                        onClick={() => setAllBooksSubjectFilter(allBooksSubjectFilter === sub ? "all" : sub)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                          allBooksSubjectFilter === sub
+                            ? "bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-900/40"
+                            : "bg-gray-100 dark:bg-white/8 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/12"
+                        }`}
+                      >
+                        {sub}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ── Content ── */}
+              <div className="p-5 sm:p-6 overflow-y-auto flex-1 bg-gray-50/60 dark:bg-[#0f0f18]">
+                {loadingAllBooks ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="h-10 w-10 rounded-full border-[3px] border-indigo-200 border-t-indigo-600"
+                    />
+                    <p className="text-sm text-gray-400">Loading your library…</p>
+                  </div>
+                ) : (() => {
+                  const filtered = allClassBooks.filter((b) => {
+                    const matchSearch =
+                      b.title.toLowerCase().includes(allBooksSearch.toLowerCase()) ||
+                      (b.author || "").toLowerCase().includes(allBooksSearch.toLowerCase());
+                    const matchSubject = allBooksSubjectFilter === "all" || b.subject_name === allBooksSubjectFilter;
+                    return matchSearch && matchSubject;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex flex-col items-center justify-center py-20 gap-3"
+                      >
+                        <div className="h-16 w-16 rounded-2xl bg-gray-100 dark:bg-white/8 flex items-center justify-center">
+                          <Book className="h-8 w-8 text-gray-300 dark:text-gray-600" />
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-400 font-medium">No books found</p>
+                        <p className="text-gray-400 dark:text-gray-500 text-sm">Try a different search or subject</p>
+                      </motion.div>
+                    );
+                  }
+
+                  // Group by subject
+                  const grouped = filtered.reduce((acc, book) => {
+                    const key = book.subject_name || "Other";
+                    if (!acc[key]) acc[key] = [];
+                    acc[key].push(book);
+                    return acc;
+                  }, {});
+
+                  const subjectColorMap = {
+                    "from-blue-500 to-cyan-500": { pill: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400", dot: "bg-blue-500" },
+                    "from-purple-500 to-pink-500": { pill: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400", dot: "bg-purple-500" },
+                    "from-green-500 to-emerald-500": { pill: "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400", dot: "bg-green-500" },
+                    "from-orange-500 to-amber-500": { pill: "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400", dot: "bg-orange-500" },
+                    "from-rose-500 to-red-500": { pill: "bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400", dot: "bg-rose-500" },
+                    "from-indigo-500 to-violet-500": { pill: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400", dot: "bg-indigo-500" },
+                  };
+
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filtered.map((book, bIdx) => {
+                        const subjectColor = subjects.find((s) => s.name === book.subject_name)?.color || "from-indigo-500 to-violet-500";
+                        const colorStyle = subjectColorMap[subjectColor] || subjectColorMap["from-indigo-500 to-violet-500"];
+
+                        return (
+                          <motion.div
+                            key={book.id}
+                            initial={{ opacity: 0, y: 14 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: bIdx * 0.05 }}
+                            className="group relative bg-white dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/8 hover:border-indigo-200 dark:hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-100/50 dark:hover:shadow-indigo-900/20 transition-all duration-200 flex flex-col overflow-hidden cursor-pointer"
+                            onClick={() => { setShowAllBooksModal(false); navigate(`/book/${book.id}`); }}
+                          >
+                            {/* gradient banner */}
+                            <div className={`relative h-28 bg-gradient-to-br ${subjectColor} flex items-center justify-center overflow-hidden flex-shrink-0`}>
+                              {/* decorative circles */}
+                              <div className="absolute -top-4 -right-4 h-20 w-20 rounded-full bg-white/10" />
+                              <div className="absolute -bottom-6 -left-4 h-16 w-16 rounded-full bg-black/10" />
+                              {/* big book icon */}
+                              <div className="relative z-10 h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                                <Book className="h-7 w-7 text-white" />
+                              </div>
+                              {/* subject pill top-right */}
+                              <div className="absolute top-3 right-3 z-10">
+                                <span className="px-2.5 py-1 rounded-full bg-black/20 backdrop-blur-sm text-white/90 text-xs font-semibold">
+                                  {book.subject_name}
+                                </span>
+                              </div>
+                              {/* PDF badge top-left if available */}
+                              {book.pdf_url && (
+                                <div className="absolute top-3 left-3 z-10">
+                                  <span className="px-2 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white/80 text-xs font-medium flex items-center gap-1">
+                                    <Eye className="h-3 w-3" /> PDF
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* card body */}
+                            <div className="p-4 flex flex-col gap-3 flex-1">
+                              <div>
+                                <h4 className="font-bold text-gray-900 dark:text-gray-100 text-sm leading-snug line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors mb-1">
+                                  {book.title}
+                                </h4>
+                                {book.author && (
+                                  <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                                    by {book.author}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* meta row */}
+                              <div className="flex items-center gap-3">
+                                {book.chapter_count > 0 && (
+                                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${colorStyle.pill}`}>
+                                    <BookOpen className="h-3 w-3" />
+                                    {book.chapter_count} {book.chapter_count === 1 ? "chapter" : "chapters"}
+                                  </span>
+                                )}
+                                {book.board && (
+                                  <span className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                                    {book.board}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* actions */}
+                              <div className="flex items-center gap-2 mt-auto">
+                                <motion.button
+                                  whileTap={{ scale: 0.96 }}
+                                  onClick={(e) => { e.stopPropagation(); setShowAllBooksModal(false); navigate(`/book/${book.id}`); }}
+                                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold tracking-wide transition-all shadow-md shadow-indigo-200/60 dark:shadow-indigo-900/30"
+                                >
+                                  <BookOpen className="h-3.5 w-3.5" />
+                                  Start Reading
+                                </motion.button>
+                                {book.pdf_url && (
+                                  <motion.a
+                                    href={book.pdf_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    whileTap={{ scale: 0.96 }}
+                                    title="Open PDF"
+                                    className="h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-400 hover:text-red-500 hover:border-red-300 dark:hover:border-red-700 transition-all"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </motion.a>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Edit Subjects Modal */}
       <AnimatePresence>
         {showEditSubjects && (

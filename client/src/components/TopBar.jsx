@@ -1,9 +1,15 @@
 // components/TopBar.jsx - Updated for Tailwind v4
 import React, { useState, useEffect, useRef } from 'react'
-import { Menu, Bell, Search, ChevronDown, Sun, Moon, Calendar, X } from "lucide-react"
+import { Menu, Bell, Search, ChevronDown, Sun, Moon, Calendar, X, User, Settings, LogOut } from "lucide-react"
+import { useNavigate } from "react-router-dom"
+import { useDispatch } from "react-redux"
+import { logout } from "../store/authSlice"
 import axios from "axios";
 
 const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed }) => {
+
+  const navigate = useNavigate()
+  const dispatch = useDispatch()
 
   const [student, setStudent] = useState(null);
 
@@ -41,6 +47,21 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
   fetchStudentProfile();
 }, []);
 
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/logout`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (err) {
+      // even if backend fails, logout locally
+    }
+    dispatch(logout());
+    navigate("/login", { replace: true });
+  };
+
 
 
   const [notifications] = useState([
@@ -50,11 +71,13 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
     { id: 4, message: "Chemistry quiz completed", time: "2 days ago", unread: false },
   ])
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [unreadCount] = useState(notifications.filter(n => n.unread).length)
   const [isDesktop, setIsDesktop] = useState(false)
   
   const searchRef = useRef(null)
   const notificationsRef = useRef(null)
+  const profileRef = useRef(null)
 
   // Check if desktop
   useEffect(() => {
@@ -77,13 +100,16 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
       if (showNotifications && notificationsRef.current && !notificationsRef.current.contains(event.target)) {
         setShowNotifications(false)
       }
+      if (showProfileMenu && profileRef.current && !profileRef.current.contains(event.target)) {
+        setShowProfileMenu(false)
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [searchOpen, showNotifications])
+  }, [searchOpen, showNotifications, showProfileMenu])
 
   const getFormattedDate = () => {
     const date = new Date()
@@ -226,28 +252,64 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
             {/* User Profile */}
             <div className="flex items-center gap-2">
               <div className={`hidden sm:flex flex-col items-end transition-all duration-300 ${
-                sidebarCollapsed && isDesktop ? 'opacity-0 w-0' : 'opacity-100'
+                sidebarCollapsed && isDesktop ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
               }`}>
-               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-  {student?.studentName || "Student"}
-</p>
-<p className="text-xs text-gray-500 dark:text-gray-400">
-  Class {student?.className || "-"} • {student?.schoolName || ""}
-</p>
-
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                  {student?.studentName || "Student"}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Class {student?.className || "-"} • {student?.schoolName || ""}
+                </p>
               </div>
-              <div className="relative group">
-                <button className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-medium">
-  {student?.studentName
-    ? student.studentName.split(" ").map(n => n[0]).join("").slice(0, 2)
-    : "ST"}
-</div>
-
-                  <ChevronDown className={`h-4 w-4 text-gray-600 dark:text-gray-300 transition-all duration-300 ${
-                    sidebarCollapsed ? 'hidden' : 'block'
-                  } group-hover:rotate-180 transition-transform`} />
+              <div className="relative" ref={profileRef}>
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                >
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-medium text-sm">
+                    {student?.studentName
+                      ? student.studentName.split(" ").map(n => n[0]).join("").slice(0, 2)
+                      : "ST"}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-gray-600 dark:text-gray-300 transition-transform duration-200  ${showProfileMenu ? 'rotate-180' : ''}`} />
                 </button>
+
+                {/* Profile Dropdown Menu */}
+                {showProfileMenu && (
+                  <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-[#1f1f1f] rounded-xl shadow-xl border border-gray-200 dark:border-white/10 z-50 overflow-hidden">
+                    {/* User Info Header */}
+                    <div className="px-4 py-3 border-b border-gray-100 dark:border-white/10">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                        {student?.studentName || "Student"}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                        Class {student?.className || "-"} • {student?.schoolName || ""}
+                      </p>
+                    </div>
+
+                    {/* Menu Items */}
+                    <div className="py-1">
+                      <button
+                        onClick={() => { setShowProfileMenu(false); navigate('/profile'); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                      >
+                        <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        Profile
+                      </button>
+                     
+                    </div>
+
+                    <div className="border-t border-gray-100 dark:border-white/10 py-1">
+                      <button
+                        onClick={() => { setShowProfileMenu(false); handleLogout(); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

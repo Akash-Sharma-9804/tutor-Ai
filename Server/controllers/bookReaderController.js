@@ -47,6 +47,55 @@ exports.getAllBooks = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch books" });
   } 
 };
+
+
+
+exports.getAllBooksForClass = async (req, res) => {
+  try {
+    const studentId = req.studentId;
+
+    // Get student's class_id
+    const [[student]] = await db.query(
+      `SELECT s.class_id, c.class_name 
+       FROM students s 
+       JOIN classes c ON s.class_id = c.id 
+       WHERE s.id = ?`,
+      [studentId]
+    );
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Fetch all books for this class with subject info and chapter count
+    const [books] = await db.query(
+      `SELECT 
+        b.id,
+        b.title,
+        b.author,
+        b.pdf_url,
+        b.board,
+        b.class_num,
+        s.id as subject_id,
+        s.name as subject_name,
+        COUNT(DISTINCT bc.id) as chapter_count
+      FROM subjects s
+      JOIN books b ON b.subject_id = s.id
+      LEFT JOIN book_chapters bc ON bc.book_id = b.id
+      WHERE s.class_id = ?
+      GROUP BY b.id, s.id, s.name
+      ORDER BY s.name ASC, b.created_at DESC`,
+      [student.class_id]
+    );
+
+    console.log(`[getAllBooksForClass] student=${studentId} class_id=${student.class_id} books_found=${books.length}`);
+    res.json({ books, class_name: student.class_name });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch books for class" });
+  }
+};
+
 /**
  * GET /api/books/:bookId/chapters
  * Get table of contents (all chapters) for a book

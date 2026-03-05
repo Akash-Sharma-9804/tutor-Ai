@@ -53,7 +53,7 @@ navigate("/login", { replace: true });
 
   const bottomItems = [
     { icon: User, label: 'Profile', path: '/profile' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
+    // { icon: Settings, label: 'Settings', path: '/settings' },
     { icon: LogOut, label: 'Logout', action: 'logout' },
   ];
 

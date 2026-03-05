@@ -28,6 +28,9 @@ import {
   Heart,
   Bell,
   Camera,
+  Eye,
+  EyeOff,
+  Lock,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -53,6 +56,18 @@ export default function Profile() {
   });
   
   const [loading, setLoading] = useState(true);
+  const [editModal, setEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", phone: "", bio: "" });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [picLoading, setPicLoading] = useState(false);
+  const [picError, setPicError] = useState("");
+  const [pwModal, setPwModal] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState("");
+  const [showPw, setShowPw] = useState({ current: false, next: false, confirm: false });
 
   // Fetch student profile from backend
   useEffect(() => {
@@ -94,12 +109,18 @@ export default function Profile() {
           gender: profileData.gender || "N/A",
           dob: profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : "N/A",
           joinDate: profileData.created_at ? new Date(profileData.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : "N/A",
-          bio: "Passionate learner exploring new concepts with AI-powered tools.",
-          avatar: avatarUrl,
+          bio: profileData.bio || "Passionate learner exploring new concepts with AI-powered tools.",
+          avatar: profileData.profile_picture || avatarUrl,
           streak: stats.streak.current,
           totalHours: stats.studyHours.total,
           lessonsTotal: stats.lessons.total,
           rank: null, // not available from backend yet
+        });
+
+        setEditForm({
+          name: profileData.studentName || "",
+          phone: profileData.phone || "",
+          bio: profileData.bio || "",
         });
 
         // Map real subjects with progress
@@ -169,6 +190,74 @@ export default function Profile() {
   // Deadlines — no backend yet, show empty state
   const deadlines = [];
 
+  const handleChangePassword = async () => {
+    setPwError("");
+    setPwSuccess("");
+    if (!pwForm.current) { setPwError("Enter your current password."); return; }
+    if (pwForm.next.length < 6) { setPwError("New password must be at least 6 characters."); return; }
+    if (pwForm.next !== pwForm.confirm) { setPwError("New passwords do not match."); return; }
+    setPwLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.put(
+        `${import.meta.env.VITE_BACKEND_URL}/api/student/me/password`,
+        { currentPassword: pwForm.current, newPassword: pwForm.next },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setPwSuccess("Password changed successfully!");
+      setPwForm({ current: "", next: "", confirm: "" });
+    } catch (err) {
+      setPwError(err.response?.data?.message || "Failed to change password.");
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const handleEditSave = async () => {
+    setEditError("");
+    if (!editForm.name.trim()) {
+      setEditError("Name cannot be empty.");
+      return;
+    }
+    setEditLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.put(
+        `${import.meta.env.VITE_BACKEND_URL}/api/student/me`,
+        { name: editForm.name, phone: editForm.phone, bio: editForm.bio },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setStudent(prev => ({ ...prev, name: editForm.name, phone: editForm.phone, bio: editForm.bio }));
+      setEditModal(false);
+    } catch (err) {
+      setEditError(err.response?.data?.message || "Failed to update profile.");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleProfilePicture = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPicError("");
+    setPicLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("profilePicture", file);
+      const res = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/student/me/profile-picture`,
+        formData,
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" } }
+      );
+      setStudent(prev => ({ ...prev, avatar: res.data.url + `?t=${Date.now()}` }));
+    } catch (err) {
+      setPicError(err.response?.data?.message || "Failed to upload picture.");
+    } finally {
+      setPicLoading(false);
+    }
+  };
+
  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -208,12 +297,28 @@ export default function Profile() {
                   <img
                     src={student.avatar}
                     alt={student.name}
-                    className="relative w-32 h-32 rounded-2xl border-4 border-white dark:border-gray-800 shadow-xl"
+                    className="relative w-32 h-32 rounded-2xl border-4 border-white dark:border-gray-800 shadow-xl object-cover"
                   />
-                  <button className="absolute bottom-2 right-2 p-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg hover:shadow-xl transition-shadow">
-                    <Camera className="h-4 w-4" />
-                  </button>
+                  <label className={`absolute bottom-2 right-2 p-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer ${picLoading ? 'opacity-60 pointer-events-none' : ''}`}>
+                    {picLoading ? (
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                      </svg>
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleProfilePicture}
+                    />
+                  </label>
                 </motion.div>
+                {picError && (
+                  <p className="text-xs text-red-500 mt-2 max-w-[130px] text-center">{picError}</p>
+                )}
               </div>
 
               {/* User Info */}
@@ -236,6 +341,7 @@ export default function Profile() {
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
+                      onClick={() => { setEditError(""); setEditModal(true); }}
                       className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold flex items-center gap-2 shadow-lg hover:shadow-xl transition-shadow"
                     >
                       <Edit2 className="h-4 w-4" />
@@ -244,11 +350,13 @@ export default function Profile() {
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
+                      onClick={() => { setPwError(""); setPwSuccess(""); setPwModal(true); }}
                       className="px-4 py-2 rounded-xl bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold flex items-center gap-2 shadow hover:shadow-md transition-shadow"
                     >
-                      <Share2 className="h-4 w-4" />
-                      Share
+                      <Lock className="h-4 w-4" />
+                      Password
                     </motion.button>
+                   
                   </div>
                 </div>
 
@@ -731,6 +839,300 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      {editModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md overflow-hidden"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500">
+                  <Edit2 className="h-5 w-5 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Edit Profile</h2>
+              </div>
+              <button
+                onClick={() => setEditModal(false)}
+                className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500 dark:text-gray-400"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              {/* Profile Picture Preview */}
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <img
+                    src={student.avatar}
+                    alt={student.name}
+                    className="w-16 h-16 rounded-2xl border-2 border-gray-200 dark:border-gray-600 object-cover shadow"
+                  />
+                  <label className={`absolute -bottom-1 -right-1 p-1.5 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow cursor-pointer ${picLoading ? 'opacity-60 pointer-events-none' : ''}`}>
+                    {picLoading ? (
+                      <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                      </svg>
+                    ) : (
+                      <Camera className="h-3 w-3" />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleProfilePicture}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Profile Picture</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">JPG, PNG or WEBP · Max 5MB</p>
+                  {picError && <p className="text-xs text-red-500 mt-1">{picError}</p>}
+                </div>
+              </div>
+
+              {/* Name Field */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Your full name"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  />
+                </div>
+              </div>
+
+              {/* Phone Field */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Phone Number
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="tel"
+                    value={editForm.phone}
+                    onChange={e => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="+91 98765 43210"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  />
+                </div>
+              </div>
+
+              {/* Bio Field */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Bio
+                </label>
+                <div className="relative">
+                  <textarea
+                    value={editForm.bio}
+                    onChange={e => {
+                      if (e.target.value.length <= 200)
+                        setEditForm(prev => ({ ...prev, bio: e.target.value }))
+                    }}
+                    placeholder="Tell something about yourself..."
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
+                  />
+                  <span className={`absolute bottom-3 right-3 text-xs ${editForm.bio.length >= 190 ? 'text-orange-400' : 'text-gray-400'}`}>
+                    {editForm.bio.length}/200
+                  </span>
+                </div>
+              </div>
+
+              {/* Read-only info note */}
+              <p className="text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-900/30 rounded-xl px-4 py-3 border border-gray-200 dark:border-gray-700">
+                ℹ️ Email, class, and school details can only be updated by your school administrator.
+              </p>
+
+              {/* Error */}
+              {editError && (
+                <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl px-4 py-3 border border-red-200 dark:border-red-800">
+                  {editError}
+                </p>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex gap-3 px-6 pb-6">
+              <button
+                onClick={() => setEditModal(false)}
+                className="flex-1 py-3 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleEditSave}
+                disabled={editLoading}
+                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold shadow-lg hover:shadow-xl transition-shadow disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2"
+              >
+                {editLoading ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                    </svg>
+                    Saving...
+                  </>
+                ) : "Save Changes"}
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {pwModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500">
+                  <Lock className="h-5 w-5 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Change Password</h2>
+              </div>
+              <button
+                onClick={() => { setPwModal(false); setPwForm({ current: "", next: "", confirm: "" }); setPwError(""); setPwSuccess(""); }}
+                className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500 dark:text-gray-400"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5">
+              {/* Current Password */}
+              {[
+                { key: "current", label: "Current Password", placeholder: "Enter current password" },
+                { key: "next",    label: "New Password",     placeholder: "Min. 6 characters" },
+                { key: "confirm", label: "Confirm New Password", placeholder: "Re-enter new password" },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key}>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    {label}
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type={showPw[key] ? "text" : "password"}
+                      value={pwForm[key]}
+                      onChange={e => setPwForm(prev => ({ ...prev, [key]: e.target.value }))}
+                      placeholder={placeholder}
+                      className="w-full pl-10 pr-11 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPw(prev => ({ ...prev, [key]: !prev[key] }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    >
+                      {showPw[key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Strength hint */}
+              {pwForm.next && (
+                <div className="space-y-1">
+                  <div className="flex gap-1">
+                    {[1,2,3,4].map(i => {
+                      const len = pwForm.next.length;
+                      const hasUpper = /[A-Z]/.test(pwForm.next);
+                      const hasNum = /[0-9]/.test(pwForm.next);
+                      const hasSymbol = /[^A-Za-z0-9]/.test(pwForm.next);
+                      const strength = [len >= 6, hasUpper, hasNum, hasSymbol].filter(Boolean).length;
+                      const colors = ["bg-red-400","bg-orange-400","bg-yellow-400","bg-green-500"];
+                      return (
+                        <div
+                          key={i}
+                          className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${i <= strength ? colors[strength - 1] : "bg-gray-200 dark:bg-gray-700"}`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {(() => {
+                      const len = pwForm.next.length;
+                      const hasUpper = /[A-Z]/.test(pwForm.next);
+                      const hasNum = /[0-9]/.test(pwForm.next);
+                      const hasSymbol = /[^A-Za-z0-9]/.test(pwForm.next);
+                      const strength = [len >= 6, hasUpper, hasNum, hasSymbol].filter(Boolean).length;
+                      return ["Too weak","Fair","Good","Strong"][strength - 1] || "Too weak";
+                    })()}
+                  </p>
+                </div>
+              )}
+
+              {/* Error / Success */}
+              {pwError && (
+                <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl px-4 py-3 border border-red-200 dark:border-red-800">
+                  {pwError}
+                </p>
+              )}
+              {pwSuccess && (
+                <p className="text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-xl px-4 py-3 border border-green-200 dark:border-green-800">
+                  ✅ {pwSuccess}
+                </p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 px-6 pb-6">
+              <button
+                onClick={() => { setPwModal(false); setPwForm({ current: "", next: "", confirm: "" }); setPwError(""); setPwSuccess(""); }}
+                className="flex-1 py-3 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleChangePassword}
+                disabled={pwLoading || !!pwSuccess}
+                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold shadow-lg hover:shadow-xl transition-shadow disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2"
+              >
+                {pwLoading ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                    </svg>
+                    Updating...
+                  </>
+                ) : "Update Password"}
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="  md:-mx-8 -mx-4">

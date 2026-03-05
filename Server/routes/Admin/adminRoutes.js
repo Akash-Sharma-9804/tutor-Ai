@@ -63,6 +63,13 @@ router.post(
   bookController.uploadAndProcess
 );
 
+// Upload full book PDF
+router.post(
+  "/books/:id/upload-pdf",
+  upload.single("book_pdf"),
+  bookController.uploadBookPdf
+);
+
 // Chapter creation endpoint
 router.post("/chapters/create", bookController.createChapter);
 router.put("/books/:id", bookController.updateBook);

@@ -247,7 +247,27 @@ const Books = () => {
     }
   };
 
-  const handleEditChaptersOnly = async () => {
+  const handleUploadBookPdf = async (bookId, file) => {
+  setUploading(true);
+  setUploadStatus({ type: "info", message: "📤 Uploading full book PDF..." });
+  try {
+    const fd = new FormData();
+    fd.append("book_pdf", file);
+    const response = await adminAxios.post(`/books/${bookId}/upload-pdf`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    setUploadStatus({ type: "success", message: "✅ Book PDF uploaded successfully!" });
+    fetchBooks();
+    setTimeout(() => setUploadStatus({ type: "", message: "" }), 4000);
+  } catch (error) {
+    const msg = error.response?.data?.message || error.message || "Upload failed";
+    setUploadStatus({ type: "error", message: `❌ ${msg}` });
+  } finally {
+    setUploading(false);
+  }
+};
+
+const handleEditChaptersOnly = async () => {
     if (!existingBook) return;
     
     // Fetch book with chapters
@@ -403,6 +423,7 @@ const Books = () => {
       {showUploadModal && (
         <UploadBookModal
           onUpload={handleUploadBook}
+          onUploadPdf={handleUploadBookPdf}
           onClose={() => {
             setShowUploadModal(false);
             setEditingBook(null);

@@ -9,8 +9,11 @@ import {
   Star,
   Zap,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const HeroBox = ({student}) => {
+  const navigate = useNavigate();
+  
   return (
     <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
@@ -89,19 +92,13 @@ const HeroBox = ({student}) => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="inline-flex text-xs sm:text-base items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition text-white font-semibold shadow-lg shadow-purple-500/30"
+                 onClick={() => navigate("/subjects")}
+                className="inline-flex cursor-pointer text-xs sm:text-base items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition text-white font-semibold shadow-lg shadow-purple-500/30"
               >
                 Start Learning Today
                 <ArrowRight className="h-4 w-4" />
               </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="inline-flex text-xs sm:text-base  items-center gap-2 px-6 py-3 rounded-xl bg-white/60 dark:bg-white/10 hover:bg-white/80 dark:hover:bg-white/20 backdrop-blur-sm transition text-gray-900 dark:text-gray-100 font-semibold border border-gray-200 dark:border-gray-800/60"
-              >
-                <BookOpen className="h-4 w-4" />
-                Browse Subjects
-              </motion.button>
+       
             </div>
           </div>
 

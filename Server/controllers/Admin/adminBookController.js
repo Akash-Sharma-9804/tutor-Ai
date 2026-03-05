@@ -1011,6 +1011,76 @@ exports.forceDeleteBook = async (req, res) => {
 };
 
  
+// @desc    Upload full book PDF and save to FTP path
+// @route   POST /api/books/:id/upload-pdf
+// @access  Private
+exports.uploadBookPdf = async (req, res) => {
+  try {
+    const bookId = req.params.id;
+
+    // Check book exists and get school/class/subject info
+    const [bookRows] = await db.query(
+      `SELECT 
+        b.*,
+        s.name as subject_name,
+        c.class_name,
+        sc.name as school_name
+       FROM books b
+       LEFT JOIN subjects s ON b.subject_id = s.id
+       LEFT JOIN classes c ON s.class_id = c.id
+       LEFT JOIN schools sc ON c.school_id = sc.id
+       WHERE b.id = ?`,
+      [bookId]
+    );
+
+    if (bookRows.length === 0) {
+      return res.status(404).json({ success: false, message: "Book not found" });
+    }
+
+    const book = bookRows[0];
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No PDF file provided" });
+    }
+
+    if (req.file.mimetype !== "application/pdf") {
+      return res.status(400).json({ success: false, message: "Only PDF files are allowed" });
+    }
+
+    const schoolName = book.school_name || "Unknown";
+    const classNum = book.class_name?.match(/\d+/)?.[0] || book.class_num || "1";
+    const className = `Class ${classNum}`;
+    const subjectName = book.subject_name || "Unknown";
+
+    // Upload to FTP — same folder structure as chapters
+    const ftpRes = await uploadFileToFTP(
+      req.file.buffer,
+      `${book.title}_full_book.pdf`,
+      `/books/${schoolName}/${className}/${subjectName}`
+    );
+
+    // Save the pdf_url back to the book record
+    await db.query(
+      `UPDATE books SET pdf_url = ?, file_size = ?, updated_at = NOW() WHERE id = ?`,
+      [ftpRes.url, req.file.size, bookId]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Book PDF uploaded successfully",
+      pdf_url: ftpRes.url,
+      file_size: req.file.size,
+    });
+  } catch (error) {
+    console.error("Error uploading book PDF:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to upload book PDF",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Get book chapters
 // @route   GET /api/books/:id/chapters
 // @access  Private

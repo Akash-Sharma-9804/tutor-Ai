@@ -41,6 +41,10 @@ router.post("/:bookId/backfill-all-segments", bookReaderController.backfillAllSe
 // Get per-chapter progress summary for a whole book (Dashboard use)
 router.get("/:bookId/progress-summary", bookReaderController.getBookProgressSummary);
 
+router.get("/class/all", authMiddleware, (req, res, next) => {
+  console.log("[bookRoutes] GET /class/all hit, studentId:", req.studentId);
+  next();
+}, bookReaderController.getAllBooksForClass);
 
 module.exports = router;
 
