@@ -1,1330 +1,790 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import Footer from "../components/Footer/Footer";
+import {
+  Brain, BookOpen, ScanLine, Mic, BarChart3, Trophy,
+  Zap, Star, ArrowRight, ChevronDown, Play, CheckCircle,
+  Sparkles, GraduationCap, Users, Clock, TrendingUp, Menu, X
+} from "lucide-react";
 
-// ─── Floating Particle ───────────────────────────────────────────────────────
-function Particle({ style }) {
-  return <div className="particle" style={style} />;
+// ─── Google Fonts ────────────────────────────────────────────────────────────
+const FontStyle = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,700;0,800;1,300&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+    .font-outfit { font-family: 'Outfit', sans-serif; }
+    .font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }
+    html { scroll-behavior: smooth; }
+
+    .gradient-text-hero {
+      background: linear-gradient(135deg, #e2e8f0 0%, #ffffff 40%, #bfdbfe 75%, #c4b5fd 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .gradient-text-blue {
+      background: linear-gradient(135deg, #60a5fa, #818cf8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .gradient-text-warm {
+      background: linear-gradient(135deg, #fbbf24, #f59e0b, #a3e635);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+
+    .card-glass {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .card-glass-light {
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(148,163,184,0.15);
+      box-shadow: 0 4px 24px rgba(15,23,42,0.06);
+    }
+
+    .mesh-bg {
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59,130,246,0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 85% 80%, rgba(139,92,246,0.12) 0%, transparent 50%),
+        radial-gradient(ellipse 50% 40% at 15% 70%, rgba(245,158,11,0.06) 0%, transparent 50%),
+        #080d1a;
+    }
+    .section-dark { background: linear-gradient(180deg, #080d1a 0%, #0c1526 100%); }
+    .section-mid { background: linear-gradient(180deg, #0c1526 0%, #080d1a 100%); }
+    .section-light { background: linear-gradient(180deg, #f8faff 0%, #f1f5ff 100%); }
+
+    .orbit-ring {
+      position: absolute; border-radius: 50%;
+      border: 1px solid rgba(99,179,237,0.1);
+      animation: orbitSpin linear infinite;
+    }
+    @keyframes orbitSpin {
+      from { transform: translate(-50%,-50%) rotate(0deg); }
+      to   { transform: translate(-50%,-50%) rotate(360deg); }
+    }
+    .orbit-dot {
+      position: absolute; width: 7px; height: 7px; border-radius: 50%;
+      top: -3.5px; left: calc(50% - 3.5px);
+    }
+
+    @keyframes twinkle {
+      0%,100% { opacity: 0.15; transform: scale(1); }
+      50%      { opacity: 0.9; transform: scale(1.6); }
+    }
+    .star-particle { animation: twinkle linear infinite; }
+
+    @keyframes floatY {
+      0%,100% { transform: translateY(0px); }
+      50%      { transform: translateY(-12px); }
+    }
+    .float-a { animation: floatY 3.8s ease-in-out infinite; }
+    .float-b { animation: floatY 5.2s ease-in-out infinite 1.2s; }
+    .float-c { animation: floatY 4.5s ease-in-out infinite 0.6s; }
+
+    .btn-glow-blue {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      box-shadow: 0 6px 28px rgba(59,130,246,0.38);
+      transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+    }
+    .btn-glow-blue:hover {
+      box-shadow: 0 10px 44px rgba(59,130,246,0.55);
+      transform: translateY(-2px);
+    }
+    .btn-ghost {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.15);
+      transition: all 0.25s;
+    }
+    .btn-ghost:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(99,179,237,0.4);
+      transform: translateY(-2px);
+    }
+
+    .nav-glass {
+      background: rgba(8,13,26,0.7);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    @keyframes shimmerAnim {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
+    .shimmer-line {
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+      background-size: 200% 100%;
+      animation: shimmerAnim 2.5s ease-in-out infinite;
+    }
+
+    .typing-cursor::after {
+      content: '|'; color: #60a5fa;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 0%,100%{ opacity:1; } 50%{ opacity:0; } }
+
+    .subject-card { transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+    .subject-card:hover { transform: translateY(-8px) scale(1.04); }
+
+    @media (max-width: 768px) {
+      .orbit-ring { display: none; }
+    }
+  `}</style>
+);
+
+// ─── Typing word rotator ─────────────────────────────────────────────────────
+const WORDS = ["Physics", "Chemistry", "Mathematics", "Biology", "History", "Computer Science", "Economics"];
+function TypingWord() {
+  const [idx, setIdx] = useState(0);
+  const [text, setText] = useState("");
+  const [del, setDel] = useState(false);
+  useEffect(() => {
+    const w = WORDS[idx];
+    let t;
+    if (!del && text.length < w.length)      t = setTimeout(() => setText(w.slice(0, text.length + 1)), 85);
+    else if (!del && text.length === w.length) t = setTimeout(() => setDel(true), 2000);
+    else if (del && text.length > 0)           t = setTimeout(() => setText(text.slice(0, -1)), 45);
+    else { setDel(false); setIdx(i => (i + 1) % WORDS.length); }
+    return () => clearTimeout(t);
+  }, [text, del, idx]);
+  return <span className="gradient-text-warm font-outfit typing-cursor">{text}</span>;
 }
 
-// ─── Counter animation hook ───────────────────────────────────────────────────
-function useCounter(target, duration = 2000, start = false) {
-  const [count, setCount] = useState(0);
+// ─── Animated counter ────────────────────────────────────────────────────────
+function Counter({ to, suffix, started }) {
+  const [v, setV] = useState(0);
   useEffect(() => {
-    if (!start) return;
-    let startTime = null;
-    const step = (timestamp) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      setCount(Math.floor(progress * target));
-      if (progress < 1) requestAnimationFrame(step);
+    if (!started) return;
+    let s = null;
+    const run = ts => {
+      if (!s) s = ts;
+      const p = Math.min((ts - s) / 2400, 1);
+      setV(Math.floor((1 - Math.pow(1 - p, 3)) * to));
+      if (p < 1) requestAnimationFrame(run);
     };
-    requestAnimationFrame(step);
-  }, [target, duration, start]);
-  return count;
+    requestAnimationFrame(run);
+  }, [to, started]);
+  return <>{v.toLocaleString()}{suffix}</>;
 }
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-function StatCard({ value, suffix, label, started }) {
-  const count = useCounter(value, 2000, started);
-  return (
-    <div className="stat-card">
-      <div className="stat-number">{count}{suffix}</div>
-      <div className="stat-label">{label}</div>
-    </div>
-  );
-}
+// ─── Stars ───────────────────────────────────────────────────────────────────
+const STARS = Array.from({ length: 55 }, () => ({
+  x: Math.random() * 100, y: Math.random() * 100,
+  size: Math.random() * 2.2 + 0.4,
+  delay: Math.random() * 6, dur: Math.random() * 3 + 2.5,
+}));
 
-// ─── Feature Card ─────────────────────────────────────────────────────────────
-function FeatureCard({ icon, title, desc, accent, delay }) {
-  return (
-    <div className="feature-card" style={{ animationDelay: delay }}>
-      <div className="feature-icon" style={{ background: accent }}>{icon}</div>
-      <h3 className="feature-title">{title}</h3>
-      <p className="feature-desc">{desc}</p>
-    </div>
-  );
-}
+// ─── Feature data ────────────────────────────────────────────────────────────
+const FEATURES = [
+  {
+    icon: Brain, color: "#60a5fa", bgColor: "rgba(96,165,250,0.12)",
+    title: "AI Tutor — Always Available",
+    desc: "Ask anything, anytime. The AI explains concepts in multiple ways until you truly understand — no judgment, unlimited patience.",
+    example: "I asked about Newton's third law 4 different ways and the AI kept rephrasing until it finally clicked for me!",
+  },
+  {
+    icon: BookOpen, color: "#34d399", bgColor: "rgba(52,211,153,0.12)",
+    title: "Line-by-Line Book Reader",
+    desc: "Read your school textbooks one sentence at a time with AI annotations and instant explanations on every page.",
+    example: "Tapped a sentence in my History chapter and the AI instantly explained the full context and why it mattered.",
+  },
+  {
+    icon: ScanLine, color: "#fbbf24", bgColor: "rgba(251,191,36,0.12)",
+    title: "Scan & Learn",
+    desc: "Photograph any question from your notebook or textbook and get complete step-by-step solutions in seconds.",
+    example: "Snapped a photo of a trigonometry problem I was stuck on and got a full worked solution in 3 seconds.",
+  },
+  {
+    icon: BarChart3, color: "#a78bfa", bgColor: "rgba(167,139,250,0.12)",
+    title: "Smart Progress Tracking",
+    desc: "Visual dashboards show exactly how much you've studied, what you've mastered, and where to focus next.",
+    example: "My dashboard showed I was over-studying chapters I already knew — helped me refocus on weak areas instantly.",
+  },
+  {
+    icon: Trophy, color: "#f472b6", bgColor: "rgba(244,114,182,0.12)",
+    title: "Personalised Practice Tests",
+    desc: "AI-generated tests from your exact syllabus, adapting difficulty as you improve week by week.",
+    example: "My practice scores jumped from 62% to 89% in 2 weeks using AI-generated tests from my actual textbooks.",
+  },
+  {
+    icon: Mic, color: "#22d3ee", bgColor: "rgba(34,211,238,0.12)",
+    title: "Talk to Your AI Tutor",
+    desc: "Voice-based learning for students who prefer listening. Speak your question and get clear spoken answers.",
+    example: "I do all my revision during my commute now — just speak to the AI tutor through my earphones.",
+  },
+];
 
-// ─── Testimonial ──────────────────────────────────────────────────────────────
-function TestimonialCard({ quote, name, grade, school, emoji }) {
-  return (
-    <div className="testimonial-card">
-      <div className="testimonial-emoji">{emoji}</div>
-      <p className="testimonial-quote">"{quote}"</p>
-      <div className="testimonial-author">
-        <strong>{name}</strong>
-        <span>{grade} · {school}</span>
-      </div>
-    </div>
-  );
-}
+const SUBJECTS = [
+  { e: "➗", n: "Mathematics" }, { e: "⚛️", n: "Physics" },
+  { e: "🧪", n: "Chemistry" },  { e: "🧬", n: "Biology" },
+  { e: "🌍", n: "Geography" },  { e: "📜", n: "History" },
+  { e: "💻", n: "Computer Sci" }, { e: "📗", n: "English" },
+  { e: "🏛️", n: "Civics" },    { e: "📊", n: "Economics" },
+  { e: "🌱", n: "Env. Science" }, { e: "🎨", n: "Arts" },
+];
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+const STEPS = [
+  { n: "01", icon: "✍️", title: "Create Your Account", desc: "Sign up with email or Google in 60 seconds. Select your school and class for a personalised experience." },
+  { n: "02", icon: "📚", title: "Pick Your Subjects", desc: "Subjects auto-load based on your class. Class 11 & 12 students choose their specific stream." },
+  { n: "03", icon: "🚀", title: "Start with AI Now", desc: "Open a book, chat with your AI tutor, scan a question, or take a practice test — immediately." },
+];
+
+const TESTIMONIALS = [
+  { quote: "My Physics marks went from 54 to 88 in one term. The AI explained Newton's laws in five different ways until it clicked.", name: "Priya Sharma", grade: "Class 11 Science", school: "Delhi Public School", avatar: "P" },
+  { quote: "I used to dread exam season. Now I actually look forward to studying — the AI makes it feel like a real conversation.", name: "Rohan Mehta", grade: "Class 9", school: "Kendriya Vidyalaya", avatar: "R" },
+  { quote: "The scan feature is insane. I photograph a problem I'm stuck on and get a full step-by-step walkthrough in seconds.", name: "Ananya Reddy", grade: "Class 12 PCM", school: "Narayana Junior College", avatar: "A" },
+];
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const [statsVisible, setStatsVisible] = useState(false);
+  const [menuOpen, setMenuOpen]       = useState(false);
+  const [scrolled, setScrolled]       = useState(false);
+  const [statsVis, setStatsVis]       = useState(false);
+  const [activeF, setActiveF]         = useState(0);
   const statsRef = useRef(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const heroRef  = useRef(null);
+
+  const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
+  const heroY   = useTransform(scrollYProgress, [0, 1], ["0%", "25%"]);
+  const heroOpa = useTransform(scrollYProgress, [0, 0.85], [1, 0]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
+    const fn = () => setScrolled(window.scrollY > 48);
+    window.addEventListener("scroll", fn);
+    return () => window.removeEventListener("scroll", fn);
   }, []);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setStatsVisible(true); },
-      { threshold: 0.3 }
-    );
-    if (statsRef.current) observer.observe(statsRef.current);
-    return () => observer.disconnect();
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setStatsVis(true); }, { threshold: 0.35 });
+    if (statsRef.current) obs.observe(statsRef.current);
+    return () => obs.disconnect();
   }, []);
 
-  const particles = Array.from({ length: 24 }, (_, i) => ({
-    width: `${Math.random() * 8 + 2}px`,
-    height: `${Math.random() * 8 + 2}px`,
-    left: `${Math.random() * 100}%`,
-    top: `${Math.random() * 100}%`,
-    animationDelay: `${Math.random() * 8}s`,
-    animationDuration: `${Math.random() * 12 + 8}s`,
-    opacity: Math.random() * 0.3 + 0.1,
-    background: `linear-gradient(135deg, #6366f1, #8b5cf6)`,
-  }));
+  useEffect(() => {
+    const t = setInterval(() => setActiveF(p => (p + 1) % FEATURES.length), 3800);
+    return () => clearInterval(t);
+  }, []);
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+    <div className="font-jakarta bg-[#080d1a] text-white overflow-x-hidden">
+      <FontStyle />
 
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      {/* ── NAV ─────────────────────────────────────────────────────────────── */}
+      <motion.nav initial={{ y: -24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5 }}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "nav-glass" : ""}`}>
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between">
 
-        :root {
-          --ink: #0a0a14;
-          --cream: #f8f5ef;
-          --quantum: #6366f1;
-          --quantum-dark: #4f46e5;
-          --quantum-light: #818cf8;
-          --gold: #fbbf24;
-          --teal: #2dd4bf;
-          --coral: #f87171;
-          --purple: #8b5cf6;
-          --card-bg: #ffffff;
-          --muted: #6b7280;
-          --border: rgba(0,0,0,0.07);
-          --glass-bg: rgba(255, 255, 255, 0.95);
-        }
-
-        html { scroll-behavior: smooth; }
-        body { 
-          font-family: 'Inter', sans-serif; 
-          background: var(--cream); 
-          color: var(--ink); 
-          overflow-x: hidden; 
-          line-height: 1.6;
-        }
-
-        h1, h2, h3, h4, .nav-logo, .btn-primary, .btn-secondary, .btn-gold {
-          font-family: 'Space Grotesk', sans-serif;
-        }
-
-        /* ── NAV ── */
-        .nav {
-          position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-          padding: 24px 0;
-        }
-        .nav.scrolled {
-          background: rgba(255, 255, 255, 0.8);
-          backdrop-filter: blur(20px);
-          padding: 16px 0;
-          box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
-          border-bottom: 1px solid rgba(99, 102, 241, 0.1);
-        }
-        .nav-inner {
-          max-width: 1280px; margin: 0 auto;
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 0 32px;
-        }
-        .nav-logo {
-          font-family: 'Space Grotesk', sans-serif; 
-          font-weight: 800; 
-          font-size: 1.5rem;
-          background: linear-gradient(135deg, var(--quantum), var(--purple));
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          text-decoration: none; 
-          display: flex; 
-          align-items: center; 
-          gap: 10px;
-          letter-spacing: -0.02em;
-        }
-        .logo-dot { 
-          width: 12px; 
-          height: 12px; 
-          background: linear-gradient(135deg, var(--quantum), var(--purple));
-          border-radius: 50%; 
-          display: inline-block;
-          box-shadow: 0 0 20px var(--quantum-light);
-          animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.2); opacity: 0.8; }
-        }
-        .nav-links { display: flex; align-items: center; gap: 40px; }
-        .nav-link { 
-          font-size: 0.95rem; 
-          font-weight: 500; 
-          color: var(--ink); 
-          text-decoration: none; 
-          opacity: 0.7; 
-          transition: all 0.2s;
-          position: relative;
-        }
-        .nav-link::after {
-          content: '';
-          position: absolute;
-          bottom: -4px;
-          left: 0;
-          width: 0;
-          height: 2px;
-          background: linear-gradient(90deg, var(--quantum), var(--purple));
-          transition: width 0.3s;
-        }
-        .nav-link:hover { 
-          opacity: 1; 
-        }
-        .nav-link:hover::after {
-          width: 100%;
-        }
-        .nav-cta {
-          background: linear-gradient(135deg, var(--quantum), var(--purple));
-          color: white;
-          font-family: 'Space Grotesk', sans-serif;
-          font-weight: 600; 
-          font-size: 0.9rem; 
-          padding: 12px 28px; 
-          border-radius: 100px;
-          text-decoration: none; 
-          transition: all 0.3s; 
-          letter-spacing: 0.02em;
-          box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.3);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .nav-cta:hover { 
-          transform: translateY(-2px);
-          box-shadow: 0 20px 30px -8px rgba(99, 102, 241, 0.4);
-        }
-        .nav-hamburger { display: none; flex-direction: column; gap: 6px; cursor: pointer; padding: 4px; }
-        .nav-hamburger span { 
-          width: 24px; 
-          height: 2px; 
-          background: linear-gradient(90deg, var(--quantum), var(--purple));
-          border-radius: 2px; 
-          transition: all 0.3s; 
-        }
-        .mobile-menu {
-          display: none; position: fixed; top: 80px; left: 0; right: 0; z-index: 99;
-          background: rgba(255, 255, 255, 0.95);
-          backdrop-filter: blur(20px);
-          padding: 32px;
-          flex-direction: column; gap: 24px;
-          box-shadow: 0 20px 40px rgba(0,0,0,0.08);
-          border-bottom: 1px solid rgba(99, 102, 241, 0.1);
-        }
-        .mobile-menu.open { display: flex; }
-        .mobile-menu .nav-link { font-size: 1rem; opacity: 1; }
-        .mobile-menu .nav-cta { text-align: center; padding: 14px; }
-
-        @media (max-width: 768px) {
-          .nav-links { display: none; }
-          .nav-hamburger { display: flex; }
-          .nav-inner { padding: 0 24px; }
-        }
-
-        /* ── HERO ── */
-        .hero {
-          min-height: 100vh; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center;
-          position: relative; 
-          overflow: hidden;
-          background: linear-gradient(135deg, #f8f5ef 0%, #f0f4ff 50%, #f5f0ff 100%);
-          padding: 140px 32px 100px;
-        }
-        .hero-bg-circle {
-          position: absolute; 
-          border-radius: 50%; 
-          filter: blur(100px); 
-          pointer-events: none;
-          opacity: 0.5;
-        }
-        .hero-bg-circle.c1 { 
-          width: 600px; 
-          height: 600px; 
-          background: rgba(99, 102, 241, 0.15); 
-          top: -200px; 
-          right: -200px; 
-          animation: float 20s infinite;
-        }
-        .hero-bg-circle.c2 { 
-          width: 500px; 
-          height: 500px; 
-          background: rgba(139, 92, 246, 0.12); 
-          bottom: -200px; 
-          left: -200px;
-          animation: float 25s infinite reverse;
-        }
-        .hero-bg-circle.c3 { 
-          width: 400px; 
-          height: 400px; 
-          background: rgba(251, 191, 36, 0.1); 
-          top: 40%; 
-          left: 40%;
-          animation: float 30s infinite;
-        }
-        @keyframes float {
-          0%, 100% { transform: translate(0, 0) rotate(0deg); }
-          33% { transform: translate(30px, -30px) rotate(120deg); }
-          66% { transform: translate(-20px, 20px) rotate(240deg); }
-        }
-
-        .particle {
-          position: absolute; 
-          border-radius: 50%;
-          animation: floatParticle linear infinite;
-          pointer-events: none;
-        }
-        @keyframes floatParticle {
-          0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 0; }
-          10% { opacity: 0.5; }
-          50% { transform: translateY(-60vh) rotate(360deg) scale(0.5); }
-          90% { opacity: 0.3; }
-          100% { transform: translateY(-120vh) rotate(720deg) scale(0); opacity: 0; }
-        }
-
-        .hero-inner { 
-          max-width: 1000px; 
-          margin: 0 auto; 
-          text-align: center; 
-          position: relative; 
-          z-index: 1; 
-        }
-        .hero-badge {
-          display: inline-flex; 
-          align-items: center; 
-          gap: 10px;
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(99, 102, 241, 0.2);
-          padding: 10px 22px; 
-          border-radius: 100px; 
-          font-size: 0.9rem; 
-          font-weight: 500;
-          color: var(--quantum-dark); 
-          margin-bottom: 32px; 
-          animation: fadeUp 0.6s ease both;
-          box-shadow: 0 4px 20px rgba(99, 102, 241, 0.1);
-        }
-        .badge-dot { 
-          width: 8px; 
-          height: 8px; 
-          background: linear-gradient(135deg, var(--quantum), var(--purple));
-          border-radius: 50%; 
-          animation: pulse 2s infinite; 
-        }
-
-        .hero-title {
-          font-family: 'Space Grotesk', sans-serif; 
-          font-weight: 800;
-          font-size: clamp(3rem, 8vw, 5.5rem); 
-          line-height: 1.05;
-          color: var(--ink); 
-          margin-bottom: 16px;
-          animation: fadeUp 0.7s 0.1s ease both;
-          letter-spacing: -0.03em;
-        }
-        .hero-title .accent { 
-          background: linear-gradient(135deg, var(--quantum), var(--purple));
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          position: relative; 
-          display: inline-block; 
-        }
-        .hero-title .accent2 { 
-          color: var(--gold); 
-        }
-        .hero-subtitle {
-          font-size: clamp(1.1rem, 2.5vw, 1.3rem); 
-          color: var(--muted); 
-          font-weight: 400;
-          max-width: 600px; 
-          margin: 0 auto 48px; 
-          line-height: 1.7;
-          animation: fadeUp 0.7s 0.2s ease both;
-        }
-        .hero-actions { 
-          display: flex; 
-          gap: 20px; 
-          justify-content: center; 
-          flex-wrap: wrap; 
-          animation: fadeUp 0.7s 0.3s ease both; 
-        }
-        .btn-primary {
-          background: linear-gradient(135deg, var(--quantum), var(--purple));
-          color: white; 
-          font-family: 'Space Grotesk', sans-serif;
-          font-weight: 700; 
-          font-size: 1.1rem; 
-          padding: 18px 44px; 
-          border-radius: 100px;
-          text-decoration: none; 
-          transition: all 0.3s; 
-          letter-spacing: 0.02em; 
-          display: inline-flex; 
-          align-items: center; 
-          gap: 10px;
-          box-shadow: 0 20px 30px -8px rgba(99, 102, 241, 0.4);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .btn-primary:hover { 
-          transform: translateY(-3px);
-          box-shadow: 0 30px 40px -10px rgba(99, 102, 241, 0.5);
-        }
-        .btn-secondary {
-          background: transparent; 
-          color: var(--ink); 
-          font-family: 'Space Grotesk', sans-serif;
-          font-weight: 600; 
-          font-size: 1.1rem; 
-          padding: 18px 44px; 
-          border-radius: 100px;
-          text-decoration: none; 
-          border: 2px solid rgba(99, 102, 241, 0.3); 
-          transition: all 0.3s; 
-          display: inline-flex; 
-          align-items: center; 
-          gap: 10px;
-          backdrop-filter: blur(10px);
-        }
-        .btn-secondary:hover { 
-          background: linear-gradient(135deg, var(--quantum), var(--purple));
-          border-color: transparent;
-          color: white;
-          transform: translateY(-3px);
-          box-shadow: 0 20px 30px -8px rgba(99, 102, 241, 0.3);
-        }
-
-        .hero-visual {
-          margin-top: 80px; 
-          animation: fadeUp 0.8s 0.4s ease both; 
-          position: relative;
-        }
-        .hero-card-wrap {
-          position: relative; 
-          max-width: 720px; 
-          margin: 0 auto;
-          background: rgba(255, 255, 255, 0.9);
-          backdrop-filter: blur(20px);
-          border-radius: 32px; 
-          padding: 36px;
-          box-shadow: 0 40px 80px rgba(99, 102, 241, 0.15);
-          border: 1px solid rgba(255, 255, 255, 0.5);
-        }
-        .chat-row { 
-          display: flex; 
-          gap: 16px; 
-          margin-bottom: 20px; 
-          align-items: flex-start; 
-        }
-        .chat-row.right { 
-          flex-direction: row-reverse; 
-        }
-        .chat-avatar { 
-          width: 44px; 
-          height: 44px; 
-          border-radius: 14px; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          font-size: 1.3rem; 
-          flex-shrink: 0;
-          box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1);
-        }
-        .chat-avatar.ai { 
-          background: linear-gradient(135deg, var(--quantum), var(--purple)); 
-        }
-        .chat-avatar.user { 
-          background: linear-gradient(135deg, var(--gold), #f59e0b); 
-        }
-        .chat-bubble {
-          background: rgba(248, 250, 252, 0.9);
-          backdrop-filter: blur(10px);
-          border-radius: 20px; 
-          padding: 14px 20px;
-          font-size: 0.95rem; 
-          line-height: 1.6; 
-          max-width: 80%; 
-          color: var(--ink);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.02);
-          border: 1px solid rgba(255,255,255,0.5);
-        }
-        .chat-row.right .chat-bubble { 
-          background: linear-gradient(135deg, var(--quantum), var(--purple)); 
-          color: white; 
-        }
-        .chat-label { 
-          font-size: 0.75rem; 
-          color: var(--muted); 
-          font-weight: 500; 
-          margin-bottom: 6px; 
-          letter-spacing: 0.5px;
-        }
-        .chat-row.right .chat-label { 
-          text-align: right; 
-          color: var(--quantum);
-        }
-        .typing-dots { 
-          display: flex; 
-          gap: 6px; 
-          padding: 14px 20px; 
-          background: rgba(248, 250, 252, 0.9);
-          backdrop-filter: blur(10px);
-          border-radius: 20px; 
-          width: fit-content; 
-          border: 1px solid rgba(255,255,255,0.5);
-        }
-        .typing-dot { 
-          width: 8px; 
-          height: 8px; 
-          background: linear-gradient(135deg, var(--quantum), var(--purple));
-          border-radius: 50%; 
-          animation: typingBounce 1.4s infinite; 
-        }
-        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes typingBounce { 
-          0%,60%,100% { transform: translateY(0); opacity: 0.4; } 
-          30% { transform: translateY(-8px); opacity: 1; } 
-        }
-        .floating-badge {
-          position: absolute; 
-          background: rgba(255, 255, 255, 0.9);
-          backdrop-filter: blur(10px);
-          border-radius: 100px; 
-          padding: 12px 22px;
-          box-shadow: 0 15px 30px -5px rgba(99, 102, 241, 0.2); 
-          border: 1px solid rgba(255, 255, 255, 0.8);
-          display: flex; 
-          align-items: center; 
-          gap: 10px; 
-          font-size: 0.9rem; 
-          font-weight: 600; 
-          white-space: nowrap;
-          color: var(--ink);
-        }
-        .fb-top-left { top: -20px; left: -30px; animation: floatBadge 4s ease-in-out infinite; }
-        .fb-top-right { top: -20px; right: -30px; animation: floatBadge 4s 1s ease-in-out infinite; }
-        .fb-bottom { bottom: -20px; left: 50%; transform: translateX(-50%); animation: floatBadgeCentered 4s 0.5s ease-in-out infinite; }
-        @keyframes floatBadge { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
-        @keyframes floatBadgeCentered { 
-          0%,100% { transform: translateX(-50%) translateY(0); } 
-          50% { transform: translateX(-50%) translateY(-12px); } 
-        }
-
-        /* ── STATS ── */
-        .stats-section { 
-          background: linear-gradient(135deg, var(--ink) 0%, #1a1a2e 100%);
-          padding: 100px 32px; 
-          position: relative;
-          overflow: hidden;
-        }
-        .stats-section::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: radial-gradient(circle at 30% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 50%);
-        }
-        .stats-inner { 
-          max-width: 1100px; 
-          margin: 0 auto; 
-          display: grid; 
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
-          gap: 48px; 
-          text-align: center; 
-          position: relative;
-          z-index: 1;
-        }
-        .stat-number { 
-          font-family: 'Space Grotesk', sans-serif; 
-          font-weight: 800; 
-          font-size: 3.5rem; 
-          background: linear-gradient(135deg, var(--gold), #f59e0b);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          line-height: 1; 
-          margin-bottom: 8px;
-        }
-        .stat-label { 
-          font-size: 1rem; 
-          color: rgba(255,255,255,0.6); 
-          font-weight: 400; 
-          letter-spacing: 0.5px;
-        }
-
-        /* ── FEATURES ── */
-        .features-section { 
-          padding: 120px 32px; 
-          background: var(--cream); 
-        }
-        .section-inner { 
-          max-width: 1280px; 
-          margin: 0 auto; 
-        }
-        .section-tag { 
-          font-size: 0.9rem; 
-          font-weight: 600; 
-          letter-spacing: 0.15em; 
-          text-transform: uppercase; 
-          background: linear-gradient(135deg, var(--quantum), var(--purple));
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          margin-bottom: 16px; 
-        }
-        .section-title { 
-          font-family: 'Space Grotesk', sans-serif; 
-          font-weight: 800; 
-          font-size: clamp(2.5rem, 5vw, 3.5rem); 
-          color: var(--ink); 
-          margin-bottom: 20px; 
-          line-height: 1.15;
-          letter-spacing: -0.02em;
-        }
-        .section-sub { 
-          font-size: 1.1rem; 
-          color: var(--muted); 
-          max-width: 600px; 
-          line-height: 1.7; 
-          font-weight: 400; 
-          margin-bottom: 64px; 
-        }
-        .features-grid { 
-          display: grid; 
-          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
-          gap: 30px; 
-        }
-        .feature-card {
-          background: white; 
-          border-radius: 28px; 
-          padding: 40px;
-          border: 1px solid var(--border); 
-          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-          animation: fadeUp 0.6s ease both;
-          box-shadow: 0 20px 40px -10px rgba(0,0,0,0.03);
-        }
-        .feature-card:hover { 
-          transform: translateY(-10px); 
-          box-shadow: 0 40px 60px -15px rgba(99, 102, 241, 0.15);
-          border-color: rgba(99, 102, 241, 0.2);
-        }
-        .feature-icon { 
-          width: 64px; 
-          height: 64px; 
-          border-radius: 20px; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          font-size: 2rem; 
-          margin-bottom: 24px;
-          box-shadow: 0 15px 30px -8px rgba(99, 102, 241, 0.2);
-        }
-        .feature-title { 
-          font-family: 'Space Grotesk', sans-serif; 
-          font-weight: 700; 
-          font-size: 1.3rem; 
-          color: var(--ink); 
-          margin-bottom: 12px; 
-        }
-        .feature-desc { 
-          font-size: 1rem; 
-          color: var(--muted); 
-          line-height: 1.7; 
-          font-weight: 400; 
-        }
-
-        /* ── HOW IT WORKS ── */
-        .how-section { 
-          padding: 120px 32px; 
-          background: linear-gradient(135deg, #0a0a14 0%, #1a103a 100%);
-          position: relative;
-          overflow: hidden;
-        }
-        .how-section::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: radial-gradient(circle at 70% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 50%);
-        }
-        .how-section .section-title { 
-          color: white; 
-        }
-        .how-section .section-tag { 
-          color: var(--gold); 
-        }
-        .how-section .section-sub { 
-          color: rgba(255,255,255,0.5); 
-        }
-        .steps-grid { 
-          display: grid; 
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-          gap: 32px; 
-          position: relative;
-          z-index: 1;
-        }
-        .step-card { 
-          text-align: center; 
-          padding: 40px 24px;
-          background: rgba(255, 255, 255, 0.03);
-          backdrop-filter: blur(10px);
-          border-radius: 28px;
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          transition: all 0.3s;
-        }
-        .step-card:hover {
-          transform: translateY(-8px);
-          background: rgba(255, 255, 255, 0.05);
-          border-color: rgba(99, 102, 241, 0.2);
-        }
-        .step-number {
-          width: 72px; 
-          height: 72px; 
-          border-radius: 50%; 
-          border: 2px solid rgba(251, 191, 36, 0.3);
-          display: flex; 
-          align-items: center; 
-          justify-content: center;
-          font-family: 'Space Grotesk', sans-serif; 
-          font-weight: 800; 
-          font-size: 1.8rem; 
-          background: linear-gradient(135deg, var(--gold), #f59e0b);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          margin: 0 auto 24px;
-        }
-        .step-icon { 
-          font-size: 2.5rem; 
-          margin-bottom: 20px; 
-        }
-        .step-title { 
-          font-family: 'Space Grotesk', sans-serif; 
-          font-weight: 700; 
-          font-size: 1.3rem; 
-          color: white; 
-          margin-bottom: 12px; 
-        }
-        .step-desc { 
-          font-size: 0.95rem; 
-          color: rgba(255,255,255,0.4); 
-          line-height: 1.7; 
-        }
-
-        /* ── SUBJECTS ── */
-        .subjects-section { 
-          padding: 120px 32px; 
-          background: var(--cream); 
-          overflow: hidden; 
-        }
-        .subjects-scroll { 
-          display: flex; 
-          gap: 20px; 
-          margin-top: 56px; 
-          overflow-x: auto; 
-          padding-bottom: 20px; 
-          scroll-snap-type: x mandatory; 
-          -webkit-overflow-scrolling: touch; 
-        }
-        .subjects-scroll::-webkit-scrollbar { height: 6px; }
-        .subjects-scroll::-webkit-scrollbar-track { background: transparent; }
-        .subjects-scroll::-webkit-scrollbar-thumb { 
-          background: linear-gradient(90deg, var(--quantum), var(--purple));
-          border-radius: 3px; 
-        }
-        .subject-pill {
-          flex-shrink: 0; 
-          scroll-snap-align: start;
-          background: white; 
-          border: 1px solid var(--border); 
-          border-radius: 100px;
-          padding: 24px 40px; 
-          display: flex; 
-          flex-direction: row; 
-          align-items: center; 
-          gap: 16px;
-          transition: all 0.3s; 
-          cursor: default; 
-          min-width: auto;
-          box-shadow: 0 10px 20px -5px rgba(0,0,0,0.03);
-        }
-        .subject-pill:hover { 
-          transform: translateY(-4px) scale(1.05); 
-          box-shadow: 0 20px 30px -8px rgba(99, 102, 241, 0.15); 
-          border-color: var(--quantum); 
-        }
-        .subject-emoji { 
-          font-size: 2rem; 
-        }
-        .subject-name { 
-          font-family: 'Space Grotesk', sans-serif; 
-          font-size: 1rem; 
-          font-weight: 600; 
-          color: var(--ink); 
-          text-align: center; 
-        }
-
-        /* ── TESTIMONIALS ── */
-        .testimonials-section { 
-          padding: 120px 32px; 
-          background: linear-gradient(135deg, #f0ecff 0%, #f8f5ef 100%);
-        }
-        .testimonials-grid { 
-          display: grid; 
-          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
-          gap: 30px; 
-          margin-top: 64px; 
-        }
-        .testimonial-card {
-          background: white; 
-          border-radius: 28px; 
-          padding: 40px;
-          border: 1px solid rgba(139,108,247,0.1); 
-          transition: all 0.3s;
-          box-shadow: 0 20px 40px -10px rgba(99, 102, 241, 0.05);
-        }
-        .testimonial-card:hover { 
-          transform: translateY(-8px); 
-          box-shadow: 0 30px 60px -15px rgba(99, 102, 241, 0.15); 
-          border-color: rgba(99, 102, 241, 0.2);
-        }
-        .testimonial-emoji { 
-          font-size: 3rem; 
-          margin-bottom: 20px; 
-        }
-        .testimonial-quote { 
-          font-size: 1rem; 
-          color: var(--ink); 
-          line-height: 1.8; 
-          font-style: italic; 
-          font-weight: 400; 
-          margin-bottom: 24px; 
-        }
-        .testimonial-author { 
-          display: flex; 
-          flex-direction: column; 
-          gap: 4px; 
-        }
-        .testimonial-author strong { 
-          font-family: 'Space Grotesk', sans-serif; 
-          font-size: 1rem; 
-          font-weight: 700; 
-          color: var(--ink); 
-        }
-        .testimonial-author span { 
-          font-size: 0.9rem; 
-          color: var(--muted); 
-        }
-
-        /* ── CTA ── */
-        .cta-section {
-          padding: 140px 32px; 
-          text-align: center;
-          background: linear-gradient(135deg, var(--ink) 0%, #1f1449 100%);
-          position: relative; 
-          overflow: hidden;
-        }
-        .cta-glow { 
-          position: absolute; 
-          width: 800px; 
-          height: 800px; 
-          border-radius: 50%; 
-          background: radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 70%); 
-          top: 50%; 
-          left: 50%; 
-          transform: translate(-50%,-50%); 
-          pointer-events: none; 
-        }
-        .cta-section .section-title { 
-          color: white; 
-          margin-bottom: 24px; 
-        }
-        .cta-section .section-sub { 
-          color: rgba(255,255,255,0.5); 
-          margin: 0 auto 56px; 
-          max-width: 600px; 
-        }
-        .cta-buttons { 
-          display: flex; 
-          gap: 24px; 
-          justify-content: center; 
-          flex-wrap: wrap; 
-          position: relative; 
-          z-index: 1; 
-        }
-        .btn-gold {
-          background: linear-gradient(135deg, var(--gold), #f59e0b);
-          color: var(--ink); 
-          font-family: 'Space Grotesk', sans-serif;
-          font-weight: 700; 
-          font-size: 1.1rem; 
-          padding: 20px 48px; 
-          border-radius: 100px;
-          text-decoration: none; 
-          transition: all 0.3s; 
-          display: inline-flex; 
-          align-items: center; 
-          gap: 10px;
-          box-shadow: 0 20px 30px -8px rgba(251, 191, 36, 0.3);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .btn-gold:hover { 
-          transform: translateY(-3px);
-          box-shadow: 0 30px 40px -10px rgba(251, 191, 36, 0.4);
-        }
-        .btn-outline-white {
-          background: transparent; 
-          color: white; 
-          font-family: 'Space Grotesk', sans-serif;
-          font-weight: 600; 
-          font-size: 1.1rem; 
-          padding: 20px 48px; 
-          border-radius: 100px;
-          text-decoration: none; 
-          border: 2px solid rgba(255,255,255,0.2); 
-          transition: all 0.3s;
-          backdrop-filter: blur(10px);
-        }
-        .btn-outline-white:hover { 
-          background: rgba(255,255,255,0.05); 
-          border-color: var(--gold);
-          transform: translateY(-3px);
-        }
-
-        /* ── FOOTER ── */
-        .footer { 
-          background: #07070f; 
-          padding: 80px 32px 40px; 
-          color: rgba(255,255,255,0.4); 
-        }
-        .footer-inner { 
-          max-width: 1280px; 
-          margin: 0 auto; 
-        }
-        .footer-top { 
-          display: flex; 
-          justify-content: space-between; 
-          align-items: flex-start; 
-          flex-wrap: wrap; 
-          gap: 60px; 
-          margin-bottom: 60px; 
-        }
-        .footer-brand .nav-logo { 
-          background: linear-gradient(135deg, var(--quantum), var(--purple));
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          opacity: 1; 
-          font-size: 1.8rem;
-        }
-        .footer-brand p { 
-          font-size: 0.95rem; 
-          line-height: 1.7; 
-          max-width: 320px; 
-          margin-top: 16px; 
-          color: rgba(255,255,255,0.5);
-        }
-        .footer-links h4 { 
-          font-family: 'Space Grotesk', sans-serif; 
-          font-weight: 600; 
-          font-size: 1rem; 
-          letter-spacing: 0.05em; 
-          text-transform: uppercase; 
-          color: white; 
-          margin-bottom: 20px; 
-        }
-        .footer-links ul { 
-          list-style: none; 
-          display: flex; 
-          flex-direction: column; 
-          gap: 14px; 
-        }
-        .footer-links a { 
-          color: rgba(255,255,255,0.4); 
-          text-decoration: none; 
-          font-size: 0.95rem; 
-          transition: all 0.2s; 
-        }
-        .footer-links a:hover { 
-          color: var(--quantum); 
-          transform: translateX(5px);
-        }
-        .footer-bottom { 
-          border-top: 1px solid rgba(255,255,255,0.06); 
-          padding-top: 32px; 
-          display: flex; 
-          justify-content: space-between; 
-          flex-wrap: wrap; 
-          gap: 16px; 
-          font-size: 0.9rem; 
-          color: rgba(255,255,255,0.3);
-        }
-
-        /* ── ANIMATIONS ── */
-        @keyframes fadeUp { 
-          from { opacity: 0; transform: translateY(30px); } 
-          to { opacity: 1; transform: translateY(0); } 
-        }
-
-        @media (max-width: 600px) {
-          .hero { padding: 120px 20px 60px; }
-          .floating-badge { display: none; }
-          .footer-top { flex-direction: column; gap: 40px; }
-          .hero-title { font-size: 2.8rem; }
-          .btn-primary, .btn-secondary, .btn-gold, .btn-outline-white { 
-            width: 100%; 
-            justify-content: center;
-          }
-        }
-      `}</style>
-
-      {/* ── NAVBAR ── */}
-      <nav className={`nav ${scrolled ? "scrolled" : ""}`}>
-        <div className="nav-inner">
-          <Link to="/" className="nav-logo">
-            <span className="logo-dot" />
-            QuantumEdu
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center btn-glow-blue">
+              <Brain className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-outfit text-lg font-700 tracking-tight group-hover:text-blue-300 transition-colors">
+              QuantumEdu
+            </span>
           </Link>
-          <div className="nav-links">
-            <a href="#features" className="nav-link">Features</a>
-            <a href="#how" className="nav-link">How it works</a>
-            <a href="#subjects" className="nav-link">Subjects</a>
-            <Link to="/login" className="nav-link">Login</Link>
-            <Link to="/signup" className="nav-cta">Get Started →</Link>
+
+          {/* Desktop links */}
+          <div className="hidden md:flex items-center gap-7">
+            {[["Features","#features"],["Subjects","#subjects"],["How it Works","#how"],["About","#about"]].map(([l,h]) => (
+              <a key={l} href={h} className="text-sm text-slate-400 hover:text-white transition-colors">{l}</a>
+            ))}
           </div>
-          <div className="nav-hamburger" onClick={() => setMenuOpen(!menuOpen)}>
-            <span style={{ transform: menuOpen ? "rotate(45deg) translate(6px,6px)" : "none" }} />
-            <span style={{ opacity: menuOpen ? 0 : 1 }} />
-            <span style={{ transform: menuOpen ? "rotate(-45deg) translate(6px,-6px)" : "none" }} />
+
+          <div className="hidden md:flex items-center gap-3">
+            <Link to="/login" className="btn-ghost px-5 py-2.5 rounded-xl text-sm font-500 text-white">Sign In</Link>
+            <Link to="/signup" className="btn-glow-blue px-5 py-2.5 rounded-xl text-sm font-600 text-white flex items-center gap-1.5">
+              Get Started <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
+
+          <button className="md:hidden text-slate-300 hover:text-white" onClick={() => setMenuOpen(!menuOpen)}>
+            {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
-      </nav>
 
-      <div className={`mobile-menu ${menuOpen ? "open" : ""}`}>
-        <a href="#features" className="nav-link" onClick={() => setMenuOpen(false)}>Features</a>
-        <a href="#how" className="nav-link" onClick={() => setMenuOpen(false)}>How it works</a>
-        <a href="#subjects" className="nav-link" onClick={() => setMenuOpen(false)}>Subjects</a>
-        <Link to="/login" className="nav-link" onClick={() => setMenuOpen(false)}>Login</Link>
-        <Link to="/signup" className="nav-cta" onClick={() => setMenuOpen(false)}>Start Learning Free →</Link>
-      </div>
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }} className="md:hidden nav-glass border-t border-white/5 overflow-hidden">
+              <div className="px-5 py-5 space-y-4">
+                {[["Features","#features"],["Subjects","#subjects"],["How it Works","#how"]].map(([l,h]) => (
+                  <a key={l} href={h} className="block text-slate-300 text-sm" onClick={() => setMenuOpen(false)}>{l}</a>
+                ))}
+                <hr className="border-white/10" />
+                <Link to="/login" className="block text-slate-300 text-sm" onClick={() => setMenuOpen(false)}>Sign In</Link>
+                <Link to="/signup" className="block btn-glow-blue px-5 py-3 rounded-xl text-sm font-700 text-white text-center" onClick={() => setMenuOpen(false)}>
+                  Get Started Free
+                </Link>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.nav>
 
-      {/* ── HERO ── */}
-      <section className="hero">
-        <div className="hero-bg-circle c1" />
-        <div className="hero-bg-circle c2" />
-        <div className="hero-bg-circle c3" />
-        {particles.map((p, i) => <Particle key={i} style={p} />)}
+      {/* ── HERO ────────────────────────────────────────────────────────────── */}
+      <section ref={heroRef} className="relative min-h-[100svh] flex items-center justify-center overflow-hidden mesh-bg">
 
-        <div className="hero-inner">
-          <div className="hero-badge">
-            <span className="badge-dot" />
-            AI-Powered Learning Platform for Students
+        {/* Stars */}
+        <div className="absolute inset-0 pointer-events-none">
+          {STARS.map((s, i) => (
+            <div key={i} className="star-particle absolute rounded-full bg-white"
+              style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.size, height: s.size,
+                animationDelay: `${s.delay}s`, animationDuration: `${s.dur}s` }} />
+          ))}
+        </div>
+
+        {/* Orbit rings */}
+        {[420, 620, 820].map((sz, i) => (
+          <div key={i} className="orbit-ring"
+            style={{ width: sz, height: sz, top: "50%", left: "50%",
+              animationDuration: `${18 + i * 14}s`, animationDirection: i % 2 ? "reverse" : "normal" }}>
+            <div className="orbit-dot" style={{ background: ["#60a5fa","#a78bfa","#34d399"][i] }} />
           </div>
+        ))}
 
-          <h1 className="hero-title">
-            Learn Smarter with<br />
-            <span className="accent">Quantum</span> <span className="accent2">AI</span>
-          </h1>
+        {/* Glow blobs */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/4 w-[700px] h-[700px] rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 65%)" }} />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 65%)" }} />
 
-          <p className="hero-subtitle">
-            Experience the future of education with personalized AI tutoring, 
-            smart book reader, and instant doubt solving — all in one place.
-          </p>
+        <motion.div style={{ y: heroY, opacity: heroOpa }}
+          className="relative z-10 max-w-5xl mx-auto px-5 sm:px-8 text-center pt-28 pb-12">
 
-          <div className="hero-actions">
-            <Link to="/signup" className="btn-primary">
-              Start Learning Free ✦
+          {/* Live badge */}
+          <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.55, delay: 0.1 }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full card-glass mb-7 cursor-default">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute h-full w-full rounded-full bg-blue-400 opacity-70" />
+              <span className="relative rounded-full h-2 w-2 bg-blue-400" />
+            </span>
+            <span className="text-xs font-600 text-blue-300 tracking-wide font-outfit">
+              AI-Powered Learning · For School Students
+            </span>
+          </motion.div>
+
+          {/* Headline */}
+          <motion.h1 initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.65, delay: 0.18 }}
+            className="font-outfit text-5xl sm:text-6xl lg:text-[4.5rem] font-800 leading-[1.06] mb-5">
+            <span className="gradient-text-hero">Master </span>
+            <TypingWord /><br />
+            <span className="gradient-text-hero">with Your Personal AI</span>
+          </motion.h1>
+
+          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.32 }}
+            className="text-slate-400 text-lg sm:text-xl max-w-2xl mx-auto mb-9 leading-relaxed font-300">
+            Experience school subjects like never before. Your AI tutor understands your pace,
+            answers every question, and guides you through every chapter — <em className="text-slate-300">24 hours a day</em>.
+          </motion.p>
+
+          {/* Buttons */}
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.42 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
+            <Link to="/signup" className="btn-glow-blue px-8 py-4 rounded-2xl font-outfit font-700 text-base text-white flex items-center gap-2 w-full sm:w-auto justify-center">
+              <Sparkles className="w-5 h-5" /> Start Learning Free
             </Link>
-            <Link to="/login" className="btn-secondary">
-              Watch Demo →
+            <Link to="/login" className="btn-ghost px-8 py-4 rounded-2xl font-outfit font-600 text-base text-white flex items-center gap-2 w-full sm:w-auto justify-center">
+              <Play className="w-4 h-4 fill-white" /> Student Login
             </Link>
-          </div>
+          </motion.div>
 
-          {/* Chat Preview Card */}
-          <div className="hero-visual">
-            <div className="hero-card-wrap">
-              <div className="floating-badge fb-top-left">
-                🔥 <span>50K+ Students</span>
-              </div>
-              <div className="floating-badge fb-top-right">
-                ⚡ <span>24/7 AI Support</span>
-              </div>
-              <div className="floating-badge fb-bottom">
-                🏆 <span>94% Grade Improvement</span>
-              </div>
+          {/* Trust indicators */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.65 }}
+            className="flex flex-wrap justify-center gap-5 text-sm text-slate-500 mb-14">
+            {["✓ Free to start", "✓ No card needed", "✓ Class 1–12 covered", "✓ 24 / 7 AI"].map(t => (
+              <span key={t}>{t}</span>
+            ))}
+          </motion.div>
 
-              <div className="chat-row">
-                <div className="chat-avatar ai">🤖</div>
+          {/* Hero Chat Preview */}
+          <motion.div initial={{ opacity: 0, y: 48 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75, delay: 0.5 }}
+            className="relative max-w-[640px] mx-auto">
+
+            {/* Floating chips */}
+            <motion.div animate={{ y: [0,-10,0] }} transition={{ duration: 3.5, repeat: Infinity }}
+              className="hidden sm:flex absolute -top-6 -left-10 card-glass rounded-2xl px-4 py-3 items-center gap-2.5 z-10">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <Trophy className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <div className="text-xs font-700 text-white font-outfit">94% improve grades</div>
+                <div className="text-[10px] text-slate-500">verified results</div>
+              </div>
+            </motion.div>
+
+            <motion.div animate={{ y: [0,-8,0] }} transition={{ duration: 4.5, repeat: Infinity, delay: 1 }}
+              className="hidden sm:flex absolute -top-6 -right-10 card-glass rounded-2xl px-4 py-3 items-center gap-2 z-10">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute h-full w-full rounded-full bg-green-400 opacity-70" />
+                <span className="relative rounded-full h-2.5 w-2.5 bg-green-400" />
+              </span>
+              <span className="text-xs font-600 text-white font-outfit">AI online · 24 / 7</span>
+            </motion.div>
+
+            {/* Chat card */}
+            <div className="card-glass rounded-3xl p-5 sm:p-7 relative overflow-hidden">
+              <div className="absolute inset-0 shimmer-line pointer-events-none opacity-40 rounded-3xl" />
+
+              {/* Chat header */}
+              <div className="flex items-center gap-3 mb-5 pb-4 border-b border-white/8">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 btn-glow-blue">
+                  <Brain className="w-5 h-5 text-white" />
+                </div>
                 <div>
-                  <div className="chat-label">Quantum AI</div>
-                  <div className="chat-bubble">
-                    Hey! Ready to explore Chapter 5 — Quantum Mechanics? I noticed you found wave-particle duality interesting. Want to dive deeper? 🚀
+                  <div className="font-outfit font-700 text-sm text-white">AI Tutor</div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-[11px] text-slate-500">Ready to help</span>
                   </div>
                 </div>
+                <div className="ml-auto text-[11px] text-slate-600 font-outfit">Physics · Chapter 3</div>
               </div>
 
-              <div className="chat-row right">
-                <div className="chat-avatar user">👤</div>
-                <div>
-                  <div className="chat-label">You</div>
-                  <div className="chat-bubble">
-                    Yes! Can you explain the double-slit experiment with some practice problems?
+              {/* Messages */}
+              <div className="space-y-4">
+                <div className="flex gap-3 items-start">
+                  <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-base btn-glow-blue">🤖</div>
+                  <div className="bg-white/6 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-300 leading-relaxed max-w-xs">
+                    Hey! Ready to continue Newton's Laws? I noticed you found <strong className="text-blue-300">inertia</strong> tricky last session — want a fresh analogy? 🚀
                   </div>
                 </div>
-              </div>
-
-              <div className="chat-row">
-                <div className="chat-avatar ai">🤖</div>
-                <div>
-                  <div className="chat-label">Quantum AI</div>
-                  <div className="typing-dots">
-                    <div className="typing-dot" />
-                    <div className="typing-dot" />
-                    <div className="typing-dot" />
+                <div className="flex gap-3 items-start justify-end">
+                  <div className="rounded-2xl rounded-tr-sm px-4 py-3 text-sm text-white leading-relaxed max-w-xs"
+                    style={{ background: "linear-gradient(135deg, #2563eb, #4f46e5)" }}>
+                    Yes please! And 3 practice questions after? 💪
+                  </div>
+                  <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-base bg-gradient-to-br from-amber-400 to-orange-500">😄</div>
+                </div>
+                <div className="flex gap-3 items-start">
+                  <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-base btn-glow-blue">🤖</div>
+                  <div className="bg-white/6 rounded-2xl rounded-tl-sm px-4 py-2.5 flex gap-1.5 items-center">
+                    {[0, 0.22, 0.44].map(d => (
+                      <div key={d} className="w-2 h-2 rounded-full bg-blue-400"
+                        style={{ animation: `pulse 1.2s ease-in-out ${d}s infinite` }} />
+                    ))}
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+
+            <motion.div animate={{ y: [0,-7,0] }} transition={{ duration: 5, repeat: Infinity, delay: 0.8 }}
+              className="hidden sm:flex absolute -bottom-5 left-1/2 -translate-x-1/2 card-glass rounded-2xl px-4 py-2.5 items-center gap-2 z-10">
+              <TrendingUp className="w-4 h-4 text-green-400" />
+              <span className="text-xs font-outfit font-700 text-white">50,000+ students learning now</span>
+            </motion.div>
+          </motion.div>
+
+          {/* Scroll hint */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.3 }}
+            className="mt-20 flex flex-col items-center gap-1 text-slate-600">
+            <span className="text-xs font-outfit tracking-widest uppercase">Explore</span>
+            <motion.div animate={{ y: [0, 7, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
+              <ChevronDown className="w-5 h-5" />
+            </motion.div>
+          </motion.div>
+        </motion.div>
       </section>
 
-      {/* ── STATS ── */}
-      <section className="stats-section" ref={statsRef}>
-        <div className="stats-inner">
-          <StatCard value={50000} suffix="+" label="Active Students" started={statsVisible} />
-          <StatCard value={94} suffix="%" label="Grade Improvement" started={statsVisible} />
-          <StatCard value={200} suffix="+" label="Subjects Covered" started={statsVisible} />
-          <StatCard value={24} suffix="/7" label="AI Availability" started={statsVisible} />
-        </div>
-      </section>
-
-      {/* ── FEATURES ── */}
-      <section className="features-section" id="features">
-        <div className="section-inner">
-          <div className="section-tag">✦ Why Students Love QuantumEdu</div>
-          <h2 className="section-title">Everything You Need<br />to Excel in Your Studies</h2>
-          <p className="section-sub">From AI tutoring to smart book reading, every feature is designed to make learning intuitive, engaging, and effective.</p>
-          <div className="features-grid">
-            <FeatureCard
-              icon="🧠"
-              title="Quantum AI Tutor"
-              desc="Your personal AI tutor available 24/7. Explains concepts in multiple ways, adapts to your learning style, and never gets tired."
-              accent="linear-gradient(135deg, #6366f1, #8b5cf6)"
-              delay="0s"
-            />
-            <FeatureCard
-              icon="📖"
-              title="Smart Book Reader"
-              desc="Read textbooks line-by-line with AI annotations, instant explanations, and interactive summaries on every page."
-              accent="linear-gradient(135deg, #2dd4bf, #0d9488)"
-              delay="0.1s"
-            />
-            <FeatureCard
-              icon="📷"
-              title="Scan & Solve"
-              desc="Point your camera at any question from your notebook or textbook and get step-by-step solutions with detailed explanations."
-              accent="linear-gradient(135deg, #f87171, #dc2626)"
-              delay="0.2s"
-            />
-            <FeatureCard
-              icon="🎯"
-              title="Smart Assessments"
-              desc="Personalized practice tests generated from your syllabus. Track progress by chapter and topic with detailed analytics."
-              accent="linear-gradient(135deg, #fbbf24, #d97706)"
-              delay="0.3s"
-            />
-            <FeatureCard
-              icon="📊"
-              title="Progress Dashboard"
-              desc="Visual insights into your learning journey. See exactly what you've mastered and where to focus next."
-              accent="linear-gradient(135deg, #f472b6, #db2777)"
-              delay="0.4s"
-            />
-            <FeatureCard
-              icon="🗣️"
-              title="Voice Learning"
-              desc="Learn with voice commands and get spoken explanations. Perfect for auditory learners and revision on the go."
-              accent="linear-gradient(135deg, #60a5fa, #2563eb)"
-              delay="0.5s"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ── HOW IT WORKS ── */}
-      <section className="how-section" id="how">
-        <div className="section-inner">
-          <div className="section-tag">✦ Simple Process</div>
-          <h2 className="section-title">Start Learning<br />in 4 Easy Steps</h2>
-          <p className="section-sub">No complicated setup. Just sign up, set your preferences, and let Quantum AI guide your learning journey.</p>
-          <div className="steps-grid">
+      {/* ── STATS ───────────────────────────────────────────────────────────── */}
+      <section ref={statsRef} className="py-20 section-mid">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { n: "01", icon: "📝", title: "Create Account", desc: "Sign up with email or Google in seconds. Choose your grade and subjects to personalize your experience." },
-              { n: "02", icon: "🔧", title: "Customize Settings", desc: "Set your learning goals, preferred pace, and subjects. Our AI adapts to your unique requirements." },
-              { n: "03", icon: "🚀", title: "Start Learning", desc: "Dive into any subject, chat with AI, scan questions, or take assessments. Learning begins immediately." },
-              { n: "04", icon: "📈", title: "Track Progress", desc: "Monitor your improvement with detailed analytics. The AI continuously adapts to help you master concepts." },
-            ].map(s => (
-              <div key={s.n} className="step-card">
-                <div className="step-number">{s.n}</div>
-                <div className="step-icon">{s.icon}</div>
-                <div className="step-title">{s.title}</div>
-                <div className="step-desc">{s.desc}</div>
-              </div>
+              { val: 50000, suf: "+", label: "Active Students", icon: Users, c: "#60a5fa" },
+              { val: 94,    suf: "%", label: "Improve Their Grades", icon: TrendingUp, c: "#34d399" },
+              { val: 200,   suf: "+", label: "Books & Chapters", icon: BookOpen, c: "#a78bfa" },
+              { val: 24,    suf: "/7", label: "AI Always Available", icon: Zap, c: "#fbbf24" },
+            ].map(({ val, suf, label, icon: Icon, c }, i) => (
+              <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }} transition={{ delay: i * 0.1 }}>
+                <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center"
+                  style={{ background: c + "15", border: `1px solid ${c}25` }}>
+                  <Icon className="w-5 h-5" style={{ color: c }} />
+                </div>
+                <div className="font-outfit text-3xl sm:text-4xl font-800 mb-1" style={{ color: c }}>
+                  <Counter to={val} suffix={suf} started={statsVis} />
+                </div>
+                <div className="text-xs sm:text-sm text-slate-500">{label}</div>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── SUBJECTS ── */}
-      <section className="subjects-section" id="subjects">
-        <div className="section-inner">
-          <div className="section-tag">✦ Comprehensive Coverage</div>
-          <h2 className="section-title">All Subjects,<br />One Platform</h2>
-          <p className="section-sub">From Class 1 to 12 — every subject in your curriculum is supported with AI-powered learning materials.</p>
-        </div>
-        <div className="subjects-scroll">
-          {[
-            { e: "🧮", n: "Mathematics" },
-            { e: "⚛️", n: "Physics" },
-            { e: "🧪", n: "Chemistry" },
-            { e: "🧬", n: "Biology" },
-            { e: "🌍", n: "Geography" },
-            { e: "📜", n: "History" },
-            { e: "💻", n: "Computer Science" },
-            { e: "📗", n: "English" },
-            { e: "🏛️", n: "Civics" },
-            { e: "📊", n: "Economics" },
-            { e: "🎨", n: "Fine Arts" },
-            { e: "🌱", n: "Environmental Science" },
-            { e: "🔢", n: "Statistics" },
-            { e: "🧠", n: "Psychology" },
-          ].map(s => (
-            <div key={s.n} className="subject-pill">
-              <span className="subject-emoji">{s.e}</span>
-              <span className="subject-name">{s.n}</span>
+      {/* ── FEATURES ────────────────────────────────────────────────────────── */}
+      <section id="features" className="py-24 section-dark">
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-outfit font-600 mb-5 tracking-widest uppercase">
+              ✦ Platform Features
             </div>
-          ))}
-        </div>
-      </section>
+            <h2 className="font-outfit text-4xl sm:text-5xl font-800 mb-4">
+              <span className="gradient-text-hero">Every Tool You Need</span>
+            </h2>
+            <p className="text-slate-500 max-w-lg mx-auto text-base leading-relaxed">
+              Built around how students actually learn — each feature solves a real problem students face every day.
+            </p>
+          </motion.div>
 
-      {/* ── TESTIMONIALS ── */}
-      <section className="testimonials-section">
-        <div className="section-inner">
-          <div className="section-tag">✦ Student Success Stories</div>
-          <h2 className="section-title">What Our Students Say</h2>
-          <div className="testimonials-grid">
-            <TestimonialCard
-              emoji="🌟"
-              quote="My Physics grades improved from 54 to 88 in just one term. The AI explained complex concepts in ways that finally made sense to me."
-              name="Priya Sharma"
-              grade="Class 11 Science"
-              school="Delhi Public School"
-            />
-            <TestimonialCard
-              emoji="🎯"
-              quote="I used to struggle with exam anxiety. Now I actually enjoy studying because Quantum AI makes learning feel like a conversation, not a lecture."
-              name="Rohan Mehta"
-              grade="Class 9"
-              school="Kendriya Vidyalaya"
-            />
-            <TestimonialCard
-              emoji="🔥"
-              caption="The scan feature is a game-changer. I just photograph any problem I'm stuck on and get instant, detailed solutions with explanations."
-              name="Ananya Reddy"
-              grade="Class 12 PCM"
-              school="Narayana Junior College"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {FEATURES.map((f, i) => (
+              <motion.div key={i}
+                initial={{ opacity: 0, y: 36 }} whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.08 }}
+                whileHover={{ y: -8 }}
+                className="group card-glass rounded-2xl p-7 cursor-default relative overflow-hidden">
+                <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                  style={{ background: `radial-gradient(ellipse at 20% 20%, ${f.color}10, transparent 60%)` }} />
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110"
+                    style={{ background: f.bgColor, border: `1px solid ${f.color}30` }}>
+                    <f.icon className="w-5 h-5" style={{ color: f.color }} />
+                  </div>
+                  <h3 className="font-outfit font-700 text-base text-white mb-3">{f.title}</h3>
+                  <p className="text-sm text-slate-400 leading-relaxed">{f.desc}</p>
+                </div>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section className="cta-section">
-        <div className="cta-glow" />
-        <div style={{ position: "relative", zIndex: 1 }}>
-          <div className="section-tag" style={{ color: "var(--gold)" }}>✦ Ready to Begin?</div>
-          <h2 className="section-title">Start Your Quantum<br />Learning Journey Today</h2>
-          <p className="section-sub">
-            Join thousands of students who are already studying smarter with AI. 
-            Free to start — no credit card required.
-          </p>
-          <div className="cta-buttons">
-            <Link to="/signup" className="btn-gold">Create Free Account ✦</Link>
-            <Link to="/login" className="btn-outline-white">Sign In →</Link>
+      {/* ── HOW IT WORKS ────────────────────────────────────────────────────── */}
+      <section id="how" className="py-24 section-light">
+        <div className="max-w-5xl mx-auto px-6">
+          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-100 border border-violet-200 text-violet-600 text-xs font-outfit font-600 mb-5 uppercase tracking-widest">
+              ✦ Getting Started
+            </div>
+            <h2 className="font-outfit text-4xl sm:text-5xl font-800 text-gray-900 mb-4">
+              Up & Learning in<br />
+              <span className="gradient-text-blue">3 Simple Steps</span>
+            </h2>
+            <p className="text-gray-500 max-w-md mx-auto">No complicated setup. Sign up, pick your class, and the AI starts teaching immediately.</p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+            <div className="hidden md:block absolute top-14 left-[calc(33%-16px)] right-[calc(33%-16px)] h-0.5"
+              style={{ background: "linear-gradient(90deg, #3b82f6, #8b5cf6)" }} />
+            {STEPS.map(({ n, icon, title, desc }, i) => (
+              <motion.div key={i} initial={{ opacity: 0, y: 36 }} whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.15 }}
+                className="text-center relative">
+                <div className="relative inline-flex mb-6">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg relative z-10"
+                    style={{ background: "linear-gradient(135deg, #3b82f6, #7c3aed)" }}>
+                    {icon}
+                  </div>
+                  <div className="absolute -top-2.5 -right-2.5 w-6 h-6 rounded-full bg-white shadow border-2 border-blue-400 flex items-center justify-center">
+                    <span className="text-[10px] font-outfit font-800 text-blue-500">{n}</span>
+                  </div>
+                </div>
+                <h3 className="font-outfit font-700 text-gray-900 text-base mb-2">{title}</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+            transition={{ delay: 0.5 }} className="text-center mt-14">
+            <Link to="/signup" className="inline-flex items-center gap-2 btn-glow-blue px-9 py-4 rounded-2xl font-outfit font-700 text-white">
+              <GraduationCap className="w-5 h-5" /> Create My Free Account
+            </Link>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── SUBJECTS ────────────────────────────────────────────────────────── */}
+      <section id="subjects" className="py-24 section-dark overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 mb-12">
+          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} className="text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-outfit font-600 mb-5 uppercase tracking-widest">
+              ✦ Full Curriculum
+            </div>
+            <h2 className="font-outfit text-4xl sm:text-5xl font-800 mb-3 gradient-text-hero">
+              All Your School Subjects
+            </h2>
+            <p className="text-slate-500">Class 1 through 12 — every topic, covered by AI</p>
+          </motion.div>
+        </div>
+
+        {/* Auto-scrolling rows */}
+        {[SUBJECTS, [...SUBJECTS].reverse()].map((row, ri) => (
+          <motion.div key={ri}
+            animate={{ x: ri === 0 ? [0, -200] : [-200, 0] }}
+            transition={{ duration: 22, repeat: Infinity, ease: "linear", repeatType: "mirror" }}
+            className="flex gap-4 mb-4 px-4">
+            {[...row, ...row, ...row].map((s, i) => (
+              <div key={i} className="subject-card card-glass rounded-2xl px-6 py-5 flex-shrink-0 text-center min-w-[130px] cursor-default">
+                <div className="text-3xl mb-2">{s.e}</div>
+                <div className="font-outfit font-700 text-xs text-slate-300">{s.n}</div>
+              </div>
+            ))}
+          </motion.div>
+        ))}
+      </section>
+
+      {/* ── INTERACTIVE FEATURE EXPLORER ─────────────────────────────────── */}
+      <section className="py-24 section-mid relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse 60% 40% at 50% 50%, rgba(59,130,246,0.06) 0%, transparent 60%)" }} />
+        <div className="max-w-5xl mx-auto px-6 relative">
+          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-outfit font-600 mb-5 uppercase tracking-widest">
+              ✦ See It in Action
+            </div>
+            <h2 className="font-outfit text-4xl sm:text-5xl font-800 gradient-text-hero mb-3">
+              AI Features Explored
+            </h2>
+            <p className="text-slate-400 max-w-md mx-auto">Select any feature to see exactly how it helps you learn</p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+            {/* Selector */}
+            <div className="lg:col-span-2 space-y-2">
+              {FEATURES.map((f, i) => (
+                <motion.button key={i} onClick={() => setActiveF(i)} whileHover={{ x: 3 }}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-left transition-all duration-300 ${
+                    activeF === i ? "card-glass border-l-2 bg-white/4" : "hover:bg-white/3 border-l-2 border-transparent"
+                  }`}
+                  style={ activeF === i ? { borderLeftColor: f.color } : {} }>
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: activeF === i ? f.bgColor : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${activeF === i ? f.color + "40" : "transparent"}` }}>
+                    <f.icon className="w-4 h-4" style={{ color: activeF === i ? f.color : "#475569" }} />
+                  </div>
+                  <span className={`font-outfit text-sm font-500 ${activeF === i ? "text-white" : "text-slate-500"}`}>
+                    {f.title}
+                  </span>
+                </motion.button>
+              ))}
+            </div>
+
+            {/* Preview panel */}
+            <div className="lg:col-span-3">
+              <AnimatePresence mode="wait">
+                <motion.div key={activeF}
+                  initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.28 }}
+                  className="card-glass rounded-2xl p-7 h-full min-h-[260px] flex flex-col justify-between">
+                  <div>
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
+                      style={{ background: FEATURES[activeF].bgColor, border: `1px solid ${FEATURES[activeF].color}30` }}>
+                      {(() => { const I = FEATURES[activeF].icon; return <I className="w-7 h-7" style={{ color: FEATURES[activeF].color }} />; })()}
+                    </div>
+                    <h3 className="font-outfit text-xl font-700 text-white mb-3">{FEATURES[activeF].title}</h3>
+                    <p className="text-slate-400 text-sm leading-relaxed">{FEATURES[activeF].desc}</p>
+                  </div>
+                  <div className="mt-5 p-4 rounded-xl bg-white/4 border border-white/6">
+                    <p className="text-[11px] text-slate-600 mb-1 font-outfit uppercase tracking-wider">Real student example</p>
+                    <p className="text-sm text-slate-300 italic">"{FEATURES[activeF].example}"</p>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
-      <footer className="footer">
-        <div className="footer-inner">
-          <div className="footer-top">
-            <div className="footer-brand">
-              <Link to="/" className="nav-logo">
-                <span className="logo-dot" />
-                QuantumEdu
+      {/* ── TESTIMONIALS ────────────────────────────────────────────────────── */}
+      <section className="py-24 section-light">
+        <div className="max-w-5xl mx-auto px-6">
+          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-green-100 border border-green-200 text-green-600 text-xs font-outfit font-600 mb-5 uppercase tracking-widest">
+              ✦ Student Stories
+            </div>
+            <h2 className="font-outfit text-4xl sm:text-5xl font-800 text-gray-900 mb-2">What Students Say</h2>
+            <p className="text-gray-500">Real results from real students across India</p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {TESTIMONIALS.map(({ quote, name, grade, school, avatar }, i) => (
+              <motion.div key={i}
+                initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }} transition={{ duration: 0.45, delay: i * 0.12 }}
+                whileHover={{ y: -6 }}
+                className="card-glass-light rounded-2xl p-6 relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-0.5 rounded-t-2xl"
+                  style={{ background: "linear-gradient(90deg, #3b82f6, #8b5cf6)" }} />
+                <div className="flex gap-1 mb-4">
+                  {[...Array(5)].map((_, j) => <Star key={j} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />)}
+                </div>
+                <p className="text-gray-600 text-sm leading-relaxed italic mb-5">"{quote}"</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-outfit font-800 text-white"
+                    style={{ background: "linear-gradient(135deg, #3b82f6, #7c3aed)" }}>{avatar}</div>
+                  <div>
+                    <div className="font-outfit font-700 text-gray-900 text-sm">{name}</div>
+                    <div className="text-[11px] text-gray-400">{grade} · {school}</div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FINAL CTA ───────────────────────────────────────────────────────── */}
+      <section className="py-28 relative overflow-hidden section-dark">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[450px] rounded-full"
+            style={{ background: "radial-gradient(ellipse, rgba(59,130,246,0.09) 0%, transparent 65%)" }} />
+        </div>
+        {[320, 520].map((sz, i) => (
+          <div key={i} className="orbit-ring"
+            style={{ width: sz, height: sz, top: "50%", left: "50%",
+              animationDuration: `${18 + i * 10}s`, animationDirection: i % 2 ? "reverse" : "normal" }}>
+            <div className="orbit-dot" style={{ background: ["#60a5fa","#a78bfa"][i] }} />
+          </div>
+        ))}
+
+        <div className="relative max-w-3xl mx-auto px-6 text-center z-10">
+          <motion.div initial={{ opacity: 0, scale: 0.92 }} whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }} transition={{ duration: 0.55 }}>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-outfit font-600 mb-6 uppercase tracking-widest">
+              ✦ Ready to Begin?
+            </div>
+            <h2 className="font-outfit text-4xl sm:text-6xl font-800 leading-tight mb-5">
+              <span className="gradient-text-hero">Your Smarter</span><br />
+              <span className="gradient-text-warm">Learning Journey</span><br />
+              <span className="gradient-text-hero">Starts Today</span>
+            </h2>
+            <p className="text-slate-400 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
+              Join thousands of students already learning smarter with AI.
+              Free to get started — no credit card needed.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
+              <Link to="/signup" className="btn-glow-blue px-10 py-4 rounded-2xl font-outfit font-700 text-lg text-white flex items-center justify-center gap-2">
+                <Sparkles className="w-5 h-5" /> Create Free Account
               </Link>
-              <p>Revolutionizing education through AI-powered personalized learning for students worldwide.</p>
+              <Link to="/login" className="btn-ghost px-10 py-4 rounded-2xl font-outfit font-600 text-lg text-white flex items-center justify-center gap-2">
+                Sign In <ArrowRight className="w-5 h-5" />
+              </Link>
             </div>
-            <div className="footer-links">
-              <h4>Platform</h4>
-              <ul>
-                <li><a href="#features">Features</a></li>
-                <li><a href="#subjects">Subjects</a></li>
-                <li><a href="#how">How it works</a></li>
-                <li><a href="#">Pricing</a></li>
-              </ul>
+            <div className="flex flex-wrap justify-center gap-6">
+              {["50,000+ students", "Always free to start", "All subjects covered", "Class 1–12"].map(t => (
+                <div key={t} className="flex items-center gap-2 text-sm text-slate-500">
+                  <CheckCircle className="w-4 h-4 text-green-500" /> {t}
+                </div>
+              ))}
             </div>
-            <div className="footer-links">
-              <h4>Account</h4>
-              <ul>
-                <li><Link to="/signup">Sign Up</Link></li>
-                <li><Link to="/login">Login</Link></li>
-                <li><a href="#">Student Dashboard</a></li>
-                <li><a href="#">Parent Access</a></li>
-              </ul>
-            </div>
-            <div className="footer-links">
-              <h4>Legal</h4>
-              <ul>
-                <li><a href="#">Privacy Policy</a></li>
-                <li><a href="#">Terms of Service</a></li>
-                <li><a href="#">Cookie Policy</a></li>
-                <li><a href="#">GDPR Compliance</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="footer-bottom">
-            <span>© 2025 QuantumEdu. All rights reserved.</span>
-            <span>Made with ✦ for students everywhere</span>
-          </div>
+          </motion.div>
         </div>
-      </footer>
-    </>
+      </section>
+
+      {/* ── FOOTER ──────────────────────────────────────────────────────────── */}
+      <Footer />
+    </div>
   );
 }
