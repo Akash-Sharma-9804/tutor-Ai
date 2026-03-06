@@ -1,9 +1,10 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 
 // ===== Student Imports =====
 import DashboardLayout from "./layouts/DashboardLayout";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
+import CompleteProfile from "./pages/auth/CompleteProfile";
 import Dashboard from "./pages/Dashboard";
 import Subjects from "./pages/Subjects";
 import AITutor from "./pages/AITutor";
@@ -14,6 +15,7 @@ import TalkAI from "./pages/TalkAI";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import HomePage from "./pages/HomePage";
 
 // ===== Book Reader Imports =====
 import TableOfContents from "./pages/TableOfContents";
@@ -47,9 +49,14 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+     {/* ================= PUBLIC HOME ================= */}
+<Route path="/home" element={<HomePage />} />
+<Route path="*" element={<Navigate to="/home" replace />} />
+
         {/* ================= STUDENT AUTH ================= */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/complete-profile" element={<CompleteProfile />} />
 
         {/* ================= STUDENT APP ================= */}
         <Route element={<ProtectedRoute />}>

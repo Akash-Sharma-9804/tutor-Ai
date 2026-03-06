@@ -19,6 +19,8 @@ exports.getStudentProfile = async (req, res) => {
     s.bio,
     s.profile_picture,
     s.created_at,
+    s.auth_provider,
+    s.password_set,
     sch.name AS schoolName,
     c.class_name AS className,
     s.class_id AS classId
@@ -29,7 +31,6 @@ exports.getStudentProfile = async (req, res) => {
   `,
   [studentId]
 );
-
     if (rows.length === 0) {
       return res.status(404).json({ message: "Student not found" });
     }
@@ -45,9 +46,9 @@ exports.getStudentProfile = async (req, res) => {
 exports.updateStudentProfile = async (req, res) => {
   try {
     const studentId = req.studentId;
-    const { name, phone, bio } = req.body;
+    const { name, phone, bio, dob } = req.body;
 
-    if (!name && !phone && bio === undefined) {
+    if (!name && !phone && bio === undefined && !dob) {
       return res.status(400).json({ message: "Nothing to update" });
     }
 
@@ -65,6 +66,18 @@ exports.updateStudentProfile = async (req, res) => {
     if (bio !== undefined) {
       fields.push("bio = ?");
       values.push(bio.trim());
+    }
+    if (dob) {
+      // Recalculate age from new dob
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+      fields.push("dob = ?");
+      fields.push("age = ?");
+      values.push(dob);
+      values.push(age);
     }
 
     values.push(studentId);
@@ -127,17 +140,12 @@ exports.changePassword = async (req, res) => {
     const studentId = req.studentId;
     const { currentPassword, newPassword } = req.body;
 
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Current and new password are required" });
-    }
-
-    if (newPassword.length < 6) {
+    if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ message: "New password must be at least 6 characters" });
     }
 
-    // Fetch current hashed password
     const [rows] = await db.query(
-      `SELECT password FROM students WHERE id = ?`,
+      `SELECT password, auth_provider, password_set FROM students WHERE id = ?`,
       [studentId]
     );
 
@@ -145,13 +153,33 @@ exports.changePassword = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    const isMatch = await bcrypt.compare(currentPassword, rows[0].password);
+    const student = rows[0];
+
+    // Google user setting password for the FIRST time — no current password needed
+    if (student.auth_provider === "google" && !student.password_set) {
+      const hashed = await bcrypt.hash(newPassword, 10);
+      await db.query(
+        `UPDATE students SET password = ?, password_set = TRUE WHERE id = ?`,
+        [hashed, studentId]
+      );
+      return res.json({ message: "Password set successfully! You can now login with email too." });
+    }
+
+    // Normal user — must verify current password
+    if (!currentPassword) {
+      return res.status(400).json({ message: "Current password is required" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, student.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Current password is incorrect" });
     }
 
     const hashed = await bcrypt.hash(newPassword, 10);
-    await db.query(`UPDATE students SET password = ? WHERE id = ?`, [hashed, studentId]);
+    await db.query(
+      `UPDATE students SET password = ?, password_set = TRUE WHERE id = ?`,
+      [hashed, studentId]
+    );
 
     res.json({ message: "Password changed successfully" });
   } catch (err) {

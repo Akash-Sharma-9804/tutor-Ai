@@ -1,19 +1,30 @@
 import { Link, useNavigate } from "react-router-dom";
-import { BookOpen, Sparkles, Lock, Mail, Eye, EyeOff, GraduationCap, Brain, Trophy } from "lucide-react";
+import { BookOpen, Sparkles, Lock, Mail, Eye, EyeOff, GraduationCap, Brain, Trophy, CheckCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { loginSuccess } from "../../store/authSlice";
 import { useDispatch } from "react-redux";
+import { GoogleLogin } from '@react-oauth/google';
+ 
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginDone, setLoginDone] = useState(false);
   const [hoverStates, setHoverStates] = useState({
     loginButton: false,
     googleButton: false
   });
+
+  // Forgot password states
+  const [forgotMode, setForgotMode] = useState(false); // 'email' | 'otp' | 'reset' | false
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState("");
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -46,8 +57,8 @@ export default function Login() {
         })
       );
 
-      // Add success animation before navigating
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setLoginDone(true);
+      await new Promise(resolve => setTimeout(resolve, 1500));
       navigate("/", { replace: true });
     } catch (err) {
       console.error("Login error:", err);
@@ -56,7 +67,11 @@ export default function Login() {
       setTimeout(() => {
         document.querySelector("form").classList.remove("animate-shake");
       }, 500);
-      alert(err.response?.data?.message || "Login failed");
+      const msg = err.response?.data?.message || "Login failed";
+      // Show modal message instead of alert
+      document.querySelector("form").classList.add("animate-shake");
+      setTimeout(() => document.querySelector("form").classList.remove("animate-shake"), 500);
+      alert(msg);
     } finally {
       setIsLoading(false);
     }
@@ -69,8 +84,55 @@ export default function Login() {
     }));
   };
 
+  const handleForgotSendOTP = async () => {
+    setForgotLoading(true); setForgotMsg("");
+    try {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/forgot-password`, { email: forgotEmail });
+      setForgotMode("otp");
+      setForgotMsg("OTP sent to your email. Check your inbox.");
+    } catch (err) {
+      setForgotMsg(err.response?.data?.message || "Failed to send OTP");
+    } finally { setForgotLoading(false); }
+  };
+
+  const handleForgotVerifyOTP = async () => {
+    setForgotLoading(true); setForgotMsg("");
+    try {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/verify-otp`, { email: forgotEmail, otp });
+      setForgotMode("reset");
+      setForgotMsg("");
+    } catch (err) {
+      setForgotMsg(err.response?.data?.message || "Invalid OTP");
+    } finally { setForgotLoading(false); }
+  };
+
+  const handleForgotReset = async () => {
+    setForgotLoading(true); setForgotMsg("");
+    try {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/reset-password`, { email: forgotEmail, otp, newPassword });
+      setForgotMsg("Password reset successful! You can now login.");
+      setTimeout(() => { setForgotMode(false); setForgotMsg(""); setForgotEmail(""); setOtp(""); setNewPassword(""); }, 2000);
+    } catch (err) {
+      setForgotMsg(err.response?.data?.message || "Reset failed");
+    } finally { setForgotLoading(false); }
+  };
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 overflow-hidden relative">
+
+      {/* Success Login Overlay */}
+      {loginDone && (
+        <div className="fixed inset-0 bg-green-500/90 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in">
+          <div className="text-center p-8 bg-white rounded-3xl shadow-2xl max-w-md animate-bounce-in">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full mb-6 animate-pulse">
+              <CheckCircle className="w-10 h-10 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back! 🎉</h3>
+            <p className="text-gray-600 mb-6">Login successful! Taking you to your dashboard...</p>
+            <div className="w-12 h-12 border-4 border-white border-t-green-500 rounded-full animate-spin mx-auto"></div>
+          </div>
+        </div>
+      )}
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
         {floatingElements.map((Element, index) => {
@@ -189,12 +251,13 @@ export default function Login() {
                   <Lock className="w-4 h-4 animate-bounce-slow delay-100" />
                   Password
                 </label>
-                <a
-                  href="#"
+               <button
+                  type="button"
+                  onClick={() => { setForgotMode("email"); setForgotMsg(""); }}
                   className="text-sm text-indigo-600 hover:text-indigo-800 hover:underline transition-colors"
                 >
                   Forgot password?
-                </a>
+                </button>
               </div>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -255,33 +318,122 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
-              <button
-                type="button"
-                onMouseEnter={() => handleHover('googleButton', true)}
-                onMouseLeave={() => handleHover('googleButton', false)}
-                className={`flex items-center justify-center gap-3 py-3.5 border-2 border-gray-200 rounded-xl transition-all duration-300 ${
-                  hoverStates.googleButton 
-                    ? 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200 shadow-md scale-[1.02]' 
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                <div className={`p-2 bg-white rounded-lg shadow-inner transition-transform duration-300 ${
-                  hoverStates.googleButton ? 'scale-110' : ''
-                }`}>
-                  <img
-                    src="https://www.google.com/favicon.ico"
-                    alt="Google"
-                    className="w-5 h-5"
-                  />
-                </div>
-                <span className="text-gray-700 font-medium">Continue with Google</span>
-              </button>
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={async (credentialResponse) => {
+                  try {
+                    const res = await axios.post(
+                      `${import.meta.env.VITE_BACKEND_URL}/api/auth/google`,
+                      { token: credentialResponse.credential }
+                    );
+                    localStorage.setItem("token", res.data.token);
+                    dispatch(loginSuccess({
+                      token: res.data.token,
+                      student: res.data.student,
+                    }));
+                    if (!res.data.student.profile_complete) {
+                      // New Google user — go complete profile (no success overlay)
+                      navigate("/complete-profile", {
+                        state: { studentId: res.data.student.id, token: res.data.token },
+                        replace: true
+                      });
+                    } else {
+                      // Returning Google user — show success overlay then go to dashboard
+                      setLoginDone(true);
+                      await new Promise(resolve => setTimeout(resolve, 1500));
+                      navigate("/", { replace: true });
+                    }
+                  } catch (err) {
+                    alert(err.response?.data?.message || "Google login failed");
+                  }
+                }}
+                onError={() => alert("Google Login Failed")}
+              />
             </div>
           </form>
 
+            {/* Forgot Password Modal */}
+          {forgotMode && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md animate-bounce-in">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  {forgotMode === "email" && "🔑 Forgot Password"}
+                  {forgotMode === "otp" && "📧 Enter OTP"}
+                  {forgotMode === "reset" && "🔐 Set New Password"}
+                </h3>
+                <p className="text-gray-500 text-sm mb-6">
+                  {forgotMode === "email" && "Enter your email to receive a reset OTP"}
+                  {forgotMode === "otp" && `OTP sent to ${forgotEmail}`}
+                  {forgotMode === "reset" && "Create a new strong password"}
+                </p>
+
+                {forgotMode === "email" && (
+                  <div className="space-y-4">
+                    <input
+                      type="email"
+                      placeholder="Your registered email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm"
+                    />
+                    <button onClick={handleForgotSendOTP} disabled={forgotLoading || !forgotEmail}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold disabled:opacity-50">
+                      {forgotLoading ? "Sending..." : "Send OTP"}
+                    </button>
+                  </div>
+                )}
+
+                {forgotMode === "otp" && (
+                  <div className="space-y-4">
+                    <input
+                      type="text" maxLength={6}
+                      placeholder="Enter 6-digit OTP"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/, ""))}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm text-center text-2xl tracking-widest font-bold"
+                    />
+                    <button onClick={handleForgotVerifyOTP} disabled={forgotLoading || otp.length !== 6}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold disabled:opacity-50">
+                      {forgotLoading ? "Verifying..." : "Verify OTP"}
+                    </button>
+                    <button onClick={handleForgotSendOTP} className="w-full text-indigo-600 text-sm hover:underline">
+                      Resend OTP
+                    </button>
+                  </div>
+                )}
+
+                {forgotMode === "reset" && (
+                  <div className="space-y-4">
+                    <input
+                      type="password"
+                      placeholder="New password (min 8 characters)"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm"
+                    />
+                    <button onClick={handleForgotReset} disabled={forgotLoading || newPassword.length < 8}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold disabled:opacity-50">
+                      {forgotLoading ? "Resetting..." : "Reset Password"}
+                    </button>
+                  </div>
+                )}
+
+                {forgotMsg && (
+                  <p className={`mt-4 text-sm text-center font-medium ${forgotMsg.includes("success") || forgotMsg.includes("sent") ? "text-green-600" : "text-red-500"}`}>
+                    {forgotMsg}
+                  </p>
+                )}
+
+                <button onClick={() => { setForgotMode(false); setForgotMsg(""); }}
+                  className="mt-4 w-full text-gray-400 hover:text-gray-600 text-sm">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           <p className="text-center text-gray-600 mt-8 animate-fade-in delay-700">
-            New to AI Tutor?{" "}
+            New to QuantumEdu ?{" "}
             <Link
               to="/signup"
               className="text-indigo-600 hover:text-indigo-800 font-semibold hover:underline ml-1 transition-all duration-300 hover:tracking-wider"

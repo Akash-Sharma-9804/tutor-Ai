@@ -57,7 +57,7 @@ export default function Profile() {
   
   const [loading, setLoading] = useState(true);
   const [editModal, setEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", phone: "", bio: "" });
+  const [editForm, setEditForm] = useState({ name: "", phone: "", bio: "", dob: "" });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
   const [picLoading, setPicLoading] = useState(false);
@@ -108,19 +108,23 @@ export default function Profile() {
           age: profileData.age || "N/A",
           gender: profileData.gender || "N/A",
           dob: profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : "N/A",
+          dobRaw: profileData.dob ? new Date(profileData.dob).toISOString().split("T")[0] : "",
           joinDate: profileData.created_at ? new Date(profileData.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : "N/A",
           bio: profileData.bio || "Passionate learner exploring new concepts with AI-powered tools.",
           avatar: profileData.profile_picture || avatarUrl,
           streak: stats.streak.current,
           totalHours: stats.studyHours.total,
           lessonsTotal: stats.lessons.total,
-          rank: null, // not available from backend yet
+          rank: null,
+          authProvider: profileData.auth_provider || "local",
+          passwordSet: profileData.password_set ?? true,
         });
 
         setEditForm({
           name: profileData.studentName || "",
           phone: profileData.phone || "",
           bio: profileData.bio || "",
+          dob: profileData.dob ? new Date(profileData.dob).toISOString().split("T")[0] : "",
         });
 
         // Map real subjects with progress
@@ -193,7 +197,8 @@ export default function Profile() {
   const handleChangePassword = async () => {
     setPwError("");
     setPwSuccess("");
-    if (!pwForm.current) { setPwError("Enter your current password."); return; }
+    const isGoogleNewPassword = student.authProvider === "google" && !student.passwordSet;
+    if (!isGoogleNewPassword && !pwForm.current) { setPwError("Enter your current password."); return; }
     if (pwForm.next.length < 6) { setPwError("New password must be at least 6 characters."); return; }
     if (pwForm.next !== pwForm.confirm) { setPwError("New passwords do not match."); return; }
     setPwLoading(true);
@@ -204,8 +209,11 @@ export default function Profile() {
         { currentPassword: pwForm.current, newPassword: pwForm.next },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setPwSuccess("Password changed successfully!");
+      setPwSuccess(isGoogleNewPassword ? "Password set! You can now login with email too." : "Password changed successfully!");
       setPwForm({ current: "", next: "", confirm: "" });
+      if (isGoogleNewPassword) {
+        setStudent(prev => ({ ...prev, passwordSet: true }));
+      }
     } catch (err) {
       setPwError(err.response?.data?.message || "Failed to change password.");
     } finally {
@@ -224,10 +232,17 @@ export default function Profile() {
       const token = localStorage.getItem("token");
       await axios.put(
         `${import.meta.env.VITE_BACKEND_URL}/api/student/me`,
-        { name: editForm.name, phone: editForm.phone, bio: editForm.bio },
+        { name: editForm.name, phone: editForm.phone, bio: editForm.bio, dob: editForm.dob },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setStudent(prev => ({ ...prev, name: editForm.name, phone: editForm.phone, bio: editForm.bio }));
+      setStudent(prev => ({
+        ...prev,
+        name: editForm.name,
+        phone: editForm.phone,
+        bio: editForm.bio,
+        dobRaw: editForm.dob,
+        dob: editForm.dob ? new Date(editForm.dob).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : prev.dob,
+      }));
       setEditModal(false);
     } catch (err) {
       setEditError(err.response?.data?.message || "Failed to update profile.");
@@ -957,6 +972,23 @@ export default function Profile() {
                 </div>
               </div>
 
+              {/* Date of Birth Field */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Date of Birth
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="date"
+                    value={editForm.dob}
+                    onChange={e => setEditForm(prev => ({ ...prev, dob: e.target.value }))}
+                    max={new Date().toISOString().split("T")[0]}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  />
+                </div>
+              </div>
+
               {/* Read-only info note */}
               <p className="text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-900/30 rounded-xl px-4 py-3 border border-gray-200 dark:border-gray-700">
                 ℹ️ Email, class, and school details can only be updated by your school administrator.
@@ -1000,7 +1032,7 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Change Password Modal */}
+      {/* Change / Set Password Modal */}
       {pwModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <motion.div
@@ -1015,7 +1047,16 @@ export default function Profile() {
                 <div className="p-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500">
                   <Lock className="h-5 w-5 text-white" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Change Password</h2>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    {student.authProvider === "google" && !student.passwordSet ? "Set Password" : "Change Password"}
+                  </h2>
+                  {student.authProvider === "google" && !student.passwordSet && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      You signed in with Google. Set a password to also login with email.
+                    </p>
+                  )}
+                </div>
               </div>
               <button
                 onClick={() => { setPwModal(false); setPwForm({ current: "", next: "", confirm: "" }); setPwError(""); setPwSuccess(""); }}
@@ -1030,8 +1071,10 @@ export default function Profile() {
             {/* Body */}
             <div className="p-6 space-y-5">
               {/* Current Password */}
-              {[
-                { key: "current", label: "Current Password", placeholder: "Enter current password" },
+            {[
+                ...(student.authProvider === "google" && !student.passwordSet
+                  ? []
+                  : [{ key: "current", label: "Current Password", placeholder: "Enter current password" }]),
                 { key: "next",    label: "New Password",     placeholder: "Min. 6 characters" },
                 { key: "confirm", label: "Confirm New Password", placeholder: "Re-enter new password" },
               ].map(({ key, label, placeholder }) => (

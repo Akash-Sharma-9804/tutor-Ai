@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { GoogleLogin } from '@react-oauth/google';
+ 
 import {
   GraduationCap,
   User,
@@ -213,10 +215,10 @@ export default function Signup() {
       setFormSubmitted(true);
       await new Promise((resolve) => setTimeout(resolve, 1500));
       window.location.href = "/login";
-    } catch {
+    } catch (err) {
       formRef.current.classList.add("animate-shake");
       setTimeout(() => formRef.current.classList.remove("animate-shake"), 500);
-      alert("Signup failed. Please try again.");
+      alert(err.response?.data?.message || "Signup failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -285,8 +287,7 @@ export default function Signup() {
               Welcome Aboard! 🎉
             </h3>
             <p className="text-gray-600 mb-6">
-              Your AI learning adventure is about to begin! Redirecting to
-              login...
+              Account created! Redirecting you to complete your profile...
             </p>
             <div className="w-12 h-12 border-4 border-white border-t-green-500 rounded-full animate-spin mx-auto"></div>
           </div>
@@ -825,6 +826,39 @@ export default function Signup() {
             </form>
 
              
+
+            {/* Google Signup */}
+            <div className="my-4 flex justify-center animate-fade-in delay-850">
+              <GoogleLogin
+                onSuccess={async (credentialResponse) => {
+                  try {
+                    const res = await axios.post(
+                      `${API_BASE_URL}/api/auth/google`,
+                      { token: credentialResponse.credential }
+                    );
+                    if (res.data.token) {
+                      localStorage.setItem("token", res.data.token);
+                      if (res.data.isNewUser) {
+                        // New user — show welcome overlay then go to complete profile
+                        setFormSubmitted(true);
+                        await new Promise((resolve) => setTimeout(resolve, 1500));
+                        window.location.href = `/complete-profile?studentId=${res.data.student.id}&token=${res.data.token}`;
+                      } else if (!res.data.student.profile_complete) {
+                        // Returning Google user with incomplete profile
+                        window.location.href = `/complete-profile?studentId=${res.data.student.id}&token=${res.data.token}`;
+                      } else {
+                        // Already has full account — redirect to login
+                        alert("You already have an account! Please login instead.");
+                        window.location.href = "/login";
+                      }
+                    }
+                  } catch (err) {
+                    alert(err.response?.data?.message || "Google signup failed");
+                  }
+                }}
+                onError={() => alert("Google Login Failed")}
+              />
+            </div>
 
             {/* Divider */}
             <div className="my-6 flex items-center animate-fade-in delay-900">
