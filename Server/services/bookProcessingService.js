@@ -193,21 +193,36 @@ NEVER return empty content arrays, even for near-empty pages.
 
 CRITICAL INSTRUCTIONS:
 1. FIRST classify the content type:
-   - THEORY / CONCEPT → explain line by line.
+   - THEORY / CONCEPT → group into balanced segments (see Rule 3 below).
    - EXERCISE / QUESTION / NUMERICAL / PROBLEM → SOLVE completely.
 
 2. DO NOT treat questions like theory.
 
-3. GROUPING RULE (VERY IMPORTANT):
-   - DO NOT create a separate content block for every single line.
-   - Merge consecutive related lines into ONE meaningful paragraph.
-   - Each "text" block MUST represent a complete idea or thought from the textbook.
-   - Do NOT split content unless the topic clearly changes.
+3. GROUPING RULE — BALANCED SEGMENTS (MOST IMPORTANT RULE):
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Think of how a TEACHER explains in class — not too fast (one line at a time), not too slow (a giant wall of text). Apply this same balance:
+
+   ✅ IDEAL TEXT BLOCK SIZE: 2–4 sentences from the book (40–80 words)
+   ✅ IDEAL EXPLANATION SIZE: 3–5 sentences (60–100 words)
+
+   WHEN TO GROUP LINES TOGETHER (merge into one block):
+   - Lines that together explain ONE concept or ONE idea (e.g., "what is metabolism" across 2 short lines)
+   - A list of related points (A, B, C...) that all belong to the same topic
+   - A definition followed immediately by its example
+
+   WHEN TO SPLIT INTO SEPARATE BLOCKS (do NOT merge):
+   - When the topic clearly shifts (e.g., from metabolism to reproduction)
+   - When one point is already 3–4 sentences on its own
+   - When a new lettered/numbered point introduces a DIFFERENT concept
+
+   ❌ DO NOT: Put an entire section (10+ sentences) into one text block
+   ❌ DO NOT: Make a block for every single short line (1 sentence per block)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 4. HANDLING RULES BASED ON CONTENT TYPE:
 
 A. THEORY / CONCEPT CONTENT:
-   - Explain line by line in 2–3 sentence segments.
+   - Group 2–4 related sentences into one "text" block (see Rule 3).
    - Use simple language suitable for Class ${bookMetadata.class}.
    - Explain meanings, ideas, and real-life relevance.
 
@@ -309,8 +324,8 @@ OUTPUT FORMAT (STRICT JSON ONLY):
       "content": [
         {
           "type": "text",
-          "text": "2-3 sentences exactly as written in the markdown",
-          "explanation": "A clear, connected explanation of AT LEAST 2-4 full sentences. Explain the idea like a teacher in class. Focus on meaning, cause, and understanding."
+          "text": "2–4 sentences from the book covering ONE complete idea (40–80 words). Never a single short line. Never an entire section.",
+          "explanation": "3–5 sentences explaining this idea like a teacher: what it means, why it matters, and a real-life example if possible. (60–100 words)"
         },
         {
           "type": "diagram_concept",
@@ -351,10 +366,11 @@ OUTPUT FORMAT (STRICT JSON ONLY):
 }
 
 QUALITY REQUIREMENTS:
-- Explanations must be LONG, clear, and teacher-like (5-8 sentences if needed)
+- Each text block covers ONE complete idea — not a single line, not an entire topic dump
+- Explanations are teacher-like: clear, connected, 3–5 sentences (60–100 words)
 - Explain WHY concepts work, not just WHAT they are
 - Use real-life analogies familiar to Class ${bookMetadata.class} students
-- For diagrams: explain every visible part and interaction
+- For diagrams: explain every visible part and interaction (3–5 sentences)
 - For equations: explain every step and the rule used
 - Maintain strict JSON validity at all times`,
       },

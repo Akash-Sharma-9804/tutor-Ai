@@ -10,8 +10,32 @@ import "katex/dist/katex.min.css";
 import TeacherAvatar from '../components/TeacherAvatar.jsx';
 import WhiteboardPanel from '../components/WhiteboardPanel.jsx';
 
+// Renders text that contains inline LaTeX ($...$) mixed with plain text
+const renderMixedText = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  // Don't try to parse if no $ signs present
+  if (!text.includes('$')) return text;
+
+  // Split on $...$ pattern (single dollar = inline math)
+  const parts = text.split(/(\$[^$]+\$)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
+      const math = part.slice(1, -1).trim();
+      try {
+        return <InlineMath key={i} math={math} />;
+      } catch {
+        return <span key={i}>{part}</span>;
+      }
+    }
+    return <span key={i}>{part}</span>;
+  });
+};
+
 const LineByLineReader = () => {
   const utteranceRef = useRef(null);
+  const ttsAbortRef = useRef(null); // AbortController for TTS fetch stream
+  const autoPlayRef = useRef(false); // Tracks autoplay without stale closure
+  const autoPlayTimerRef = useRef(null); // Tracks the pause-between-segments timer
 
   const { chapterId } = useParams();
   const navigate = useNavigate();
@@ -57,6 +81,7 @@ const LineByLineReader = () => {
   const audioRef = useRef(null);
 
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [autoPlayCountdown, setAutoPlayCountdown] = useState(0); // seconds remaining before next segment
   const segmentStartTime = useRef(Date.now());
 
   const [highlightedWordIndex, setHighlightedWordIndex] = useState(-1);
@@ -105,7 +130,10 @@ const handleFullscreenChange = () => {
     document.webkitFullscreenElement ||
     document.msFullscreenElement
   );
-  
+
+  // Always stop audio when fullscreen changes (exit or enter)
+  stopReading();
+
   setIsFullscreen(isCurrentlyFullscreen);
 
   // Navigate back when fullscreen is exited
@@ -152,119 +180,233 @@ useEffect(() => {
 
 
 
-  // Deepgram TTS function
+  // Deepgram TTS function — streams audio directly so playback starts instantly
   const speakWithDeepgram = async (text, stepInfo = null, isTeacherBoard = false) => {
     try {
       setIsLoadingAudio(true);
       const token = localStorage.getItem("token");
 
-      const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/books/chapters/${chapterId}/tts`,
-        { text },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      // Abort any previous TTS fetch stream
+      if (ttsAbortRef.current) {
+        ttsAbortRef.current.abort();
+      }
+      const abortController = new AbortController();
+      ttsAbortRef.current = abortController;
 
-      // Create audio from base64
-      const audioBlob = new Blob(
-        [Uint8Array.from(atob(response.data.audio), c => c.charCodeAt(0))],
-        { type: 'audio/mpeg' }
-      );
-      const audioUrl = URL.createObjectURL(audioBlob);
-
-      // Play audio
+      // Stop any existing audio
       if (audioRef.current) {
         audioRef.current.pause();
-        URL.revokeObjectURL(audioRef.current.src);
+        audioRef.current.src = "";
+        audioRef.current = null;
       }
 
-      const audio = new Audio(audioUrl);
+      const streamUrl = `${import.meta.env.VITE_BACKEND_URL}/api/books/chapters/${chapterId}/tts`;
+      const audio = new Audio();
       audioRef.current = audio;
+      const mediaSource = new MediaSource();
+      const audioUrl = URL.createObjectURL(mediaSource);
+      audio.src = audioUrl;
 
-      // Split text into words for highlighting
-      // Split text into words for highlighting
+      // Words for highlight — show immediately, don't clear on end
       const words = text.split(/\s+/);
-
       if (isTeacherBoard) {
         setTeacherBoardWords(words);
       } else {
         setCurrentWords(words);
       }
 
-      // Wait for audio metadata to load
-      audio.addEventListener('loadedmetadata', () => {
-        const avgWordDuration = audio.duration / words.length;
+      // Track word highlight via timeupdate (not loadedmetadata duration)
+      // We estimate total duration as words * 0.35s average speaking pace
+      // and update highlight index based on actual currentTime
+      const estimatedDuration = words.length * 0.38;
+      let lastHighlightIndex = -1;
+      let rafId = null;
 
-        let wordIndex = 0;
-        const highlightInterval = setInterval(() => {
-          if (wordIndex < words.length) {
-            if (isTeacherBoard) {
-              setTeacherBoardHighlightIndex(wordIndex);
-            } else {
-              setHighlightedWordIndex(wordIndex);
-            }
-            wordIndex++;
+      // Use requestAnimationFrame for smooth 60fps word tracking
+      const trackWords = () => {
+        if (!audioRef.current || audioRef.current !== audio) return;
+        const duration = audio.duration && isFinite(audio.duration) ? audio.duration : estimatedDuration;
+        const progress = audio.currentTime / Math.max(duration, 0.1);
+        const wordIndex = Math.min(Math.floor(progress * words.length), words.length - 1);
+        if (wordIndex !== lastHighlightIndex && wordIndex >= 0) {
+          lastHighlightIndex = wordIndex;
+          if (isTeacherBoard) {
+            setTeacherBoardHighlightIndex(wordIndex);
           } else {
-            clearInterval(highlightInterval);
-            if (isTeacherBoard) {
-              setTeacherBoardHighlightIndex(-1);
-            } else {
-              setHighlightedWordIndex(-1);
-            }
+            setHighlightedWordIndex(wordIndex);
           }
-        }, avgWordDuration * 1000);
+        }
+        rafId = requestAnimationFrame(trackWords);
+      };
 
-        // If this is an equation step, handle typing animation
-        // If this is an equation step, handle typing animation
-        if (stepInfo) {
+      const handleTimeUpdate = () => {
+        // Start rAF loop on first timeupdate (audio has started)
+        if (rafId === null) {
+          rafId = requestAnimationFrame(trackWords);
+        }
+      };
+      audio.addEventListener('timeupdate', handleTimeUpdate);
+
+      // Store rafId for cleanup
+      audio.rafId = rafId;
+
+      mediaSource.addEventListener("sourceopen", async () => {
+        let sourceBuffer;
+        try {
+          sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
+        } catch (e) {
+          console.error("Failed to add source buffer:", e);
+          setIsLoadingAudio(false);
+          return;
+        }
+
+        let response;
+        try {
+          response = await fetch(streamUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ text }),
+            signal: abortController.signal,
+          });
+        } catch (e) {
+          if (e.name === "AbortError") return;
+          console.error("TTS fetch failed:", e);
+          setIsLoadingAudio(false);
+          setIsReading(false);
+          return;
+        }
+
+        setIsLoadingAudio(false);
+        setIsReading(true);
+
+        // Start playing as soon as first chunk arrives
+        audio.play().catch(() => {});
+
+        const reader = response.body.getReader();
+
+        // Queue-based pump: chunks are queued and appended one at a time
+        // This prevents InvalidStateError when chunks arrive faster than SourceBuffer processes
+        const chunkQueue = [];
+        let isAppending = false;
+        let streamDone = false;
+
+        const tryAppendNext = () => {
+          if (isAppending || chunkQueue.length === 0) return;
+          if (abortController.signal.aborted) return;
+          if (mediaSource.readyState !== "open") return;
+
+          isAppending = true;
+          const chunk = chunkQueue.shift();
+          try {
+            sourceBuffer.appendBuffer(chunk);
+          } catch (e) {
+            console.error("appendBuffer error:", e);
+            isAppending = false;
+          }
+        };
+
+        sourceBuffer.addEventListener("updateend", () => {
+          isAppending = false;
+          if (streamDone && chunkQueue.length === 0) {
+            try { mediaSource.endOfStream(); } catch (_) {}
+          } else {
+            tryAppendNext();
+          }
+        });
+
+        const pump = async () => {
+          while (true) {
+            if (abortController.signal.aborted) {
+              reader.cancel();
+              return;
+            }
+            const { done, value } = await reader.read();
+            if (done) {
+              streamDone = true;
+              // If nothing is currently appending and queue is empty, end stream now
+              if (!isAppending && chunkQueue.length === 0) {
+                try { mediaSource.endOfStream(); } catch (_) {}
+              }
+              return;
+            }
+            chunkQueue.push(value);
+            tryAppendNext();
+          }
+        };
+
+        pump().catch(err => {
+          if (err.name !== "AbortError") console.error("Stream pump error:", err);
+        });
+      });
+
+      // Equation step typing animation (unchanged logic)
+      if (stepInfo) {
+        audio.addEventListener('loadedmetadata', () => {
           const { stepIndex, stepText, explanationText } = stepInfo;
-
-          // Type the step formula at a readable pace (complete in 3 seconds regardless of audio length)
-          const stepTypingDuration = 3000; // 3 seconds total
+          const stepTypingDuration = 3000;
           const charDuration = stepTypingDuration / stepText.length;
-
           let charIndex = 0;
           const typingInterval = setInterval(() => {
             if (charIndex <= stepText.length) {
-              setEquationStepChars(prev => ({
-                ...prev,
-                [stepIndex]: charIndex
-              }));
+              setEquationStepChars(prev => ({ ...prev, [stepIndex]: charIndex }));
               charIndex++;
             } else {
               clearInterval(typingInterval);
-              // After step typing is done, start explanation word reveal
               if (explanationText) {
                 startExplanationReveal(stepIndex, explanationText, audio.duration - stepTypingDuration);
               }
             }
           }, charDuration);
-
           setActiveStepUnderline(stepIndex);
           audio.typingInterval = typingInterval;
-        }
-
-        audio.highlightInterval = highlightInterval;
-      });
+        });
+      }
 
       audio.onended = () => {
         if (audio.highlightInterval) clearInterval(audio.highlightInterval);
         if (audio.typingInterval) clearInterval(audio.typingInterval);
         if (audio.explanationInterval) clearInterval(audio.explanationInterval);
+        audio.removeEventListener('timeupdate', handleTimeUpdate);
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
 
-        // Don't reset if we're in equation mode and still reading steps
+        // Highlight all words at end to show full text, don't clear
+        if (isTeacherBoard) {
+          setTeacherBoardHighlightIndex(words.length - 1);
+        } else {
+          setHighlightedWordIndex(words.length - 1);
+        }
+        setActiveStepUnderline(-1);
+
+        // Only mark as not reading if not equation mid-steps
         if (currentSegment?.type !== 'equation' || !stepInfo) {
           setIsReading(false);
         }
 
-
-        setHighlightedWordIndex(-1);
-        setCurrentWords([]);
-        setTeacherBoardHighlightIndex(-1);
-        setActiveStepUnderline(-1);
         URL.revokeObjectURL(audioUrl);
 
-        if (autoPlayMode && currentSegment?.type !== 'equation') {
-          setTimeout(goToNextSegment, 600);
+        if (autoPlayRef.current && currentSegment?.type !== 'equation') {
+          // Wait 2 seconds with a visible countdown, then go to next segment
+          const PAUSE_SECONDS = 5;
+          let remaining = PAUSE_SECONDS;
+          setAutoPlayCountdown(remaining);
+
+          const tick = () => {
+            remaining -= 1;
+            setAutoPlayCountdown(remaining);
+            if (remaining <= 0) {
+              setAutoPlayCountdown(0);
+              if (autoPlayRef.current) {
+                goToNextSegment();
+                // readAloud() will be triggered by the useEffect that watches segment change
+              }
+            } else {
+              autoPlayTimerRef.current = setTimeout(tick, 1000);
+            }
+          };
+          autoPlayTimerRef.current = setTimeout(tick, 1000);
         }
       };
 
@@ -417,13 +559,50 @@ useEffect(() => {
 
   useEffect(() => {
     loadChapterContent();
+    // Stop all audio when component unmounts (navigate away, back button, etc.)
+    return () => {
+      if (ttsAbortRef.current) {
+        ttsAbortRef.current.abort();
+        ttsAbortRef.current = null;
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+        audioRef.current = null;
+      }
+    };
   }, [chapterId]);
 
   useEffect(() => {
+    const wasAutoPlaying = autoPlayRef.current;
+
+    // Stop current audio but preserve autoplay state if it was active
+    if (ttsAbortRef.current) {
+      ttsAbortRef.current.abort();
+      ttsAbortRef.current = null;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
+    setIsReading(false);
+    setIsLoadingAudio(false);
+    setHighlightedWordIndex(-1);
+    setCurrentWords([]);
     setActiveEquationStep(0);
     setExplanationWords({});
     setEquationStepChars({});
     setShowFinalResult(false);
+
+    // If autoplay was running, start reading the new segment after a short render delay
+    if (wasAutoPlaying) {
+      autoPlayRef.current = true;
+      setAutoPlayMode(true);
+      autoPlayTimerRef.current = setTimeout(() => {
+        readAloud();
+      }, 400); // small delay to let the new segment render first
+    }
   }, [currentSegmentIndex, currentPageIndex]);
 
 
@@ -517,10 +696,10 @@ useEffect(() => {
     ? currentSection.content[currentSegmentIndex + 1]
     : null;
 
-  // If we have a subheading followed by content, use the next segment as current
-  if (isSubheading && nextSegment && nextSegment.type !== 'subheading') {
-    currentSegment = nextSegment;
-  }
+  // // If we have a subheading followed by content, use the next segment as current
+  // if (isSubheading && nextSegment && nextSegment.type !== 'subheading') {
+  //   currentSegment = nextSegment;
+  // }
 
   const saveSegmentProgress = async (segmentIdx, pageIdx) => {
     try {
@@ -555,30 +734,76 @@ useEffect(() => {
   };
 
   const goToNextSegment = () => {
-    // Save progress for segment being left
     saveSegmentProgress(currentSegmentIndex, currentPageIndex);
     segmentStartTime.current = Date.now();
 
-    if (currentSegmentIndex < currentSection.content.length - 1) {
-      setCurrentSegmentIndex(currentSegmentIndex + 1);
-    } else if (currentPageIndex < (chapterData?.sections?.length || 0) - 1) {
-      setCurrentPageIndex(currentPageIndex + 1);
-      setCurrentSegmentIndex(0);
+    let nextSegIdx = currentSegmentIndex + 1;
+    let nextPageIdx = currentPageIndex;
+
+    // If past end of current section, move to next page
+    if (nextSegIdx >= currentSection.content.length) {
+      if (currentPageIndex < (chapterData?.sections?.length || 0) - 1) {
+        nextPageIdx = currentPageIndex + 1;
+        nextSegIdx = 0;
+      }
     }
+
+    // Skip ALL consecutive subheadings
+    while (chapterData?.sections?.[nextPageIdx]?.content?.[nextSegIdx]?.type === 'subheading') {
+      nextSegIdx += 1;
+      // If skipping pushed past the end of this page, go to next page
+      if (nextSegIdx >= (chapterData?.sections?.[nextPageIdx]?.content?.length || 0)) {
+        if (nextPageIdx < (chapterData?.sections?.length || 0) - 1) {
+          nextPageIdx += 1;
+          nextSegIdx = 0;
+        } else {
+          break;
+        }
+      }
+    }
+
+    if (nextPageIdx !== currentPageIndex) {
+      setCurrentPageIndex(nextPageIdx);
+    }
+    setCurrentSegmentIndex(nextSegIdx);
     setShowDetailedExplanation(false);
   };
 
   const goToPreviousSegment = () => {
-    if (currentSegmentIndex > 0) {
-      setCurrentSegmentIndex(currentSegmentIndex - 1);
-    } else if (currentPageIndex > 0) {
-      setCurrentPageIndex(currentPageIndex - 1);
-      const prevSection = chapterData.sections[currentPageIndex - 1];
-      setCurrentSegmentIndex(prevSection.content.length - 1);
-    }
-    setShowDetailedExplanation(false); // Reset detailed explanation
-  };
+    let prevSegIdx = currentSegmentIndex - 1;
+    let prevPageIdx = currentPageIndex;
 
+    // If before start of current section, move to previous page
+    if (prevSegIdx < 0) {
+      if (currentPageIndex > 0) {
+        prevPageIdx = currentPageIndex - 1;
+        prevSegIdx = chapterData.sections[prevPageIdx].content.length - 1;
+      } else {
+        return; // already at very beginning
+      }
+    }
+
+    // Skip ALL consecutive subheadings going backwards
+    while (chapterData?.sections?.[prevPageIdx]?.content?.[prevSegIdx]?.type === 'subheading') {
+      prevSegIdx -= 1;
+      // If skipping pushed before start of this page, go to previous page
+      if (prevSegIdx < 0) {
+        if (prevPageIdx > 0) {
+          prevPageIdx -= 1;
+          prevSegIdx = chapterData.sections[prevPageIdx].content.length - 1;
+        } else {
+          prevSegIdx = 0;
+          break;
+        }
+      }
+    }
+
+    if (prevPageIdx !== currentPageIndex) {
+      setCurrentPageIndex(prevPageIdx);
+    }
+    setCurrentSegmentIndex(prevSegIdx);
+    setShowDetailedExplanation(false);
+  };
   const readAloud = async (customText = null) => {
     if (!customText && !currentSegment) return;
 
@@ -897,29 +1122,48 @@ useEffect(() => {
 
 
   const stopReading = () => {
-    // Stop Deepgram audio
+    autoPlayRef.current = false;
+
+    // Cancel any pending autoplay pause timer
+    if (autoPlayTimerRef.current) {
+      clearTimeout(autoPlayTimerRef.current);
+      autoPlayTimerRef.current = null;
+    }
+
+    // Abort the fetch stream — this stops audio even after navigate
+    if (ttsAbortRef.current) {
+      ttsAbortRef.current.abort();
+      ttsAbortRef.current = null;
+    }
+
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+      audioRef.current.src = "";
       audioRef.current = null;
     }
 
     setIsReading(false);
     setAutoPlayMode(false);
     setIsLoadingAudio(false);
-
-    // Reset teacher board states
+    setHighlightedWordIndex(-1);
+    setCurrentWords([]);
     setTeacherBoardWords([]);
     setTeacherBoardHighlightIndex(-1);
     setCurrentChunk({ current: 0, total: 0 });
+    setAutoPlayCountdown(0);
   };
-
 
 
   const toggleAutoPlay = () => {
     if (autoPlayMode) {
+      autoPlayRef.current = false;
+      if (autoPlayTimerRef.current) {
+        clearTimeout(autoPlayTimerRef.current);
+        autoPlayTimerRef.current = null;
+      }
       stopReading();
     } else {
+      autoPlayRef.current = true;
       setAutoPlayMode(true);
       readAloud();
     }
@@ -1370,7 +1614,7 @@ useEffect(() => {
                               }`}
                             style={{ fontFamily: 'Comic Sans MS, cursive' }}
                           >
-                            {autoPlayMode ? '🔄 Auto-Play ON' : '▶️ Auto-Play'}
+                           {autoPlayCountdown > 0 ? `Next in ${autoPlayCountdown}s` : 'Auto-Play'}
                           </button>
 
                           <button
@@ -1413,9 +1657,9 @@ useEffect(() => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           {/* LEFT: Diagram Image */}
           <div className="order-1">
-            <div className="bg-white rounded-2xl shadow-lg p-3 border-4 border-purple-400 max-h-[400px] overflow-y-auto custom-scrollbar">
+            <div className="bg-white rounded-2xl shadow-lg p-3 border-4 border-purple-400">
               {(currentSegment.title || currentSegment.reference) && (
-                <p className="text-center mb-2 text-sm font-semibold text-purple-700 bg-purple-50 py-2 rounded-lg sticky top-0 z-10">
+                <p className="text-center mb-2 text-sm font-semibold text-purple-700 bg-purple-50 py-2 rounded-lg">
                   📍 {currentSegment.title || currentSegment.reference}
                 </p>
               )}
@@ -1423,7 +1667,7 @@ useEffect(() => {
                 <img
                   src={diagramImageUrl}
                   alt={currentSegment.title || currentSegment.reference || "Diagram"}
-                  className="w-full rounded-lg shadow-xl object-contain"
+                  className="w-full rounded-lg shadow-md object-contain max-h-72"
                   onError={(e) => {
                     console.error('Diagram image failed to load:', diagramImageUrl);
                     e.target.style.display = 'none';
@@ -1444,7 +1688,7 @@ useEffect(() => {
           {/* RIGHT: Explanation */}
           <div className="order-2">
             {(currentSegment.description || currentSegment.explanation) && (
-              <div className="bg-purple-100 rounded-2xl shadow-lg p-4 sm:p-6 border-4 border-purple-400 max-h-[400px] overflow-y-auto custom-scrollbar" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+              <div className="bg-purple-100 rounded-2xl shadow-lg p-4 border-4 border-purple-400" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 bg-purple-500 rounded-lg border-2 border-purple-600 shadow-md">
                     <Lightbulb className="h-6 w-6 text-white" />
@@ -1457,8 +1701,8 @@ useEffect(() => {
                   </p>
                 )}
                 {currentSegment.explanation && (
-                  <p className="text-xs sm:text-base leading-relaxed text-slate-700 chalk-text" style={{ wordSpacing: '0.15em' }}>
-                    {currentSegment.explanation}
+                  <p className="text-xs sm:text-sm leading-relaxed text-slate-700 chalk-text" style={{ wordSpacing: '0.15em' }}>
+                    {renderMixedText(currentSegment.explanation)}
                   </p>
                 )}
               </div>
@@ -1518,32 +1762,36 @@ useEffect(() => {
                                     )}
                                   </div>
 
-                                  {/* Text content - don't show for diagram-only segments */}
-                                  {currentSegment?.type !== 'diagram' && (
+                                  {/* Text content - don't show for diagram-only, example, or equation segments (they have their own display) */}
+                                  {currentSegment?.type !== 'diagram' && currentSegment?.type !== 'example' && currentSegment?.type !== 'equation' && (
                                     <p
-  className={`text-base sm:text-xl md:text-2xl leading-relaxed transition-all text-slate-800 ${currentSegment?.type === 'equation' ? 'font-mono font-bold text-center' : 'font-medium'
-    }`}
+  className="text-base sm:text-lg md:text-xl leading-relaxed transition-all text-slate-800 font-medium"
   style={{ fontFamily: 'Comic Sans MS, cursive', wordSpacing: '0.15em' }}
 >
-                                      {isReading && currentWords.length > 0 && currentSegment?.type !== 'equation' ? (
+                                      {isReading && currentWords.length > 0 ? (
                                         currentWords.map((word, idx) => (
                                           <span
                                             key={idx}
-                                            className={`inline-block transition-all duration-150 ease-out ${idx <= highlightedWordIndex
-                                              ? 'opacity-100 scale-100'
-                                              : 'opacity-0 scale-95'
-                                              }`}
+                                            className="inline-block transition-colors duration-100"
                                             style={{
-                                              marginRight: '0.3em'
+                                              marginRight: '0.3em',
+                                              color: idx === highlightedWordIndex
+                                                ? '#2563eb'          // current word — bright blue
+                                                : idx < highlightedWordIndex
+                                                ? 'rgba(30,41,59,0.45)'  // already spoken — faded
+                                                : 'rgb(30,41,59)',    // upcoming — normal
+                                              fontWeight: idx === highlightedWordIndex ? '700' : 'inherit',
+                                              textShadow: idx === highlightedWordIndex ? '0 0 12px rgba(37,99,235,0.35)' : 'none',
                                             }}
                                           >
                                             {word}
                                           </span>
                                         ))
                                       ) : (
-                                        currentSegment?.type === 'equation'
-                                          ? currentSegment?.equation
-                                          : currentSegment?.text || currentSegment?.problem || currentSegment?.reference || currentSegment?.title || ''
+                                        (currentSegment?.text || currentSegment?.reference || currentSegment?.title || '')
+                                          .split('\n').map((line, i) => line.trim()
+                                            ? <span key={i} style={{display:'block'}}>{renderMixedText(line)}</span>
+                                            : null)
                                       )}
                                     </p>
                                   )}
@@ -1563,9 +1811,11 @@ useEffect(() => {
                                 </div>
                                 <h2 className="text-xl font-bold text-slate-800 chalk-text">Example Problem</h2>
                               </div>
-                              <p className="text-sm sm:text-base md:text-lg leading-relaxed text-slate-700 chalk-text" style={{ wordSpacing: '0.15em' }}>
-                                {currentSegment.problem}
-                              </p>
+                              <div className="text-sm sm:text-base leading-relaxed text-slate-700 chalk-text space-y-1" style={{ wordSpacing: '0.15em' }}>
+                                {currentSegment.problem.split('\n').map((line, i) => (
+                                  line.trim() ? <p key={i}>{renderMixedText(line)}</p> : null
+                                ))}
+                              </div>
                             </div>
 
                             {/* Solution */}
@@ -1579,38 +1829,48 @@ useEffect(() => {
                                 </div>
                                 <div className="prose prose-slate max-w-none">
                                   {currentSegment.solution.split('\n').map((line, idx) => {
+                                    // Renders markdown bold/italic AND inline LaTeX $...$
                                     const renderInline = (text) => {
-                                      const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
-                                      return parts.map((part, i) => {
-                                        if (part.startsWith('**') && part.endsWith('**'))
-                                          return <strong key={i}>{part.slice(2, -2)}</strong>;
-                                        if (part.startsWith('*') && part.endsWith('*'))
-                                          return <em key={i}>{part.slice(1, -1)}</em>;
-                                        return part;
+                                      // First split on $...$ for math
+                                      const mathParts = text.split(/(\$[^$]+\$)/g);
+                                      return mathParts.map((part, i) => {
+                                        if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
+                                          try { return <InlineMath key={i} math={part.slice(1, -1).trim()} />; }
+                                          catch { return <span key={i}>{part}</span>; }
+                                        }
+                                        // Handle bold/italic in non-math segments
+                                        const mdParts = part.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+                                        return mdParts.map((mp, j) => {
+                                          if (mp.startsWith('**') && mp.endsWith('**'))
+                                            return <strong key={`${i}-${j}`}>{mp.slice(2, -2)}</strong>;
+                                          if (mp.startsWith('*') && mp.endsWith('*'))
+                                            return <em key={`${i}-${j}`}>{mp.slice(1, -1)}</em>;
+                                          return <span key={`${i}-${j}`}>{mp}</span>;
+                                        });
                                       });
                                     };
-                                    // Bullet point: starts with *   (asterisk + spaces, not inline)
-                                    if (line.trim().match(/^\*\s+\S/) || line.trim().match(/^\*\s*\*\*/) ) {
+                                    // Bullet point
+                                    if (line.trim().match(/^\*\s+\S/) || line.trim().match(/^\*\s*\*\*/)) {
                                       const content = line.trim().replace(/^\*\s*/, '');
                                       return (
-                                        <div key={idx} className="mb-2 pl-8 flex gap-2">
-                                          <span className="text-slate-500 mt-1">•</span>
+                                        <div key={idx} className="mb-2 pl-4 flex gap-2">
+                                          <span className="text-slate-500 mt-1 flex-shrink-0">•</span>
                                           <p className="text-sm text-slate-600 chalk-text">{renderInline(content)}</p>
                                         </div>
                                       );
                                     }
-                                    // Numbered step
+                                    // Numbered step header (bold it)
                                     if (line.trim().match(/^\d+\./)) {
                                       return (
-                                        <div key={idx} className="mb-3 pl-4">
-                                          <p className="text-base text-slate-700 chalk-text font-semibold">{renderInline(line)}</p>
+                                        <div key={idx} className="mb-2 mt-3">
+                                          <p className="text-sm text-slate-700 chalk-text font-bold">{renderInline(line)}</p>
                                         </div>
                                       );
                                     }
                                     // Regular paragraph
                                     if (line.trim()) {
                                       return (
-                                        <p key={idx} className="text-base text-slate-700 chalk-text mb-2 leading-relaxed">
+                                        <p key={idx} className="text-sm text-slate-700 chalk-text mb-1 leading-relaxed">
                                           {renderInline(line)}
                                         </p>
                                       );
@@ -1626,8 +1886,75 @@ useEffect(() => {
                       
 
 
+                        {/* ── TABLE ─────────────────────────────────────────── */}
+                        {currentSegment?.type === 'table' && (
+                          <div className="mb-6 animate-slideIn" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                            {/* Title */}
+                            {currentSegment.title && (
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-2xl">📊</span>
+                                <h3 className="text-base sm:text-lg font-bold text-slate-800 chalk-text">
+                                  {currentSegment.title}
+                                </h3>
+                              </div>
+                            )}
+
+                            {/* Table */}
+                            <div className="overflow-x-auto rounded-xl border-2 border-blue-300 shadow-md">
+                              <table className="w-full border-collapse text-sm sm:text-base">
+                                {/* Headers */}
+                                {currentSegment.headers && currentSegment.headers.length > 0 && (
+                                  <thead>
+                                    <tr className="bg-blue-500 text-white">
+                                      {currentSegment.headers.map((header, hi) => (
+                                        <th
+                                          key={hi}
+                                          className="px-4 py-3 text-left font-bold chalk-text border-r border-blue-400 last:border-r-0"
+                                        >
+                                          {renderMixedText(String(header))}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                )}
+                                {/* Rows */}
+                                <tbody>
+                                  {(currentSegment.rows || []).map((row, ri) => (
+                                    <tr
+                                      key={ri}
+                                      className={ri % 2 === 0 ? 'bg-white' : 'bg-blue-50'}
+                                    >
+                                      {(Array.isArray(row) ? row : [row]).map((cell, ci) => (
+                                        <td
+                                          key={ci}
+                                          className="px-4 py-3 text-slate-700 chalk-text border-t border-blue-100 border-r last:border-r-0 leading-relaxed"
+                                        >
+                                          {renderMixedText(String(cell))}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Explanation */}
+                            {showExplanation && currentSegment.explanation && (
+                              <div className="mt-4 bg-yellow-100 rounded-2xl p-4 border-4 border-yellow-400 animate-chalkWrite">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Lightbulb className="h-5 w-5 text-yellow-600" />
+                                  <span className="font-bold text-slate-800 chalk-text">💡 Simple Explanation</span>
+                                </div>
+                                <p className="text-sm sm:text-base leading-relaxed text-slate-700 chalk-text">
+                                  {renderMixedText(currentSegment.explanation)}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {/* Explanation Card - Whiteboard Style */}
-                        {showExplanation && currentSegment?.explanation && currentSegment?.type !== 'diagram' && currentSegment?.type !== 'diagram_concept' && currentSegment?.type !== 'diagram_reference' && (
+                        {showExplanation && currentSegment?.explanation && currentSegment?.type !== 'diagram' && currentSegment?.type !== 'diagram_concept' && currentSegment?.type !== 'diagram_reference' && currentSegment?.type !== 'table' && (
                           <div
                             className="bg-yellow-100 rounded-2xl shadow-lg p-2   border-4 border-yellow-400 transform transition-all duration-300 mb-6 animate-chalkWrite"
                             style={{ fontFamily: 'Comic Sans MS, cursive' }}
@@ -1638,8 +1965,8 @@ useEffect(() => {
                               </div>
                               <h2 className="text-sm md:text-xl font-bold text-slate-800 chalk-text">💡 Simple Explanation</h2>
                             </div>
-                            <p className="text-sm sm:text-base md:text-lg leading-relaxed text-slate-700 chalk-text" style={{ wordSpacing: '0.15em' }}>
-                              {currentSegment.explanation}
+                            <p className="text-sm sm:text-base leading-relaxed text-slate-700 chalk-text" style={{ wordSpacing: '0.15em' }}>
+                              {renderMixedText(currentSegment.explanation)}
                             </p>
                           </div>
                         )}
@@ -1660,11 +1987,21 @@ useEffect(() => {
                               </h2>
                             </div>
 
-                            {/* Main Equation */}
-                            <div className="p-4 mb-6">
-                              <p className="text-xl sm:text-2xl md:text-3xl font-mono text-center text-slate-800 font-bold chalk-text">
-                                {currentSegment.equation}
-                              </p>
+                            {/* Main Equation — rendered with KaTeX */}
+                            <div className="p-4 mb-6 overflow-x-auto">
+                              {(() => {
+                                // Strip outer $$ if present and render with BlockMath
+                                const raw = (currentSegment.equation || '').trim().replace(/^\$\$/, '').replace(/\$\$$/, '').trim();
+                                try {
+                                  return <BlockMath math={raw} />;
+                                } catch {
+                                  return (
+                                    <p className="text-base font-mono text-center text-slate-800 font-bold chalk-text break-all">
+                                      {currentSegment.equation}
+                                    </p>
+                                  );
+                                }
+                              })()}
                             </div>
 
                             {/* Step-by-Step Derivation */}
@@ -1692,17 +2029,33 @@ useEffect(() => {
                                           {index + 1}
                                         </div>
                                         <div className="flex-1">
+                                          {/* Step title — word highlight when this step is active */}
                                           <p className="text-base sm:text-lg font-bold text-slate-800 mb-2 chalk-text relative">
                                             <span className={`${activeStepUnderline === index ? 'underline-animation' : ''}`}>
-                                              {equationStepChars[index] !== undefined
-                                                ? step.step.substring(0, equationStepChars[index])
+                                              {activeStepUnderline === index && isReading && currentWords.length > 0
+                                                ? currentWords.map((word, widx) => (
+                                                    <span
+                                                      key={widx}
+                                                      className="inline-block transition-colors duration-100"
+                                                      style={{
+                                                        marginRight: '0.25em',
+                                                        color: widx === highlightedWordIndex
+                                                          ? '#2563eb'
+                                                          : widx < highlightedWordIndex
+                                                          ? 'rgba(30,41,59,0.45)'
+                                                          : 'rgb(30,41,59)',
+                                                        fontWeight: widx === highlightedWordIndex ? '800' : 'inherit',
+                                                        textShadow: widx === highlightedWordIndex ? '0 0 10px rgba(37,99,235,0.3)' : 'none',
+                                                      }}
+                                                    >
+                                                      {word}
+                                                    </span>
+                                                  ))
                                                 : step.step}
-                                              {equationStepChars[index] !== undefined && equationStepChars[index] < step.step.length && (
-                                                <span className="typing-cursor">|</span>
-                                              )}
                                             </span>
                                           </p>
 
+                                          {/* Step explanation — word reveal animation */}
                                           <p className="text-sm sm:text-base leading-relaxed chalk-text text-slate-700">
                                             {(() => {
                                               const cleanExplanation = String(step.explanation)
@@ -1715,17 +2068,15 @@ useEffect(() => {
                                               const words = cleanExplanation.split(/\s+/);
                                               const revealedCount = explanationWords[index] || 0;
 
-                                              if (revealedCount === 0) {
-                                                return cleanExplanation;
-                                              }
+                                              if (revealedCount === 0) return renderMixedText(cleanExplanation);
 
                                               return words.map((word, wordIdx) => (
                                                 <span
                                                   key={wordIdx}
-                                                  className={`${wordIdx < revealedCount
-                                                    ? 'opacity-100 transition-opacity duration-400'
-                                                    : 'opacity-30'
-                                                    }`}
+                                                  style={{
+                                                    color: wordIdx < revealedCount ? 'rgb(51,65,85)' : 'rgba(51,65,85,0.25)',
+                                                    transition: 'color 0.3s ease',
+                                                  }}
                                                 >
                                                   {word}{' '}
                                                 </span>
@@ -1764,7 +2115,7 @@ useEffect(() => {
                                   <h4 className="text-lg font-bold text-slate-800 chalk-text">Real-World Application:</h4>
                                 </div>
                                 <p className="text-base text-slate-700 leading-relaxed chalk-text">
-                                  {currentSegment.application}
+                                  {renderMixedText(currentSegment.application)}
                                 </p>
                               </div>
                             )}

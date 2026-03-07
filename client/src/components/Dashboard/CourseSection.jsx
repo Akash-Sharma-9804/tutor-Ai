@@ -16,8 +16,31 @@ import {
   Star,
   GraduationCap,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const CourseSection = ({ subjects, student, stats }) => {
+
+  const navigate = useNavigate();
+
+  const handleStartLearning = async (subjectId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/books/subject/${subjectId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data && res.data.length > 0) {
+        navigate(`/book/${res.data[0].id}`);
+      } else {
+        navigate("/subjects");
+      }
+    } catch (err) {
+      console.error("Failed to fetch book for subject", err);
+      navigate("/subjects");
+    }
+  };
+
   // Subject icons mapping with better visuals
   const subjectIcons = {
     Mathematics: {
@@ -110,6 +133,7 @@ const CourseSection = ({ subjects, student, stats }) => {
               <motion.button
                 whileHover={{ scale: 1.05, x: 5 }}
                 whileTap={{ scale: 0.95 }}
+                  onClick={() => navigate(`/subjects`)}
                 className="group flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-300"
               >
                 View All
@@ -245,6 +269,7 @@ const CourseSection = ({ subjects, student, stats }) => {
                       <motion.button
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
+                          onClick={() => handleStartLearning(subject.id)}
                           className={`px-4 py-2 rounded-lg text-white text-sm font-semibold flex items-center gap-2 shadow-lg bg-gradient-to-r ${
                             progress === 100
                               ? "from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"

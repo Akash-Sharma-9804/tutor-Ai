@@ -36,6 +36,7 @@ const UploadBookModal = ({ onUpload, onUploadPdf, onClose, uploading, selectedSc
   });
 
   const [chaptersToDelete, setChaptersToDelete] = useState([]);
+  const [confirmDelete, setConfirmDelete] = useState(null); // { index, title }
 
   const [fullBookPdf, setFullBookPdf] = useState(null);
   const [uploadingPdf, setUploadingPdf] = useState(false);
@@ -125,24 +126,27 @@ const UploadBookModal = ({ onUpload, onUploadPdf, onClose, uploading, selectedSc
 
   const removeChapter = (index) => {
     const chapterToRemove = formData.chapters[index];
-    
-    // If it's an existing chapter, add to delete list
+    setConfirmDelete({
+      index,
+      title: chapterToRemove.chapter_title || `Chapter ${chapterToRemove.chapter_number}`,
+      isExisting: chapterToRemove.existing,
+    });
+  };
+
+  const confirmRemoveChapter = () => {
+    const { index } = confirmDelete;
+    const chapterToRemove = formData.chapters[index];
+
     if (chapterToRemove.existing && chapterToRemove.id) {
       setChaptersToDelete([...chaptersToDelete, chapterToRemove.id]);
     }
-    
-    // Remove from formData
-    const updatedChapters = formData.chapters.filter((_, i) => i !== index);
-    
-    // Renumber chapters
-    updatedChapters.forEach((chapter, i) => {
-      chapter.chapter_number = i + 1;
-    });
-    
-    setFormData({
-      ...formData,
-      chapters: updatedChapters
-    });
+
+    const updatedChapters = formData.chapters
+      .filter((_, i) => i !== index)
+      .map((chapter, i) => ({ ...chapter, chapter_number: i + 1 }));
+
+    setFormData({ ...formData, chapters: updatedChapters });
+    setConfirmDelete(null);
   };
 
   const handleSubmit = (e) => {
@@ -218,6 +222,7 @@ const UploadBookModal = ({ onUpload, onUploadPdf, onClose, uploading, selectedSc
   };
 
   return (
+    <>
     <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center p-4 z-50 overflow-y-auto">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full my-8">
         {/* Header */}
@@ -512,6 +517,52 @@ const UploadBookModal = ({ onUpload, onUploadPdf, onClose, uploading, selectedSc
         </form>
       </div>
     </div>
+    <>
+      {/* Chapter Delete Confirm Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <FaTrash className="text-red-600 dark:text-red-400 text-sm" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Delete Chapter?</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">This action cannot be undone</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+              You are about to delete:
+            </p>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 mb-4">
+              <p className="font-semibold text-red-800 dark:text-red-300 text-sm">"{confirmDelete.title}"</p>
+              {confirmDelete.isExisting && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  ⚠️ This is an existing chapter and will be permanently removed from the book.
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRemoveChapter}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors text-sm flex items-center justify-center gap-2"
+              >
+                <FaTrash className="text-xs" /> Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+    </>
   );
 };
 

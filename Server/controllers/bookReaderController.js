@@ -351,7 +351,7 @@ exports.textToSpeech = async (req, res) => {
     }
 
     // Clean text for better TTS
-    const cleanText = text
+    let cleanText = text
       .replace(/\*\*/g, '')
       .replace(/##/g, '')
       .replace(/^\* /gm, '')
@@ -359,6 +359,20 @@ exports.textToSpeech = async (req, res) => {
       .replace(/<[^>]+>/g, '')
       .replace(/\n+/g, ' ')
       .trim();
+
+    // Deepgram has a ~2000 char limit — truncate at last sentence boundary
+    const MAX_TTS_CHARS = 1800;
+    if (cleanText.length > MAX_TTS_CHARS) {
+      const truncated = cleanText.substring(0, MAX_TTS_CHARS);
+      const lastSentenceEnd = Math.max(
+        truncated.lastIndexOf('. '),
+        truncated.lastIndexOf('? '),
+        truncated.lastIndexOf('! ')
+      );
+      cleanText = lastSentenceEnd > 0
+        ? truncated.substring(0, lastSentenceEnd + 1)
+        : truncated;
+    }
     
       
     // ✅ Validate API key BEFORE calling Deepgram
@@ -367,29 +381,29 @@ if (!process.env.DEEPGRAM_API_KEY) {
   return res.status(500).json({ message: "TTS service not configured" });
 }
 
-const response = await axios.post(
-  "https://api.deepgram.com/v1/speak",
-  {
-    text: cleanText
-  },
-  {
-    params: {
-      model: "aura-2-mars-en"
-    },
-    headers: {
-      Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
-      Accept: "audio/mpeg",
-      "Content-Type": "application/json"
-    },
-    responseType: "arraybuffer"
-  }
-);
+// Stream directly from Deepgram to client — no waiting for full buffer
+    const dgResponse = await axios.post(
+      "https://api.deepgram.com/v1/speak",
+      { text: cleanText },
+      {
+        params: { model: "aura-2-mars-en" },
+        headers: {
+          Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
+          Accept: "audio/mpeg",
+          "Content-Type": "application/json"
+        },
+        responseType: "stream"
+      }
+    );
 
-    // Return audio as base64 for easier frontend handling
-    const audioBase64 = Buffer.from(response.data).toString('base64');
-    res.json({ 
-      audio: audioBase64,
-      mimeType: "audio/mpeg"
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Transfer-Encoding", "chunked");
+    res.setHeader("Cache-Control", "no-cache");
+    dgResponse.data.pipe(res);
+
+    dgResponse.data.on("error", (err) => {
+      console.error("Deepgram stream error:", err);
+      res.end();
     });
     
   } catch (err) {

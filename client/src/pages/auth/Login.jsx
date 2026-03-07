@@ -106,6 +106,12 @@ export default function Login() {
     } finally { setForgotLoading(false); }
   };
 
+  useEffect(() => {
+    if (otp.length === 6 && forgotMode === "otp" && !forgotLoading) {
+      handleForgotVerifyOTP();
+    }
+  }, [otp]);
+
   const handleForgotReset = async () => {
     setForgotLoading(true); setForgotMsg("");
     try {
@@ -392,10 +398,9 @@ export default function Login() {
                       onChange={(e) => setOtp(e.target.value.replace(/\D/, ""))}
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm text-center text-2xl tracking-widest font-bold"
                     />
-                    <button onClick={handleForgotVerifyOTP} disabled={forgotLoading || otp.length !== 6}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold disabled:opacity-50">
-                      {forgotLoading ? "Verifying..." : "Verify OTP"}
-                    </button>
+                    {forgotLoading && (
+                      <p className="text-center text-indigo-600 text-sm font-medium animate-pulse">Verifying OTP...</p>
+                    )}
                     <button onClick={handleForgotSendOTP} className="w-full text-indigo-600 text-sm hover:underline">
                       Resend OTP
                     </button>

@@ -91,12 +91,7 @@ export default function Profile() {
         const profileData = profileRes.data;
         const stats = statsRes.data;
 
-        let avatarUrl;
-        if (profileData.gender === 'Male') {
-          avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileData.studentName}&backgroundColor=06b6d4&hair=short01,short02,short03,short04,short05&facialHair=beardMajestic,beardLight,moustacheFancy`;
-        } else {
-          avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileData.studentName}&backgroundColor=06b6d4&hair=longButNotTooLong,wavyBob,curly,curvy&facialHair=blank&top=hijab,turban,winterHat1,longHair,curly`;
-        }
+      const avatarUrl = profileData.gender === 'Male' ? '/man-profile.jpg' : '/female-profile.jpg';
 
         setStudent({
           name: profileData.studentName || "Student",

@@ -77,7 +77,7 @@ navigate("/login", { replace: true });
               </div>
               {!collapsed && (
                 <div className="flex flex-col flex-shrink-0">
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">AI Tutor</h1>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">QuantumEdu</h1>
                   <p className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Learning Platform</p>
                 </div>
               )}

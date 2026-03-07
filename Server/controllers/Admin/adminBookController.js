@@ -328,18 +328,11 @@ const updateBookWithChapters = async (req, res, data) => {
     // 2. Delete chapters marked for deletion
     let deletedCount = 0;
     if (chaptersToDelete && chaptersToDelete.length > 0) {
-      // Delete chapter segments first (if using segments table)
-      await db.query(
-        `DELETE FROM book_chapter_segments WHERE chapter_id IN (?)`,
-        [chaptersToDelete]
-      );
-      
-      // Delete chapters
+      // Delete chapters directly (no segments table)
       await db.query(
         `DELETE FROM book_chapters WHERE id IN (?)`,
         [chaptersToDelete]
       );
-      
       deletedCount = chaptersToDelete.length;
     }
 
@@ -354,15 +347,9 @@ const updateBookWithChapters = async (req, res, data) => {
         const file = files[fileIndex];
         fileIndex++;
 
-        // If updating existing chapter, delete old segments first
+        // If updating existing chapter
         if (chapterMeta.existing && chapterMeta.id) {
-          await db.query(
-            `DELETE FROM book_chapter_segments WHERE chapter_id = ?`,
-            [chapterMeta.id]
-          );
-          
-         
-       // Update chapter metadata
+          // Update chapter metadata
           await db.query(
             `UPDATE book_chapters 
              SET chapter_title = ?, chapter_no = ?
