@@ -350,14 +350,41 @@ exports.textToSpeech = async (req, res) => {
       return res.status(400).json({ message: "Text is required" });
     }
 
-    // Clean text for better TTS
+    // Clean text for TTS — strips LaTeX, markdown, emojis, HTML, symbols
     let cleanText = text
-      .replace(/\*\*/g, '')
-      .replace(/##/g, '')
+      // LaTeX display math $$...$$
+      .replace(/\$\$[\s\S]*?\$\$/g, 'equation')
+      // LaTeX inline math $...$ → spoken words
+      .replace(/\$([^$\n]+)\$/g, (_, inner) => inner
+        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1 over $2')
+        .replace(/\\sqrt\{([^}]+)\}/g, 'square root of $1')
+        .replace(/\\sqrt/g, 'square root')
+        .replace(/\\theta/g, 'theta').replace(/\\alpha/g, 'alpha')
+        .replace(/\\beta/g, 'beta').replace(/\\gamma/g, 'gamma')
+        .replace(/\\pi/g, 'pi').replace(/\\sin/g, 'sine')
+        .replace(/\\cos/g, 'cosine').replace(/\\tan/g, 'tangent')
+        .replace(/\\circ/g, ' degrees').replace(/\\times/g, ' times ')
+        .replace(/\\div/g, ' divided by ').replace(/\\pm/g, ' plus or minus ')
+        .replace(/\^2/g, ' squared').replace(/\^3/g, ' cubed')
+        .replace(/\^\{([^}]+)\}/g, ' to the power of $1')
+        .replace(/\^(\w)/g, ' to the power of $1')
+        .replace(/\{|\}/g, '').replace(/\\/g, ' ')
+        .replace(/\s{2,}/g, ' ').trim()
+      )
+      // Markdown
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/#{1,6}\s/g, '')
       .replace(/^\* /gm, '')
       .replace(/^- /gm, '')
+      // HTML
       .replace(/<[^>]+>/g, '')
+      // Emojis & symbols
+      .replace(/[✓✗⚠️💡👁🎭🔍📖💬📐💭📝✅]/g, '')
+      .replace(/→/g, ' equals ').replace(/≈/g, ' approximately ')
+      .replace(/≠/g, ' not equal to ').replace(/°/g, ' degrees ')
       .replace(/\n+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
       .trim();
 
     // Deepgram has a ~2000 char limit — truncate at last sentence boundary

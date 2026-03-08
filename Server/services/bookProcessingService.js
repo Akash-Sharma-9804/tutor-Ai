@@ -21,6 +21,8 @@ const {
   uploadPageDiagrams,
   checkMemory,
 } = require("./mistralOCRService");
+const { isMathsSubject, buildMathsPrompt } = require("./mathsPrompt");
+const { isEnglishSubject, buildEnglishPrompt } = require("./englishPrompt");
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const EMBEDDING_MODEL = "text-embedding-3-small";
@@ -94,7 +96,8 @@ async function processPageChunk(
   pageNumber,
   bookMetadata,
   chunkIndex,
-  retryMode = false
+  retryMode = false,
+  subjectName = ""
 ) {
   console.log(`\n📄 Processing page ${pageNumber} (Chunk ${chunkIndex})...`);
 
@@ -117,10 +120,25 @@ async function processPageChunk(
 
     const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
+    // ── Choose prompt: maths-specific, english-specific, or general ──────────
+    const effectiveSubject = subjectName || bookMetadata.subject || "";
+    const useMathsPrompt = isMathsSubject(effectiveSubject);
+    const useEnglishPrompt = !useMathsPrompt && isEnglishSubject(effectiveSubject);
+
+    if (useMathsPrompt) {
+      console.log(`🔢 Using MATHS prompt for page ${pageNumber} (subject: ${effectiveSubject})`);
+    } else if (useEnglishPrompt) {
+      console.log(`📖 Using ENGLISH prompt for page ${pageNumber} (subject: ${effectiveSubject})`);
+    }
+
     // Build parts array: text prompt + diagram images inline
     const parts = [
       {
-        text: `${
+        text: useMathsPrompt
+          ? buildMathsPrompt(pageMarkdown, pageImages, pageNumber, bookMetadata, retryMode)
+          : useEnglishPrompt
+          ? buildEnglishPrompt(pageMarkdown, pageImages, pageNumber, bookMetadata, retryMode)
+          : `${
           retryMode
             ? `🚨🚨🚨 CRITICAL - RETRY MODE ACTIVATED 🚨🚨🚨
 
@@ -449,7 +467,8 @@ QUALITY REQUIREMENTS:
         pageNumber,
         bookMetadata,
         chunkIndex,
-        true
+        true,
+        subjectName
       );
     }
     throw new Error("EMPTY_RESPONSE_FROM_GEMINI");
@@ -570,6 +589,14 @@ QUALITY REQUIREMENTS:
     }
 
     // Normalize subheading structure
+    const mathsTypes = new Set([
+      "definition", "theorem", "proof", "formula",
+      "concept", "note", "activity", "topic_intro",
+      "worked_example", "exercise", "summary_table",
+      "diagram",   // ← new maths prompt type; image_url injected by injectImageUrls
+      // English prompt types — pass through as-is
+      "passage", "dialogue", "author_note", "question", "glossary",
+    ]);
     chunkData.sections?.forEach((section, sectionIndex) => {
       section.content = section.content?.map((item, contentIndex) => {
         if (item.type === "subheading") {
@@ -579,7 +606,12 @@ QUALITY REQUIREMENTS:
           };
         }
 
-        // Add page metadata to diagram blocks
+        // Maths-specific types — pass through as-is (image_url injected later)
+        if (mathsTypes.has(item.type)) {
+          return item;
+        }
+
+        // Add page metadata to diagram blocks (legacy types from general prompt)
         if (
           item.type === "diagram_concept" ||
           item.type === "diagram_reference"
@@ -595,7 +627,7 @@ QUALITY REQUIREMENTS:
       });
     });
 
-    // Fill missing diagram explanations
+    // Fill missing diagram explanations (legacy diagram types only)
     chunkData.sections?.forEach((section) => {
       section.content?.forEach((item) => {
         if (item.type === "diagram_concept" && !item.explanation) {
@@ -637,7 +669,8 @@ QUALITY REQUIREMENTS:
           pageNumber,
           bookMetadata,
           chunkIndex,
-          true
+          true,
+          subjectName
         );
       }
 
@@ -695,7 +728,8 @@ function injectImageUrls(sections, imageUrlMap) {
     section.content?.forEach((item) => {
       if (
         item.type === "diagram_concept" ||
-        item.type === "diagram_reference"
+        item.type === "diagram_reference" ||
+        item.type === "diagram"
       ) {
         if (item.mistral_image_id && imageUrlMap[item.mistral_image_id]) {
           // ✅ Exact match by ID
@@ -706,8 +740,11 @@ function injectImageUrls(sections, imageUrlMap) {
           positionalIndex++;
         }
 
-        // Clean up internal field — frontend doesn't need it
-        delete item.mistral_image_id;
+        // Keep mistral_image_id on the object — frontend normalizeMathsContent
+        // reads it when mapping "diagram" → "diagram_concept"
+        if (item.type !== "diagram") {
+          delete item.mistral_image_id;
+        }
       }
     });
   });
@@ -823,7 +860,8 @@ async function processBookFromPDF(
           pageNumber,
           bookMetadata,
           i + 1,
-          false
+          false,
+          subjectNameForPath
         );
       } catch (pageError) {
         console.error(
@@ -844,7 +882,8 @@ async function processBookFromPDF(
               pageNumber,
               bookMetadata,
               i + 1,
-              false
+              false,
+              subjectNameForPath
             );
             console.log(`✅ Retry succeeded for page ${pageNumber}`);
           } catch (retry1Error) {
@@ -857,7 +896,8 @@ async function processBookFromPDF(
                 pageNumber,
                 bookMetadata,
                 i + 1,
-                true // safe mode
+                true, // safe mode
+                subjectNameForPath
               );
               console.log(`✅ Safe-mode retry succeeded for page ${pageNumber}`);
             } catch (retry2Error) {

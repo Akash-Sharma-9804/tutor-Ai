@@ -31,6 +31,516 @@ const renderMixedText = (text) => {
   });
 };
 
+// Normalizes maths-specific segment types into types the frontend already renders.
+// definition/theorem → example-style, concept/note → text-style,
+// proof/formula → equation-style, exercise → example, activity → example
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// cleanForTTS — strips ALL markup before sending to Deepgram
+// Handles: LaTeX ($...$  $$...$$), markdown (**bold** *italic* ## #),
+//          emojis, HTML tags, arrows, math symbols
+// ─────────────────────────────────────────────────────────────────────────────
+const cleanForTTS = (str) => {
+  if (!str) return '';
+  return String(str)
+    // ── LaTeX display math $$...$$ ──────────────────────────────────────────
+    .replace(/\$\$[\s\S]*?\$\$/g, 'equation')
+    // ── LaTeX inline math $...$ → spoken words ──────────────────────────────
+    .replace(/\$([^$\n]+)\$/g, (_, inner) => inner
+      .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1 over $2')
+      .replace(/\\sqrt\{([^}]+)\}/g, 'square root of $1')
+      .replace(/\\sqrt/g, 'square root')
+      .replace(/\\theta/g, 'theta').replace(/\\alpha/g, 'alpha')
+      .replace(/\\beta/g, 'beta').replace(/\\gamma/g, 'gamma')
+      .replace(/\\pi/g, 'pi').replace(/\\sin/g, 'sine')
+      .replace(/\\cos/g, 'cosine').replace(/\\tan/g, 'tangent')
+      .replace(/\\circ/g, ' degrees').replace(/\\times/g, ' times ')
+      .replace(/\\div/g, ' divided by ').replace(/\\pm/g, ' plus or minus ')
+      .replace(/\\infty/g, 'infinity').replace(/\\neq/g, ' not equal to ')
+      .replace(/\\leq/g, ' less than or equal to ')
+      .replace(/\\geq/g, ' greater than or equal to ')
+      .replace(/\^2/g, ' squared').replace(/\^3/g, ' cubed')
+      .replace(/\^\{([^}]+)\}/g, ' to the power of $1')
+      .replace(/\^(\w)/g, ' to the power of $1')
+      .replace(/\{|\}/g, '').replace(/\\/g, ' ')
+      .replace(/\s{2,}/g, ' ').trim()
+    )
+    // ── Markdown ────────────────────────────────────────────────────────────
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/^[-*]\s+/gm, '')
+    .replace(/`[^`]+`/g, '')
+    // ── HTML ────────────────────────────────────────────────────────────────
+    .replace(/<[^>]+>/g, '')
+    // ── Emoji & symbols ─────────────────────────────────────────────────────
+    .replace(/[✓✗⚠️💡👁🎭🔍📖💬📐💭📝✅]/g, '')
+    .replace(/[\u{1F300}-\u{1FFFF}]/gu, '')
+    // ── Math/arrow symbols → spoken ─────────────────────────────────────────
+    .replace(/→/g, ' equals ').replace(/≈/g, ' approximately ')
+    .replace(/≠/g, ' not equal to ').replace(/≤/g, ' less than or equal to ')
+    .replace(/≥/g, ' greater than or equal to ').replace(/°/g, ' degrees ')
+    // ── Cleanup ─────────────────────────────────────────────────────────────
+    .replace(/\n+/g, '. ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\.\s*\.\s*/g, '. ')
+    .trim();
+};
+
+// normalizeMathsContent
+// Maps the rich maths JSON types from mathsPrompt.js into the types the
+// frontend renderer already handles: text, equation, example, diagram_concept,
+// table, subheading. Each type is mapped to preserve ALL teaching fields.
+// ─────────────────────────────────────────────────────────────────────────────
+const normalizeMathsContent = (content) => {
+  if (!content?.sections) return content;
+
+  return {
+    ...content,
+    sections: content.sections.map(section => ({
+      ...section,
+      content: (section.content || []).map(item => {
+
+        // ── topic_intro ──────────────────────────────────────────────────────
+        // Renders as a "text" card with a "📘 What We'll Learn" heading
+        if (item.type === 'topic_intro') {
+          return {
+            ...item,
+            type: 'text',
+            text: item.text || item.title || '',
+            explanation: [
+              item.explanation || '',
+              item.why_it_matters ? `Why it matters: ${item.why_it_matters}` : '',
+              item.prerequisite ? `Before we begin: ${item.prerequisite}` : '',
+            ].filter(Boolean).join('\n'),
+            _badge: 'WHAT WE\'LL LEARN',
+            _badgeColor: 'yellow',
+          };
+        }
+
+        // ── concept ──────────────────────────────────────────────────────────
+        // Plain teaching explanation — renders as text card
+        if (item.type === 'concept') {
+          return {
+            ...item,
+            type: 'text',
+            text: item.text || '',
+            explanation: [
+              item.explanation || '',
+              item.visual_hint ? `💭 ${item.visual_hint}` : '',
+            ].filter(Boolean).join('\n'),
+            _heading: item.heading || '',
+          };
+        }
+
+        // ── definition ───────────────────────────────────────────────────────
+        // Renders as text card with structured definition content
+        if (item.type === 'definition') {
+          const bodyLines = [
+            `📖 Definition: ${item.term || ''}`,
+            item.text || item.formal_statement || item.statement || '',
+          ].filter(Boolean).join('\n');
+          const explanationLines = [
+            item.plain_english || item.explanation || '',
+            item.example_instance ? `Example: ${item.example_instance}` : '',
+            item.memory_tip ? `💡 Remember: ${item.memory_tip}` : '',
+          ].filter(Boolean).join('\n');
+          return {
+            ...item,
+            type: 'text',
+            text: bodyLines,
+            explanation: explanationLines,
+            _badge: 'DEFINITION',
+            _badgeColor: 'purple',
+          };
+        }
+
+        // ── theorem ──────────────────────────────────────────────────────────
+        // Renders as text card
+        if (item.type === 'theorem') {
+          const bodyLines = [
+            `📐 ${item.name || 'Theorem'}`,
+            item.text || item.statement || '',
+          ].filter(Boolean).join('\n');
+          const explanationLines = [
+            item.what_it_means || item.explanation || '',
+            item.intuition ? `Intuition: ${item.intuition}` : '',
+            item.use_case ? `When to use: ${item.use_case}` : '',
+          ].filter(Boolean).join('\n');
+          return {
+            ...item,
+            type: 'text',
+            text: bodyLines,
+            explanation: explanationLines,
+            _badge: 'THEOREM',
+            _badgeColor: 'teal',
+          };
+        }
+
+        // ── note ─────────────────────────────────────────────────────────────
+        if (item.type === 'note') {
+          return {
+            ...item,
+            type: 'text',
+            text: `${item.label ? item.label + ': ' : ''}${item.text || item.content || ''}`,
+            explanation: item.explanation || item.why_important || '',
+            _badge: item.label || 'NOTE',
+            _badgeColor: 'amber',
+          };
+        }
+
+        // ── activity ─────────────────────────────────────────────────────────
+        if (item.type === 'activity') {
+          return {
+            ...item,
+            type: 'text',
+            text: `Activity: ${item.title || ''}\n${item.text || item.instruction || ''}`,
+            explanation: item.explanation || item.what_to_verify || item.expected_result || item.purpose || '',
+            _badge: 'ACTIVITY',
+            _badgeColor: 'teal',
+          };
+        }
+
+        // ── formula ──────────────────────────────────────────────────────────
+        // Renders as equation card. Variables become derivation steps so they
+        // appear in the step-by-step panel. quick_example is the final_result.
+        if (item.type === 'formula') {
+          // Build variables as derivation steps
+          const varSteps = Array.isArray(item.variables)
+            ? item.variables.map(v => ({
+                step: `${v.symbol} = ${v.meaning}`,
+                explanation: v.unit ? `Unit: ${v.unit}` : '',
+              }))
+            : [];
+
+          // If derivation steps exist, append them after variables
+          const derivationSteps = Array.isArray(item.derivation)
+            ? item.derivation.map(s => ({
+                step: s.step || '',
+                explanation: `${s.statement || ''} — ${s.reason || ''}`.replace(/^—\s*/, ''),
+              }))
+            : [];
+
+          const allSteps = [...varSteps, ...derivationSteps];
+
+          const finalParts = [
+            item.quick_example || '',
+            item.when_to_use ? `When to use: ${item.when_to_use}` : '',
+            item.common_mistake ? `⚠️ Common mistake: ${item.common_mistake}` : '',
+          ].filter(Boolean).join('\n');
+
+          return {
+            ...item,
+            type: 'equation',
+            equation: item.formula_latex || item.formula || '',
+            derivation: allSteps.length > 0 ? allSteps : undefined,
+            final_result: finalParts || undefined,
+            application: item.when_to_use || undefined,
+            _formulaName: item.name || '',
+          };
+        }
+
+        // ── proof ────────────────────────────────────────────────────────────
+        // Renders as equation card — equation shows what's being proved,
+        // derivation steps show each proof step with its reason
+        if (item.type === 'proof') {
+          const proofSteps = Array.isArray(item.steps)
+            ? item.steps.map(s => ({
+                step: s.step || s.action || `Step ${s.step_no || ''}`,
+                explanation: [
+                  s.statement || s.math || s.working || '',
+                  s.reason ? `Reason: ${s.reason}` : '',
+                ].filter(Boolean).join(' — '),
+              }))
+            : [];
+
+          return {
+            ...item,
+            type: 'equation',
+            equation: item.proving || item.for || '',
+            derivation: proofSteps.length > 0 ? proofSteps : undefined,
+            final_result: [
+              item.conclusion || '',
+              item.key_insight ? `Key insight: ${item.key_insight}` : '',
+            ].filter(Boolean).join('\n') || undefined,
+            _proofSetup: item.setup || '',
+          };
+        }
+
+        // ── worked_example ───────────────────────────────────────────────────
+        // Renders as example card (green problem + blue solution)
+        if (item.type === 'worked_example') {
+          // Build solution string from structured steps (for display)
+          let solutionLines = [];
+          // Also build flat TTS steps array for step-by-step reading
+          const ttsSteps = [];
+
+          if (item.given) {
+            solutionLines.push(`Given: ${item.given}`);
+            ttsSteps.push(`Given: ${item.given}`);
+          }
+          if (item.find) {
+            solutionLines.push(`Find: ${item.find}`);
+            ttsSteps.push(`Find: ${item.find}`);
+          }
+          if (item.method) {
+            solutionLines.push(`Method: ${item.method}`);
+            ttsSteps.push(`Method: ${item.method}`);
+          }
+
+          if (Array.isArray(item.steps)) {
+            item.steps.forEach(s => {
+              const stepNum = s.step_no || '';
+              if (s.narration) solutionLines.push(`Step ${stepNum}: ${s.narration}`);
+              if (s.working)   solutionLines.push(`  ${s.working}`);
+              if (s.result)    solutionLines.push(`  → ${s.result}`);
+              // TTS: combine narration + working + result into one spoken chunk per step
+              const spokenStep = [
+                s.narration ? `Step ${stepNum}: ${s.narration}` : '',
+                s.working   ? s.working : '',
+                s.result    ? `Result: ${s.result}` : '',
+              ].filter(Boolean).join('. ');
+              if (spokenStep.trim()) ttsSteps.push(spokenStep);
+            });
+          }
+
+          if (item.final_answer) {
+            solutionLines.push(`\nFinal Answer: ${item.final_answer}`);
+            ttsSteps.push(`Final Answer: ${item.final_answer}`);
+          }
+          if (item.verify) {
+            solutionLines.push(`✓ Check: ${item.verify}`);
+            ttsSteps.push(`Check: ${item.verify}`);
+          }
+          if (item.common_mistake) {
+            solutionLines.push(`⚠️ Watch out: ${item.common_mistake}`);
+            ttsSteps.push(`Watch out: ${item.common_mistake}`);
+          }
+
+          const problemHeader = item.example_no
+            ? `${item.example_no}: ${item.problem || ''}`
+            : item.problem || '';
+
+          return {
+            ...item,
+            type: 'example',
+            problem: problemHeader,
+            solution: solutionLines.join('\n'),
+            _ttsSteps: ttsSteps,           // ← used by readAloud for step-by-step TTS
+            _whatThisTestes: item.what_this_tests || '',
+          };
+        }
+
+        // ── exercise ─────────────────────────────────────────────────────────
+        // Renders as example card. Multi-part questions get all parts solved.
+        if (item.type === 'exercise') {
+          let solutionLines = [];
+          const ttsSteps = [];
+
+          if (item.approach) {
+            solutionLines.push(`Approach: ${item.approach}`);
+            ttsSteps.push(`Approach: ${item.approach}`);
+          }
+
+          // Multi-part question
+          if (Array.isArray(item.parts)) {
+            item.parts.forEach(part => {
+              solutionLines.push(`\n${part.part || ''}: ${part.problem || ''}`);
+              ttsSteps.push(`${part.part || 'Part'}: ${part.problem || ''}`);
+              if (Array.isArray(part.steps)) {
+                part.steps.forEach(s => {
+                  if (s.narration) solutionLines.push(`  Step ${s.step_no || ''}: ${s.narration}`);
+                  if (s.working)   solutionLines.push(`    ${s.working}`);
+                  if (s.result)    solutionLines.push(`    → ${s.result}`);
+                  const spokenStep = [
+                    s.narration ? `Step ${s.step_no || ''}: ${s.narration}` : '',
+                    s.working   ? s.working : '',
+                    s.result    ? `Result: ${s.result}` : '',
+                  ].filter(Boolean).join('. ');
+                  if (spokenStep.trim()) ttsSteps.push(spokenStep);
+                });
+              }
+              if (part.answer) {
+                solutionLines.push(`  Answer: ${part.answer}`);
+                ttsSteps.push(`Answer: ${part.answer}`);
+              }
+            });
+          } else if (Array.isArray(item.steps)) {
+            item.steps.forEach(s => {
+              if (s.narration) solutionLines.push(`Step ${s.step_no || ''}: ${s.narration}`);
+              if (s.working)   solutionLines.push(`  ${s.working}`);
+              if (s.result)    solutionLines.push(`  → ${s.result}`);
+              const spokenStep = [
+                s.narration ? `Step ${s.step_no || ''}: ${s.narration}` : '',
+                s.working   ? s.working : '',
+                s.result    ? `Result: ${s.result}` : '',
+              ].filter(Boolean).join('. ');
+              if (spokenStep.trim()) ttsSteps.push(spokenStep);
+            });
+            if (item.final_answer) {
+              solutionLines.push(`\nAnswer: ${item.final_answer}`);
+              ttsSteps.push(`Answer: ${item.final_answer}`);
+            }
+          } else if (item.solution) {
+            solutionLines.push(item.solution);
+            ttsSteps.push(item.solution);
+          }
+
+          if (item.tip) {
+            solutionLines.push(`\n💡 Tip: ${item.tip}`);
+            ttsSteps.push(`Tip: ${item.tip}`);
+          }
+
+          const problemHeader = item.question_no
+            ? `${item.question_no}: ${item.problem || ''}`
+            : item.problem || '';
+
+          return {
+            ...item,
+            type: 'example',
+            problem: problemHeader,
+            solution: solutionLines.join('\n'),
+            _ttsSteps: ttsSteps,           // ← used by readAloud for step-by-step TTS
+          };
+        }
+
+        // ── diagram (new prompt type) ─────────────────────────────────────────
+        // Map to diagram_concept which the frontend already renders
+        if (item.type === 'diagram') {
+          return {
+            ...item,
+            type: 'diagram_concept',
+            title: item.figure_no
+              ? `${item.figure_no}${item.title ? ': ' + item.title : ''}`
+              : item.title || '',
+            mistral_image_id: item.mistral_image_id || '',
+            explanation: [
+              item.what_to_look_at || '',
+              item.mathematical_meaning || '',
+              item.observation || '',
+            ].filter(Boolean).join(' '),
+          };
+        }
+
+        // ── summary_table ────────────────────────────────────────────────────
+        if (item.type === 'summary_table') {
+          return {
+            ...item,
+            type: 'table',
+            title: item.title || '',
+            headers: item.headers || [],
+            rows: item.rows || [],
+            explanation: item.how_to_use || '',
+          };
+        }
+
+        // All other types (text, equation, example, diagram_concept,
+        // diagram_reference, table, subheading) — pass through unchanged
+        return item;
+      }),
+    })),
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// normalizeEnglishContent
+// Maps English prompt types into renderer types.
+//
+//  passage     → text          book text + teacher note in explanation panel
+//  dialogue    → dialogue      NEW dedicated type — conversation card
+//  author_note → text          amber badge card
+//  question    → example       question as problem, answer as solution
+//  glossary    → table         4 cols: Word | Meaning | Example | Explanation
+// ─────────────────────────────────────────────────────────────────────────────
+const normalizeEnglishContent = (content) => {
+  if (!content?.sections) return content;
+  return {
+    ...content,
+    sections: content.sections.map(section => ({
+      ...section,
+      content: (section.content || []).map(item => {
+
+        // ── passage ──────────────────────────────────────────────────────────
+        if (item.type === 'passage') {
+          return {
+            ...item,
+            type: 'text',
+            text: item.text || '',
+            explanation: [
+              item.explanation || '',
+              item.what_to_notice ? `👁 Notice: ${item.what_to_notice}` : '',
+              item.tone ? `🎭 Tone: ${item.tone}` : '',
+            ].filter(Boolean).join('\n'),
+            _badge: 'PASSAGE',
+            _badgeColor: 'blue',
+          };
+        }
+
+        // ── dialogue — keep as 'dialogue' so the renderer shows a chat card ─
+        if (item.type === 'dialogue') {
+          return {
+            ...item,
+            type: 'dialogue',
+            speakers: item.speakers || '',
+            text: item.text || '',
+            what_it_reveals: item.what_it_reveals || '',
+            tone: item.tone || '',
+          };
+        }
+
+        // ── author_note ───────────────────────────────────────────────────────
+        if (item.type === 'author_note') {
+          return {
+            ...item,
+            type: 'text',
+            text: item.text || '',
+            explanation: item.explanation || '',
+            _badge: item.title || 'ABOUT THE AUTHOR',
+            _badgeColor: 'amber',
+          };
+        }
+
+        // ── question ─────────────────────────────────────────────────────────
+        if (item.type === 'question') {
+          const problemText = item.question_no
+            ? `${item.question_no}: ${item.question_text || ''}`
+            : item.question_text || item.problem || '';
+          return {
+            ...item,
+            type: 'example',
+            problem: problemText,
+            solution: [
+              item.answer || item.solution || '',
+              item.tip ? `💡 Tip: ${item.tip}` : '',
+            ].filter(Boolean).join('\n'),
+            _badge: 'QUESTION',
+          };
+        }
+
+        // ── glossary → table with 4 columns ──────────────────────────────────
+        if (item.type === 'glossary') {
+          const words = Array.isArray(item.words) ? item.words : [];
+          return {
+            ...item,
+            type: 'table',
+            title: item.title || 'Word Meanings',
+            headers: ['Word', 'Meaning', 'Example from text', 'Explanation'],
+            rows: words.map(w => [
+              w.word || '',
+              w.meaning || '',
+              w.example_from_text || '',
+              w.explanation || '',
+            ]),
+            explanation: '',
+          };
+        }
+
+        return item;
+      }),
+    })),
+  };
+};
+
 const LineByLineReader = () => {
   const utteranceRef = useRef(null);
   const ttsAbortRef = useRef(null); // AbortController for TTS fetch stream
@@ -466,46 +976,89 @@ useEffect(() => {
   function buildNarrationQueue(content) {
     const queue = [];
 
+    // Strip markdown symbols for clean TTS
+    const clean = (str) => (str || '')
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/💡|👁|🎭|🔍|📖|💬|⚠️|✓/g, '')
+      .replace(/\n+/g, ' ')
+      .trim();
+
     content.forEach((item, idx) => {
-      if (item.type === "text") {
-        queue.push({
-          id: `text-${idx}`,
-          text: item.text,
-        });
 
-        queue.push({
-          id: `text-exp-${idx}`,
-          text: item.explanation,
-        });
+      // ── subheading ────────────────────────────────────────────────────────
+      if (item.type === 'subheading') {
+        queue.push({ id: `sub-${idx}`, text: `Section: ${clean(item.subheading)}` });
       }
 
-      if (item.type === "equation") {
-        queue.push({
-          id: `eq-${idx}`,
-          text: `The equation is ${item.equation}`,
-        });
-
-        item.derivation.forEach((step, sIdx) => {
-          queue.push({
-            id: `eq-${idx}-step-${sIdx}`,
-            text: step.step,
-          });
-
-          queue.push({
-            id: `eq-${idx}-step-exp-${sIdx}`,
-            text: step.explanation,
-          });
-        });
-
-        queue.push({
-          id: `eq-${idx}-final`,
-          text: item.final_result,
-        });
+      // ── text (passage, author_note, concept, definition, theorem, note, activity, topic_intro) ──
+      if (item.type === 'text') {
+        if (item.text) queue.push({ id: `text-${idx}`, text: clean(item.text) });
+        if (item.explanation) queue.push({ id: `text-exp-${idx}`, text: clean(item.explanation) });
       }
+
+      // ── dialogue (English) ────────────────────────────────────────────────
+      if (item.type === 'dialogue') {
+        const spokenText = item.speakers
+          ? `${item.speakers} says: ${clean(item.text)}`
+          : clean(item.text);
+        if (spokenText) queue.push({ id: `dlg-${idx}`, text: spokenText });
+        if (item.what_it_reveals) queue.push({ id: `dlg-exp-${idx}`, text: clean(item.what_it_reveals) });
+        if (item.tone) queue.push({ id: `dlg-tone-${idx}`, text: `Tone: ${clean(item.tone)}` });
+      }
+
+      // ── example (question / worked_example / exercise) ────────────────────
+      if (item.type === 'example') {
+        if (item.problem) queue.push({ id: `ex-${idx}`, text: clean(item.problem) });
+        if (item.solution) queue.push({ id: `ex-sol-${idx}`, text: clean(item.solution) });
+      }
+
+      // ── equation (formula / proof) ────────────────────────────────────────
+      if (item.type === 'equation') {
+        if (item.equation) queue.push({ id: `eq-${idx}`, text: `Equation: ${clean(item.equation)}` });
+        if (Array.isArray(item.derivation)) {
+          item.derivation.forEach((step, sIdx) => {
+            if (step.step) queue.push({ id: `eq-${idx}-step-${sIdx}`, text: clean(step.step) });
+            if (step.explanation) queue.push({ id: `eq-${idx}-exp-${sIdx}`, text: clean(step.explanation) });
+          });
+        }
+        if (item.final_result) queue.push({ id: `eq-${idx}-final`, text: clean(item.final_result) });
+      }
+
+      // ── diagram_concept / diagram_reference ───────────────────────────────
+      if (item.type === 'diagram_concept' || item.type === 'diagram_reference') {
+        const title = item.title || item.reference || 'this diagram';
+        queue.push({ id: `diag-${idx}`, text: `Looking at ${clean(title)}.` });
+        if (item.explanation) queue.push({ id: `diag-exp-${idx}`, text: clean(item.explanation) });
+      }
+
+      // ── table (glossary / summary_table) ─────────────────────────────────
+      if (item.type === 'table') {
+        if (item.title) queue.push({ id: `tbl-${idx}`, text: clean(item.title) });
+        if (Array.isArray(item.rows)) {
+          item.rows.forEach((row, rIdx) => {
+            // For glossary: row = [word, meaning, example, explanation]
+            // Read as "word means meaning"
+            const word = clean(row[0]);
+            const meaning = clean(row[1]);
+            const explanation = clean(row[3] || row[2] || '');
+            if (word && meaning) {
+              queue.push({
+                id: `tbl-${idx}-row-${rIdx}`,
+                text: `${word} means ${meaning}${explanation ? '. ' + explanation : ''}`,
+              });
+            }
+          });
+        }
+        if (item.explanation) queue.push({ id: `tbl-exp-${idx}`, text: clean(item.explanation) });
+      }
+
     });
 
     return queue;
   }
+
 
 
   const startResize = () => setIsResizing(true);
@@ -638,7 +1191,7 @@ useEffect(() => {
       ]);
 
       setChapter(contentRes.data.chapter);
-      setChapterData(contentRes.data.content);
+      setChapterData(normalizeEnglishContent(normalizeMathsContent(contentRes.data.content)));
       setNavigation(contentRes.data.navigation);
 
       const imageMap = {};
@@ -817,105 +1370,135 @@ useEffect(() => {
       let textToRead = '';
 
       if (customText) {
-        // Ensure we're getting a string value, not an object
-        textToRead = String(customText)
-          .replace(/\*\*/g, '')
-          .replace(/##/g, '')
-          .replace(/^\* /gm, '')
-          .replace(/^- /gm, '')
-          .replace(/<[^>]+>/g, '') // removes <sup> tags etc
-          .replace(/\n+/g, ' ')
-          .trim();
-
+        textToRead = cleanForTTS(String(customText));
         console.log('Custom text to read:', textToRead.substring(0, 100));
       }
       else if (currentSegment?.type === 'equation') {
-        // For equations, read step-by-step
+        // Step-by-step equation reading with pauses
         setActiveEquationStep(0);
         setEquationStepChars({});
 
-        // Helper function to wait for audio to complete
-        const waitForAudio = () => {
-          return new Promise((resolve) => {
-            if (audioRef.current) {
-              const handler = () => {
-                resolve();
-              };
-              audioRef.current.addEventListener('ended', handler, { once: true });
-            } else {
-              resolve();
-            }
-          });
-        };
+        const waitForAudio = () => new Promise((resolve) => {
+          if (audioRef.current) {
+            audioRef.current.addEventListener('ended', resolve, { once: true });
+          } else { resolve(); }
+        });
 
-        // Read main equation first
-        await speakWithDeepgram(`Equation: ${currentSegment.equation}`);
+        // Read main equation
+        await speakWithDeepgram(cleanForTTS(`Equation: ${currentSegment.equation || ''}`));
         await waitForAudio();
+        await new Promise(resolve => setTimeout(resolve, 600));
 
-        // Small pause after equation
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        // Read each step with typing animation
+        // Read each derivation step
         if (showExplanation && Array.isArray(currentSegment.derivation)) {
           for (let idx = 0; idx < currentSegment.derivation.length; idx++) {
             const step = currentSegment.derivation[idx];
             setActiveEquationStep(idx);
-
-            const stepText = `${step.step}. Now let me explain this step. ${step.explanation}`;
-            await speakWithDeepgram(stepText, {
-              stepIndex: idx,
-              stepText: step.step,
-              explanationText: step.explanation
-            });
-            await waitForAudio();
-
-            // Small pause between steps
-            await new Promise(resolve => setTimeout(resolve, 800));
+            const stepText = cleanForTTS(
+              `Step ${idx + 1}: ${step.step || ''}. ${step.explanation || ''}`
+            );
+            if (stepText.trim()) {
+              await speakWithDeepgram(stepText, {
+                stepIndex: idx,
+                stepText: step.step,
+                explanationText: step.explanation,
+              });
+              await waitForAudio();
+              await new Promise(resolve => setTimeout(resolve, 600));
+            }
           }
         }
 
-        // Read final result (AFTER all steps)
+        // Read final result
         if (currentSegment.final_result) {
           setShowFinalResult(true);
-          await speakWithDeepgram(`Final result: ${currentSegment.final_result}`);
+          await speakWithDeepgram(cleanForTTS(`Final result: ${currentSegment.final_result}`));
           await waitForAudio();
         }
 
+        setSpeakingIndex(null);
+        setIsReading(false);
+        return;
+      }
+      else if (currentSegment?.type === 'example') {
+        // Step-by-step reading — problem first, then each solution step with a pause
+        const waitForAudio = () => new Promise((resolve) => {
+          if (audioRef.current) {
+            audioRef.current.addEventListener('ended', resolve, { once: true });
+          } else { resolve(); }
+        });
+
+        // Read problem statement
+        const problemText = cleanForTTS(currentSegment.problem || '');
+        if (problemText) {
+          await speakWithDeepgram(problemText);
+          await waitForAudio();
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        if (showExplanation) {
+          // Prefer the structured _ttsSteps array (maths worked_example / exercise)
+          // Fall back to splitting the solution string if _ttsSteps wasn't built
+          const steps = Array.isArray(currentSegment._ttsSteps) && currentSegment._ttsSteps.length > 0
+            ? currentSegment._ttsSteps
+            : (currentSegment.solution || '').split('\n').filter(l => l.trim().length > 2);
+
+          for (const step of steps) {
+            const spoken = cleanForTTS(step);
+            if (!spoken.trim()) continue;
+            await speakWithDeepgram(spoken);
+            await waitForAudio();
+            await new Promise(resolve => setTimeout(resolve, 400));
+          }
+        }
 
         setSpeakingIndex(null);
         setIsReading(false);
-        return; // Exit early since we handled everything
+        return;
       }
-
       else if (currentSegment?.type === 'subheading') {
-        textToRead = `Section heading: ${currentSegment.subheading}`;
+        textToRead = cleanForTTS(`Section: ${currentSegment.subheading}`);
       }
-      else if (currentSegment?.type === 'example') {
-        textToRead = `Example problem: ${currentSegment.problem || ''}. `;
-        if (showExplanation && currentSegment.solution) {
-          textToRead += `Now let's solve this step by step. ${currentSegment.solution}`;
+      else if (currentSegment?.type === 'dialogue') {
+        const speaker = currentSegment.speakers ? `${currentSegment.speakers} says: ` : '';
+        textToRead = cleanForTTS(speaker + (currentSegment.text || ''));
+        if (showExplanation && currentSegment.what_it_reveals) {
+          textToRead += `. ${cleanForTTS(currentSegment.what_it_reveals)}`;
+        }
+        if (showExplanation && currentSegment.tone) {
+          textToRead += `. Tone: ${cleanForTTS(currentSegment.tone)}`;
+        }
+      }
+      else if (currentSegment?.type === 'table') {
+        textToRead = cleanForTTS(currentSegment.title || 'Word Meanings') + '. ';
+        if (Array.isArray(currentSegment.rows)) {
+          currentSegment.rows.forEach(row => {
+            const word    = cleanForTTS(row[0] || '');
+            const meaning = cleanForTTS(row[1] || '');
+            const extra   = cleanForTTS(row[3] || row[2] || '');
+            if (word && meaning) {
+              textToRead += `${word} means ${meaning}. `;
+              if (extra) textToRead += `${extra}. `;
+            }
+          });
         }
       }
       else if (
         currentSegment?.type === 'diagram_concept' ||
         currentSegment?.type === 'diagram_reference'
       ) {
-
-        textToRead = currentSegment.reference ? `Looking at ${currentSegment.reference}. ` : 'Looking at this diagram. ';
-        // Always read description for diagrams
-        if (currentSegment.description) {
-          textToRead += `${currentSegment.description}`;
-        }
-        // Add explanation if available and enabled
+        const title = cleanForTTS(currentSegment.title || currentSegment.reference || 'this diagram');
+        textToRead = `Looking at ${title}. `;
+        if (currentSegment.description) textToRead += cleanForTTS(currentSegment.description);
         if (showExplanation && currentSegment.explanation) {
-          textToRead += ` Let me explain further: ${currentSegment.explanation}`;
+          textToRead += ` ${cleanForTTS(currentSegment.explanation)}`;
         }
       }
       else {
-        // Regular text
-        textToRead = currentSegment?.text || '';
+        // text — passage, author_note, concept, definition, theorem, note, topic_intro, etc.
+        textToRead = cleanForTTS(currentSegment?.text || '');
         if (showExplanation && currentSegment?.explanation) {
-          textToRead += `. Now let's understand this properly. ${currentSegment.explanation}`;
+          textToRead += `. ${cleanForTTS(currentSegment.explanation)}`;
         }
       }
 
@@ -923,6 +1506,9 @@ useEffect(() => {
         console.log('No text to read');
         return;
       }
+
+      // Final clean — catches any markup that slipped through
+      textToRead = cleanForTTS(textToRead);
 
       console.log('Reading:', textToRead.substring(0, 100));
 
@@ -1001,18 +1587,8 @@ useEffect(() => {
     setTeacherBoardHighlightIndex(-1);
     setCurrentChunk({ current: 0, total: 0 });
 
-    // More aggressive text cleaning
-    const cleanText = String(text)
-      .replace(/\*\*/g, '')
-      .replace(/##/g, '')
-      .replace(/^\* /gm, '')
-      .replace(/^- /gm, '')
-      .replace(/^\d+\.\s*/gm, '')
-      .replace(/<[^>]+>/g, '')
-      .replace(/[*_~`]/g, '')
-      .replace(/\n+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    // Clean all markup — LaTeX, markdown, emojis, symbols
+    const cleanText = cleanForTTS(String(text));
 
     if (!cleanText) {
       console.log('Text is empty after cleaning');
@@ -1736,6 +2312,14 @@ useEffect(() => {
                                     >
                                       📖 {currentSection.heading || `Section ${currentPageIndex + 1}`}
                                     </div>
+                                    {currentSegment?.type === 'dialogue' && (
+                                      <span
+                                        className="px-3 py-1 bg-orange-300 text-orange-900 text-xs font-bold rounded-lg border-2 border-orange-500 shadow-sm"
+                                        style={{ fontFamily: 'Comic Sans MS, cursive' }}
+                                      >
+                                        💬 DIALOGUE
+                                      </span>
+                                    )}
                                     {currentSegment?.type === 'equation' && (
                                       <span
                                         className="px-3 py-1 bg-blue-300 text-blue-900 text-xs font-bold rounded-lg border-2 border-blue-500 shadow-sm"
@@ -1763,7 +2347,7 @@ useEffect(() => {
                                   </div>
 
                                   {/* Text content - don't show for diagram-only, example, or equation segments (they have their own display) */}
-                                  {currentSegment?.type !== 'diagram' && currentSegment?.type !== 'example' && currentSegment?.type !== 'equation' && (
+                                  {currentSegment?.type !== 'diagram' && currentSegment?.type !== 'example' && currentSegment?.type !== 'equation' && currentSegment?.type !== 'dialogue' && (
                                     <p
   className="text-base sm:text-lg md:text-xl leading-relaxed transition-all text-slate-800 font-medium"
   style={{ fontFamily: 'Comic Sans MS, cursive', wordSpacing: '0.15em' }}
@@ -1800,6 +2384,46 @@ useEffect(() => {
                             </div>
                           </div>
                         </div>
+                        {/* ── DIALOGUE CARD ─────────────────────────────────── */}
+                        {currentSegment?.type === 'dialogue' && (
+                          <div className="mb-6 space-y-4" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                            {/* Speaker label */}
+                            {currentSegment.speakers && (
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-2xl">💬</span>
+                                <span className="text-sm font-bold text-orange-700 uppercase tracking-wide px-3 py-1 bg-orange-100 rounded-full border-2 border-orange-300">
+                                  {currentSegment.speakers}
+                                </span>
+                              </div>
+                            )}
+                            {/* Dialogue text — speech-bubble style */}
+                            <div className="bg-orange-50 rounded-2xl shadow-lg p-4 sm:p-6 border-4 border-orange-300">
+                              <div className="text-base sm:text-lg leading-relaxed text-slate-800 font-medium" style={{ wordSpacing: '0.15em' }}>
+                                {(currentSegment.text || '').split('\n').map((line, i) =>
+                                  line.trim() ? <p key={i} className="mb-1">{renderMixedText(line)}</p> : null
+                                )}
+                              </div>
+                            </div>
+                            {/* What it reveals */}
+                            {currentSegment.what_it_reveals && (
+                              <div className="bg-purple-50 rounded-2xl shadow-lg p-4 sm:p-6 border-4 border-purple-300">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <span className="text-xl">🔍</span>
+                                  <h3 className="text-base font-bold text-purple-800">What this reveals</h3>
+                                </div>
+                                <p className="text-sm sm:text-base leading-relaxed text-slate-700">
+                                  {renderMixedText(currentSegment.what_it_reveals)}
+                                </p>
+                                {currentSegment.tone && (
+                                  <p className="mt-2 text-sm text-purple-600 font-semibold">
+                                    🎭 Tone: {currentSegment.tone}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {/* Example Problem and Solution */}
                         {currentSegment?.type === 'example' && (
                           <div className="mb-6 space-y-4">
@@ -1954,7 +2578,7 @@ useEffect(() => {
                         )}
 
                         {/* Explanation Card - Whiteboard Style */}
-                        {showExplanation && currentSegment?.explanation && currentSegment?.type !== 'diagram' && currentSegment?.type !== 'diagram_concept' && currentSegment?.type !== 'diagram_reference' && currentSegment?.type !== 'table' && (
+                        {showExplanation && currentSegment?.explanation && currentSegment?.type !== 'diagram' && currentSegment?.type !== 'diagram_concept' && currentSegment?.type !== 'diagram_reference' && currentSegment?.type !== 'table' && currentSegment?.type !== 'dialogue' && (
                           <div
                             className="bg-yellow-100 rounded-2xl shadow-lg p-2   border-4 border-yellow-400 transform transition-all duration-300 mb-6 animate-chalkWrite"
                             style={{ fontFamily: 'Comic Sans MS, cursive' }}
