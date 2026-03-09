@@ -213,12 +213,12 @@ if (chapter.segments_json_path && chapter.segments_json_path !== "null") {
     );
 
     // Count actual readable segments from content (what student navigates through)
-    // These match the page0_seg0, page0_seg1... IDs saved in reading_progress_segments
+    // Excludes 'subheading' type — frontend skips those and never saves them as completed
     let readableSegmentCount = 0;
     if (content?.sections) {
-      content.sections.forEach((section, pageIdx) => {
+      content.sections.forEach((section) => {
         if (Array.isArray(section.content)) {
-          readableSegmentCount += section.content.length;
+          readableSegmentCount += section.content.filter(seg => seg.type !== 'subheading').length;
         }
       });
     }
@@ -687,11 +687,11 @@ exports.backfillSegmentCount = async (req, res) => {
     const contentRes = await axios.get(rows[0].content_json_path);
     const content = contentRes.data;
 
-    // Count readable segments (matches page0_seg0 naming used in progress tracking)
+    // Count readable segments — excludes subheadings (frontend skips them)
     let count = 0;
     if (content?.sections) {
       content.sections.forEach(section => {
-        if (Array.isArray(section.content)) count += section.content.length;
+        if (Array.isArray(section.content)) count += section.content.filter(seg => seg.type !== 'subheading').length;
       });
     }
 
@@ -721,10 +721,10 @@ exports.backfillAllSegments = async (req, res) => {
         }
         const contentRes = await axios.get(ch.content_json_path);
         const content = contentRes.data;
-        let count = 0;
+          let count = 0;
         if (content?.sections) {
           content.sections.forEach(section => {
-            if (Array.isArray(section.content)) count += section.content.length;
+            if (Array.isArray(section.content)) count += section.content.filter(seg => seg.type !== 'subheading').length;
           });
         }
         // Force update always, regardless of existing value

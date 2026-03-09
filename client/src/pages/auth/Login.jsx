@@ -174,7 +174,7 @@ export default function Login() {
               <Sparkles className="w-8 h-8 text-indigo-600 animate-pulse" />
             </div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent animate-gradient-x">
-              AI Tutor
+              QuantumEdu
             </h1>
           </div>
 
@@ -308,7 +308,7 @@ export default function Login() {
               ) : (
                 <span className="flex items-center justify-center gap-2">
                   <Sparkles className="w-5 h-5 animate-sparkle" />
-                  Login to AI Tutor
+                  Login to QuantumEdu
                 </span>
               )}
             </button>

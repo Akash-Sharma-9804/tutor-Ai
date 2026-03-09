@@ -162,6 +162,21 @@ export default function Signup() {
     }
   }, [selectedClassId]);
 
+// Generate strong password
+const generateStrongPassword = () => {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
+  let password = "";
+  for (let i = 0; i < 12; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  setForm((prev) => ({
+    ...prev,
+    password: password,
+  }));
+};
+
   const calculatePasswordStrength = (password) => {
     let strength = 0;
     if (password.length >= 8) strength += 25;
@@ -308,7 +323,7 @@ export default function Signup() {
               <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm border border-white/30 hover:scale-110 transition-transform">
                 <GraduationCap className="w-6 h-6 text-white animate-spin-slow" />
               </div>
-              <h1 className="text-xl font-bold text-white">AI Tutor</h1>
+              <h1 className="text-xl font-bold text-white">QuantumEdu</h1>
             </div>
             <Link
               to="/login"
@@ -379,7 +394,7 @@ export default function Signup() {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold text-white animate-gradient-x">
-                    AI Tutor
+                    QuantumEdu
                   </h1>
                   <p className="text-indigo-100 text-sm">
                     Intelligent Learning Platform
@@ -728,8 +743,8 @@ export default function Signup() {
                       onChange={(e) =>
                         setForm({ ...form, password: e.target.value })
                       }
-                      placeholder="Create a strong password"
-                      className="w-full pl-10 pr-12 py-2.5 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none text-sm transition-all duration-300 hover:border-indigo-300"
+                      placeholder="Create a strong password or generate one"
+                      className="w-full pl-10 pr-12 py-2.5 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none text-sm placeholder:text-xs transition-all duration-300 hover:border-indigo-300"
                       required
                     />
                     <button
@@ -743,8 +758,28 @@ export default function Signup() {
                         <Eye className="h-4 w-4 text-gray-500 hover:text-indigo-600 transition-colors" />
                       )}
                     </button>
-                  </div>
-                  <div className="mt-2">
+
+
+
+</div>
+
+<div className="flex items-center justify-between mt-2">
+
+<button
+  type="button"
+  onClick={generateStrongPassword}
+  className="flex items-center gap-1 text-xs bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-3 py-1.5 rounded-lg shadow hover:scale-105 hover:shadow-md transition"
+>
+  ⚡ Generate Strong Password
+</button>
+
+<span className="text-[10px] text-gray-400">
+  Tip: Use letters, numbers & symbols
+</span>
+
+</div>
+
+<div className="mt-2">
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className={`h-full transition-all duration-500 ${getPasswordStrengthColor(

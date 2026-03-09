@@ -503,9 +503,11 @@ QUALITY REQUIREMENTS:
     function sanitizeJsonString(str) {
       // ✅ Full fix: handles LaTeX backslashes AND raw newlines/tabs inside JSON strings
       // Valid JSON escape sequences: \" \/ \\ \b \f \n \r \t \uXXXX
-      // Anything else after \ (like \m in \mathrm, \f in \frac, \t in \times)
-      // must be escaped to \\ so JSON.parse doesn't choke
-      const VALID_ESCAPES = new Set(['"', '/', '\\', 'b', 'f', 'n', 'r', 't', 'u']);
+      // BUT: 'f' and 't' are intentionally EXCLUDED because LaTeX uses \frac, \theta,
+      // \tau, \times, \text etc. If \f and \t are treated as valid JSON escapes,
+      // JSON.parse converts them to form-feed (U+000C) and tab characters, corrupting
+      // all LaTeX. Raw tabs are caught below by the ch==='\t' check instead.
+      const VALID_ESCAPES = new Set(['"', '/', '\\', 'b', 'n', 'r', 'u']);
       let result = "";
       let inString = false;
       let i = 0;

@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect } from "react";
 import { FaTimes, FaUpload, FaBook, FaPlus, FaTrash, FaFilePdf, FaCheck } from "react-icons/fa";
 
@@ -30,7 +28,8 @@ const UploadBookModal = ({ onUpload, onUploadPdf, onClose, uploading, selectedSc
           chapter_number: ch.chapter_number || ch.chapter_no,
           chapter_title: ch.chapter_title,
           file: null,
-          existing: true
+          existing: true,
+          pdf_url: ch.pdf_url || null
         }))
       : [{ chapter_number: 1, chapter_title: "", file: null, existing: false }]
   });
@@ -74,7 +73,8 @@ const UploadBookModal = ({ onUpload, onUploadPdf, onClose, uploading, selectedSc
           chapter_number: ch.chapter_number || ch.chapter_no,
           chapter_title: ch.chapter_title,
           file: null,
-          existing: true
+          existing: true,
+          pdf_url: ch.pdf_url || null
         }))
       }));
     }
@@ -234,13 +234,12 @@ const UploadBookModal = ({ onUpload, onUploadPdf, onClose, uploading, selectedSc
                 {isEditMode ? "Manage Book Chapters" : "Upload New Book"}
               </h2>
             </div>
-            <button
-              onClick={onClose}
-              disabled={uploading}
-              className="text-white cursor-pointer hover:bg-red-400 hover:bg-opacity-20 rounded-lg p-2 transition-colors disabled:opacity-50"
-            >
-              <FaTimes className="text-xl" />
-            </button>
+          <button
+  onClick={onClose}
+  className="text-white cursor-pointer hover:bg-red-400 hover:bg-opacity-20 rounded-lg p-2 transition-colors"
+>
+  <FaTimes className="text-xl" />
+</button>
           </div>
         </div>
 
@@ -469,8 +468,13 @@ const UploadBookModal = ({ onUpload, onUploadPdf, onClose, uploading, selectedSc
                         </p>
                       )}
                       {chapter.existing && !chapter.file && (
-                        <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                          ✓ Using existing chapter PDF
+                        <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                          <FaFilePdf className="text-red-400 flex-shrink-0" />
+                          <span>
+                            ✓ {chapter.pdf_url 
+                              ? decodeURIComponent(chapter.pdf_url.split('/').pop())
+                              : 'Using existing chapter PDF'}
+                          </span>
                         </p>
                       )}
                     </div>
@@ -482,14 +486,13 @@ const UploadBookModal = ({ onUpload, onUploadPdf, onClose, uploading, selectedSc
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4 border-t-2 border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={uploading}
-              className="flex-1 px-6 cursor-pointer py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-red-400  hover:text-black transition-all disabled:opacity-50"
-            >
-              Cancel
-            </button>
+          <button
+  type="button"
+  onClick={onClose}
+  className="flex-1 px-6 cursor-pointer py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-red-400 hover:text-black transition-all"
+>
+  Cancel
+</button>
             <button
               type="submit"
               disabled={uploading}

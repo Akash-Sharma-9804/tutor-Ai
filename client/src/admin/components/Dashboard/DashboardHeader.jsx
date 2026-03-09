@@ -17,7 +17,7 @@ const DashboardHeader = () => {
             </div>
 
             <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-              EduVision Dashboard
+              QuantumEdu Dashboard
             </h1>
           </div>
 

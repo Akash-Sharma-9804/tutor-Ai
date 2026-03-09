@@ -3,18 +3,29 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ChevronLeft, ChevronRight, Volume2, BookOpen, Lightbulb, ArrowLeft, Loader2, Play, Pause, Sparkles, X, MessageCircle } from 'lucide-react';
-import PageImageViewer from "../components/PageImageViewer";
-import { motion, AnimatePresence } from "framer-motion";
+ 
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
 import TeacherAvatar from '../components/TeacherAvatar.jsx';
-import WhiteboardPanel from '../components/WhiteboardPanel.jsx';
+ 
 
 // Renders text that contains inline LaTeX ($...$) mixed with plain text
 const renderMixedText = (text) => {
   if (!text || typeof text !== 'string') return text;
-  // Don't try to parse if no $ signs present
-  if (!text.includes('$')) return text;
+
+  // ── Heal old-processed-book corruption ───────────────────────────────────
+  // Bug: sanitizeJsonString treated \f and \t as valid JSON escapes.
+  // JSON.parse converted \f → form-feed (U+000C) and \t → tab (U+0009).
+  // These corrupt LaTeX: \frac becomes 0x0C+rac, \theta becomes 0x09+heta.
+  // Fix: detect these corruptions by matching the ACTUAL control characters.
+  // eslint-disable-next-line no-control-regex
+  text = text
+    .replace(/([a-zA-Z{])/g, '\\$1')   // form-feed+letter → \letter (restores \frac, \fbox etc)
+    .replace(/	([a-zA-Z{])/g, '\\$1');  // tab+letter → \letter (restores \theta, \times, \tau etc)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Don't try to parse if no $ signs and no LaTeX commands
+  if (!text.includes('$') && !/\\[a-zA-Z]/.test(text)) return text;
 
   // Split on $...$ pattern (single dollar = inline math)
   const parts = text.split(/(\$[^$]+\$)/g);
@@ -26,6 +37,28 @@ const renderMixedText = (text) => {
       } catch {
         return <span key={i}>{part}</span>;
       }
+    }
+    // Check if this plain text chunk contains bare LaTeX commands like \vec{} \frac{}{} \omega etc.
+    // These are LaTeX tokens that escaped $ wrapping
+    const bareLatexPattern = /\\[a-zA-Z]+(\{[^}]*\})*|[αβγδεζθλμνξπρστφχψωΩΓΔΛΣΦΨ]/;
+    if (bareLatexPattern.test(part)) {
+      // Sub-split on bare LaTeX expressions to render them inline
+      // Match: \command{...}{...} or \command or Greek unicode chars
+      const subParts = part.split(/(\\[a-zA-Z]+(?:\{[^}]*\})*(?:\{[^}]*\})*|[αβγδεζθλμνξπρστφχψωΩΓΔΛΣΦΨ])/g);
+      return (
+        <span key={i}>
+          {subParts.map((sub, si) => {
+            if (/^\\[a-zA-Z]/.test(sub) || /^[αβγδεζθλμνξπρστφχψωΩΓΔΛΣΦΨ]$/.test(sub)) {
+              try {
+                return <InlineMath key={si} math={sub} />;
+              } catch {
+                return <span key={si}>{sub}</span>;
+              }
+            }
+            return <span key={si}>{sub}</span>;
+          })}
+        </span>
+      );
     }
     return <span key={i}>{part}</span>;
   });
@@ -43,6 +76,9 @@ const renderMixedText = (text) => {
 const cleanForTTS = (str) => {
   if (!str) return '';
   return String(str)
+    // Heal form-feed (U+000C) and tab (U+0009) corruption from old sanitizeJsonString bug
+    .replace(/([a-zA-Z])/g, '\\$1')
+    .replace(/	([a-zA-Z])/g, '\\$1')
     // ── LaTeX display math $$...$$ ──────────────────────────────────────────
     .replace(/\$\$[\s\S]*?\$\$/g, 'equation')
     // ── LaTeX inline math $...$ → spoken words ──────────────────────────────
@@ -505,14 +541,18 @@ const normalizeEnglishContent = (content) => {
           const problemText = item.question_no
             ? `${item.question_no}: ${item.question_text || ''}`
             : item.question_text || item.problem || '';
+          // answer may be a plain string OR an object like { table_data: [[row], [row]] }
+          const rawAnswer = item.answer || item.solution || '';
+          const answerIsTable = rawAnswer && typeof rawAnswer === 'object' && Array.isArray(rawAnswer.table_data);
+          const solutionStr = answerIsTable
+            ? (item.tip ? `💡 Tip: ${item.tip}` : '')
+            : [typeof rawAnswer === 'string' ? rawAnswer : JSON.stringify(rawAnswer), item.tip ? `💡 Tip: ${item.tip}` : ''].filter(Boolean).join('\n');
           return {
             ...item,
             type: 'example',
             problem: problemText,
-            solution: [
-              item.answer || item.solution || '',
-              item.tip ? `💡 Tip: ${item.tip}` : '',
-            ].filter(Boolean).join('\n'),
+            solution: solutionStr,
+            answer_table: answerIsTable ? rawAnswer.table_data : null,
             _badge: 'QUESTION',
           };
         }
@@ -561,6 +601,7 @@ const LineByLineReader = () => {
 
   const [chapterData, setChapterData] = useState(null);
   const [chapter, setChapter] = useState(null);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [navigation, setNavigation] = useState({ previous: null, next: null });
   const [loading, setLoading] = useState(true);
   const [imgSize, setImgSize] = useState({ w: 0, h: 0 });
@@ -2436,9 +2477,57 @@ useEffect(() => {
                                 <h2 className="text-xl font-bold text-slate-800 chalk-text">Example Problem</h2>
                               </div>
                               <div className="text-sm sm:text-base leading-relaxed text-slate-700 chalk-text space-y-1" style={{ wordSpacing: '0.15em' }}>
-                                {currentSegment.problem.split('\n').map((line, i) => (
-                                  line.trim() ? <p key={i}>{renderMixedText(line)}</p> : null
-                                ))}
+                                {(() => {
+                                  const lines = currentSegment.problem.split('\n');
+                                  const rendered = [];
+                                  let i = 0;
+                                  while (i < lines.length) {
+                                    const line = lines[i];
+                                    // Detect markdown table block: line starts with |
+                                    if (line.trim().startsWith('|')) {
+                                      const tableLines = [];
+                                      while (i < lines.length && lines[i].trim().startsWith('|')) {
+                                        tableLines.push(lines[i]);
+                                        i++;
+                                      }
+                                      // Parse header, separator, rows
+                                      const nonSep = tableLines.filter(l => !l.replace(/\|/g, '').replace(/-/g, '').replace(/\s/g, ''));
+                                      const allRows = tableLines.filter(l => !/^\s*\|[\s\-|]+\|\s*$/.test(l));
+                                      const headerRow = allRows[0];
+                                      const dataRows = allRows.slice(1);
+                                      const parseRow = (r) => r.split('|').map(c => c.trim()).filter((c, ci, arr) => ci !== 0 || c !== '').filter((c, ci, arr) => ci !== arr.length - 1 || c !== '');
+                                      const headers = headerRow ? parseRow(headerRow) : [];
+                                      rendered.push(
+                                        <div key={`tbl-${i}`} className="overflow-x-auto rounded-xl border-2 border-green-300 shadow-sm my-2">
+                                          <table className="w-full border-collapse text-sm">
+                                            {headers.length > 0 && (
+                                              <thead>
+                                                <tr className="bg-green-200">
+                                                  {headers.map((h, hi) => (
+                                                    <th key={hi} className="border border-green-300 px-3 py-2 text-left font-bold text-slate-700">{renderMixedText(h)}</th>
+                                                  ))}
+                                                </tr>
+                                              </thead>
+                                            )}
+                                            <tbody>
+                                              {dataRows.map((row, ri) => (
+                                                <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-green-50'}>
+                                                  {parseRow(row).map((cell, ci) => (
+                                                    <td key={ci} className="border border-green-300 px-3 py-2 text-slate-600">{renderMixedText(cell)}</td>
+                                                  ))}
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      );
+                                    } else {
+                                      if (line.trim()) rendered.push(<p key={i}>{renderMixedText(line)}</p>);
+                                      i++;
+                                    }
+                                  }
+                                  return rendered;
+                                })()}
                               </div>
                             </div>
 
@@ -2452,17 +2541,15 @@ useEffect(() => {
                                   <h2 className="text-xl font-bold text-slate-800 chalk-text">Solution</h2>
                                 </div>
                                 <div className="prose prose-slate max-w-none">
-                                  {currentSegment.solution.split('\n').map((line, idx) => {
-                                    // Renders markdown bold/italic AND inline LaTeX $...$
+                                  {(() => {
+                                    // Renders solution string — handles markdown tables, bullets, numbered steps, bold/italic, LaTeX
                                     const renderInline = (text) => {
-                                      // First split on $...$ for math
                                       const mathParts = text.split(/(\$[^$]+\$)/g);
                                       return mathParts.map((part, i) => {
                                         if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
                                           try { return <InlineMath key={i} math={part.slice(1, -1).trim()} />; }
                                           catch { return <span key={i}>{part}</span>; }
                                         }
-                                        // Handle bold/italic in non-math segments
                                         const mdParts = part.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
                                         return mdParts.map((mp, j) => {
                                           if (mp.startsWith('**') && mp.endsWith('**'))
@@ -2473,35 +2560,126 @@ useEffect(() => {
                                         });
                                       });
                                     };
-                                    // Bullet point
-                                    if (line.trim().match(/^\*\s+\S/) || line.trim().match(/^\*\s*\*\*/)) {
-                                      const content = line.trim().replace(/^\*\s*/, '');
-                                      return (
-                                        <div key={idx} className="mb-2 pl-4 flex gap-2">
-                                          <span className="text-slate-500 mt-1 flex-shrink-0">•</span>
-                                          <p className="text-sm text-slate-600 chalk-text">{renderInline(content)}</p>
-                                        </div>
-                                      );
+                                    const parseRow = (r) => {
+                                      const cells = r.split('|');
+                                      const trimmed = cells[0].trim() === '' ? cells.slice(1) : cells;
+                                      const final = trimmed[trimmed.length - 1]?.trim() === '' ? trimmed.slice(0, -1) : trimmed;
+                                      return final.map(c => c.trim());
+                                    };
+                                    const lines = currentSegment.solution.split('\n');
+                                    const rendered = [];
+                                    let i = 0;
+                                    while (i < lines.length) {
+                                      const line = lines[i];
+                                      // ── Markdown table block ──────────────────────────────
+                                      if (line.trim().startsWith('|')) {
+                                        const tableLines = [];
+                                        while (i < lines.length && lines[i].trim().startsWith('|')) {
+                                          tableLines.push(lines[i]);
+                                          i++;
+                                        }
+                                        const allRows = tableLines.filter(l => !/^\s*\|[\s\-:|]+\|\s*$/.test(l));
+                                        const headerRow = allRows[0];
+                                        const dataRows = allRows.slice(1);
+                                        const headers = headerRow ? parseRow(headerRow) : [];
+                                        const colCount = headers.length;
+                                        rendered.push(
+                                          <div key={`tbl-${i}`} className="overflow-x-auto rounded-xl border-2 border-blue-300 shadow-sm my-3">
+                                            <table className="w-full border-collapse text-sm" style={{ tableLayout: 'auto' }}>
+                                              {headers.length > 0 && (
+                                                <thead>
+                                                  <tr className="bg-blue-200">
+                                                    {headers.map((h, hi) => (
+                                                      <th key={hi} className="border border-blue-300 px-3 py-2 text-left font-bold text-slate-700 text-xs sm:text-sm">{renderInline(h)}</th>
+                                                    ))}
+                                                  </tr>
+                                                </thead>
+                                              )}
+                                              <tbody>
+                                                {dataRows.map((row, ri) => {
+                                                  const cells = parseRow(row);
+                                                  while (cells.length < colCount) cells.push('');
+                                                  return (
+                                                    <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                                                      {cells.map((cell, ci) => (
+                                                        <td key={ci} className="border border-blue-300 px-3 py-2 text-slate-700 text-xs sm:text-sm">{renderInline(cell)}</td>
+                                                      ))}
+                                                    </tr>
+                                                  );
+                                                })}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        );
+                                        continue;
+                                      }
+                                      // ── Bullet point ──────────────────────────────────────
+                                      if (line.trim().match(/^\*\s+\S/) || line.trim().match(/^\*\s*\*\*/)) {
+                                        const content = line.trim().replace(/^\*\s*/, '');
+                                        rendered.push(
+                                          <div key={i} className="mb-2 pl-4 flex gap-2">
+                                            <span className="text-slate-500 mt-1 flex-shrink-0">•</span>
+                                            <p className="text-sm text-slate-600 chalk-text">{renderInline(content)}</p>
+                                          </div>
+                                        );
+                                        i++; continue;
+                                      }
+                                      // ── Numbered step ─────────────────────────────────────
+                                      if (line.trim().match(/^\d+\./)) {
+                                        rendered.push(
+                                          <div key={i} className="mb-2 mt-3">
+                                            <p className="text-sm text-slate-700 chalk-text font-bold">{renderInline(line)}</p>
+                                          </div>
+                                        );
+                                        i++; continue;
+                                      }
+                                      // ── Regular paragraph ─────────────────────────────────
+                                      if (line.trim()) {
+                                        rendered.push(
+                                          <p key={i} className="text-sm text-slate-700 chalk-text mb-1 leading-relaxed">
+                                            {renderInline(line)}
+                                          </p>
+                                        );
+                                      }
+                                      i++;
                                     }
-                                    // Numbered step header (bold it)
-                                    if (line.trim().match(/^\d+\./)) {
-                                      return (
-                                        <div key={idx} className="mb-2 mt-3">
-                                          <p className="text-sm text-slate-700 chalk-text font-bold">{renderInline(line)}</p>
-                                        </div>
-                                      );
-                                    }
-                                    // Regular paragraph
-                                    if (line.trim()) {
-                                      return (
-                                        <p key={idx} className="text-sm text-slate-700 chalk-text mb-1 leading-relaxed">
-                                          {renderInline(line)}
-                                        </p>
-                                      );
-                                    }
-                                    return null;
-                                  })}
+                                    return rendered;
+                                  })()}
                                 </div>
+                              </div>
+                            )}
+                            {/* Answer table — shown when answer is structured table_data */}
+                            {currentSegment.answer_table && Array.isArray(currentSegment.answer_table) && currentSegment.answer_table.length > 1 && (
+                              <div className="bg-blue-50 rounded-2xl shadow-lg p-4 sm:p-6 border-4 border-blue-400" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                                <div className="flex items-center gap-3 mb-4">
+                                  <div className="p-2 bg-blue-500 rounded-lg border-2 border-blue-600 shadow-md">
+                                    <span className="text-2xl">✅</span>
+                                  </div>
+                                  <h2 className="text-xl font-bold text-slate-800 chalk-text">Answer</h2>
+                                </div>
+                                <div className="overflow-x-auto rounded-xl border-2 border-blue-300 shadow-sm">
+                                  <table className="w-full border-collapse text-sm">
+                                    <thead>
+                                      <tr className="bg-blue-200">
+                                        {currentSegment.answer_table[0].map((h, hi) => (
+                                          <th key={hi} className="border border-blue-300 px-3 py-2 text-left font-bold text-slate-700">{h}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {currentSegment.answer_table.slice(1).map((row, ri) => (
+                                        <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                                          {row.map((cell, ci) => (
+                                            <td key={ci} className="border border-blue-300 px-3 py-2 text-slate-700">{renderMixedText(String(cell))}</td>
+                                          ))}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                                {currentSegment.solution && (
+                                  <p className="mt-3 text-sm text-slate-600 chalk-text">{currentSegment.solution}</p>
+                                )}
                               </div>
                             )}
                           </div>
@@ -3170,14 +3348,21 @@ useEffect(() => {
 
               {/* Next Button */}
               <button
-                onClick={goToNextSegment}
-                disabled={
-                  currentPageIndex === (chapterData?.sections?.length || 0) - 1 &&
-                  currentSegmentIndex === (currentSection?.content?.length || 0) - 1
-                }
-                className="flex cursor-pointer items-center justify-center gap-1.5 px-4 md:px-6 py-2.5 md:py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg min-w-[80px] md:min-w-[100px]"
+                onClick={() => {
+                  if (isLastSegment()) {
+                    saveSegmentProgress(currentSegmentIndex, currentPageIndex);
+                    setShowCompletionModal(true);
+                  } else {
+                    goToNextSegment();
+                  }
+                }}
+                className={`flex cursor-pointer items-center justify-center gap-1.5 px-4 md:px-6 py-2.5 md:py-3 text-white rounded-xl font-medium transition-all shadow-lg min-w-[80px] md:min-w-[100px] ${
+                  isLastSegment()
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
+                    : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'
+                }`}
               >
-                <span className="text-sm md:text-base">Next</span>
+                <span className="text-sm md:text-base">{isLastSegment() ? '🎉 Finish' : 'Next'}</span>
                 <ChevronRight className="h-5 w-5" />
               </button>
             </div>
@@ -3209,6 +3394,68 @@ useEffect(() => {
           </div>
         </div>
       </div>
+
+      {/* 🎉 Chapter Completion Modal */}
+      {showCompletionModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-md mx-4 shadow-2xl border-4 border-green-400 text-center animate-bounce-once">
+            {/* Trophy */}
+            <div className="text-7xl mb-4">🏆</div>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+              Chapter Complete!
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6 text-base">
+              You’ve finished <strong className="text-gray-900 dark:text-white">{chapter?.chapter_title}</strong>. Amazing work! 🌟
+            </p>
+
+            {/* 100% Progress Ring */}
+            <div className="flex items-center justify-center mb-6">
+              <div className="relative w-28 h-28">
+                <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="#e5e7eb" strokeWidth="10" />
+                  <circle
+                    cx="50" cy="50" r="42" fill="none"
+                    stroke="url(#completionGrad)" strokeWidth="10"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 42}`}
+                    strokeDashoffset="0"
+                    style={{ transition: 'stroke-dashoffset 1s ease' }}
+                  />
+                  <defs>
+                    <linearGradient id="completionGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="100%" stopColor="#059669" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold text-green-600">100%</span>
+                  <span className="text-xs text-gray-500">Complete</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setShowCompletionModal(false);
+                  navigate(`/book/${chapter?.book_id}`);
+                }}
+                className="w-full py-3 px-6 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold rounded-2xl text-lg shadow-lg transition-all"
+              >
+                📚 Back to Table of Contents
+              </button>
+              <button
+                onClick={() => setShowCompletionModal(false)}
+                className="w-full py-2 px-6 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-2xl transition-all"
+              >
+                Stay &amp; Review
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Exit Dialog with Black Screen */}
       {showExitDialog && (

@@ -164,14 +164,78 @@ const Books = () => {
     }
   }, [filteredBooks, selectedSubject]);
 
-  const handleUploadBook = async (formData, files) => {
-    setUploading(true);
-    setUploadStatus({ type: "info", message: "📤 Uploading chapter PDFs..." });
+  // ── Background job: stored on window so it survives navigation ──────────
+  const [backgroundJob, setBackgroundJob] = useState(
+    () => window.__uploadJob || null
+  );
+
+  // Keep window in sync whenever state changes
+  const updateJob = (job) => {
+    window.__uploadJob = job;
+    setBackgroundJob(job);
+  };
+
+  // On mount, re-attach the ticker if a job is already running
+  useEffect(() => {
+    if (
+      window.__uploadJob &&
+      (window.__uploadJob.status === "uploading" ||
+        window.__uploadJob.status === "processing")
+    ) {
+      setBackgroundJob({ ...window.__uploadJob });
+    }
+  }, []);
+
+  // Smooth ticker: runs every second, advances based on elapsed real time
+  useEffect(() => {
+    if (
+      !backgroundJob ||
+      backgroundJob.status === "done" ||
+      backgroundJob.status === "error"
+    )
+      return;
+
+    const ticker = setInterval(() => {
+      const job = window.__uploadJob;
+      if (!job || job.status === "done" || job.status === "error") {
+        clearInterval(ticker);
+        return;
+      }
+      const elapsed = (Date.now() - job.startedAt) / 1000; // seconds
+      const totalSecs = job.estimatedSecs || 300;
+      // Ease-out curve: fast early, slows near 90%
+      const raw = 1 - Math.exp(-3 * (elapsed / totalSecs));
+      const progress = Math.min(Math.round(raw * 90), 90);
+      const updated = { ...job, progress };
+      window.__uploadJob = updated;
+      setBackgroundJob({ ...updated });
+    }, 1000);
+
+    return () => clearInterval(ticker);
+  }, [backgroundJob?.status]);
+
+const handleUploadBook = async (formData, files) => {
+    // Close modal immediately so admin can keep working
+    setShowUploadModal(false);
+    setEditingBook(null);
+
+    const totalChapters = files.length || formData.chapters.filter(ch => !ch.existing || ch.file).length || 1;
+    // Estimate ~2 min per chapter for Gemini processing
+    const estimatedSecs = totalChapters * 120;
+
+    const initialJob = {
+      status: "uploading",
+      message: `📤 Uploading "${formData.title}" — ${totalChapters} chapter${totalChapters > 1 ? "s" : ""}`,
+      progress: 2,
+      chapterName: formData.title || "Book",
+      totalChapters,
+      startedAt: Date.now(),
+      estimatedSecs,
+    };
+    updateJob(initialJob);
 
     try {
       const uploadFormData = new FormData();
-      
-      // Append book metadata
       uploadFormData.append("title", formData.title);
       uploadFormData.append("author", formData.author || "Unknown");
       uploadFormData.append("subject_id", selectedSubject);
@@ -180,55 +244,68 @@ const Books = () => {
       uploadFormData.append("board", formData.board);
       uploadFormData.append("class_num", formData.class_num || "1");
       uploadFormData.append("subject_name", formData.subject_name || "Unknown");
-      
-      // Append chapter data as JSON
       uploadFormData.append("chapters", JSON.stringify(formData.chapters));
-      
-      // Append chaptersToDelete if in edit mode
       if (formData.isEditMode && formData.chaptersToDelete) {
         uploadFormData.append("chaptersToDelete", JSON.stringify(formData.chaptersToDelete));
       }
-      
-      // Append bookId if in edit mode
       if (formData.isEditMode && formData.bookId) {
         uploadFormData.append("bookId", formData.bookId);
         uploadFormData.append("isEditMode", "true");
       }
-      
-      // Append all chapter PDF files
       files.forEach((file) => {
-        uploadFormData.append(`chapter_files`, file);
+        uploadFormData.append("chapter_files", file);
       });
 
-      setUploadStatus({ type: "info", message: "⏳ Processing chapters with OCR..." });
+      // After ~5s switch message to "processing"
+      const msgTimer = setTimeout(() => {
+        if (window.__uploadJob?.status === "uploading") {
+          updateJob({ ...window.__uploadJob, status: "processing",
+            message: `⚙️ AI is processing "${formData.title}" (${totalChapters} chapter${totalChapters > 1 ? "s" : ""})…` });
+        }
+      }, 5000);
 
       const response = await adminAxios.post("/books/upload", uploadFormData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 600000 // 10 minutes for multiple chapters
+        timeout: 900000 // 15 minutes
       });
+
+      clearTimeout(msgTimer);
 
       const successMessage = formData.isEditMode
-        ? `✅ Book updated successfully! ${response.data.chapters_created || 0} chapters processed`
-        : `✅ Book uploaded successfully! ${response.data.chapters_created} chapters processed across ${response.data.total_pages} pages`;
+        ? `✅ Book updated! ${response.data.chapters_created || 0} chapters processed`
+        : `✅ "${formData.title}" uploaded! ${response.data.chapters_created} chapters · ${response.data.total_pages} pages`;
 
-      setUploadStatus({
-        type: "success",
-        message: successMessage
-      });
-
-      setShowUploadModal(false);
-      setEditingBook(null);
+      updateJob({ status: "done", message: successMessage, progress: 100, chapterName: formData.title });
       fetchBooks();
+      setTimeout(() => updateJob(null), 8000);
 
-      setTimeout(() => setUploadStatus({ type: "", message: "" }), 5000);
     } catch (error) {
-      const errorMsg = error.response?.data?.message || error.message || "Upload failed";
-      setUploadStatus({
-        type: "error",
-        message: `❌ ${errorMsg}`
-      });
-    } finally {
-      setUploading(false);
+      clearTimeout(msgTimer ?? undefined);
+      const isTimeout = error.code === "ECONNABORTED" || error.message?.includes("timeout");
+      if (isTimeout) {
+        // Backend is still running — keep the progress bar alive and poll
+        const stalledJob = {
+          ...(window.__uploadJob || {}),
+          status: "processing",
+          message: `⚙️ Still processing "${formData.title}" in background…`,
+          chapterName: formData.title,
+        };
+        updateJob(stalledJob);
+
+        const pollInterval = setInterval(async () => {
+          try { await fetchBooks(); } catch (_) {}
+        }, 30000);
+
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          updateJob(null);
+          fetchBooks();
+        }, 600000);
+      } else {
+        const errorMsg = error.response?.data?.message || error.message || "Upload failed";
+        updateJob({ status: "error", message: `❌ ${errorMsg}`, progress: 0, chapterName: formData.title });
+        setTimeout(() => updateJob(null), 8000);
+      }
     }
   };
 
@@ -346,6 +423,75 @@ const handleEditChaptersOnly = async () => {
           </div>
         </div>
       )}
+
+{/* Background Upload Job Banner */}
+{backgroundJob && (
+  <div className={`mb-4 rounded-2xl shadow-lg overflow-hidden border ${
+    backgroundJob.status === "done"
+      ? "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20"
+      : backgroundJob.status === "error"
+      ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
+      : "border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20"
+  }`}>
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {backgroundJob.status === "done" ? (
+            <span className="text-green-500 text-lg flex-shrink-0">✅</span>
+          ) : backgroundJob.status === "error" ? (
+            <span className="text-red-500 text-lg flex-shrink-0">❌</span>
+          ) : (
+            <svg className="animate-spin h-5 w-5 text-indigo-500 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          )}
+          <div className="min-w-0">
+            <p className={`font-semibold text-sm truncate ${
+              backgroundJob.status === "done" ? "text-green-800 dark:text-green-300"
+              : backgroundJob.status === "error" ? "text-red-800 dark:text-red-300"
+              : "text-indigo-800 dark:text-indigo-300"
+            }`}>
+              {backgroundJob.message}
+            </p>
+            {backgroundJob.status !== "done" && backgroundJob.status !== "error" && backgroundJob.startedAt && (
+              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-0.5">
+                {`Elapsed: ${Math.floor((Date.now() - backgroundJob.startedAt) / 60000)}m ${Math.floor(((Date.now() - backgroundJob.startedAt) % 60000) / 1000)}s`}
+                {backgroundJob.estimatedSecs ? ` · Est. total: ~${Math.round(backgroundJob.estimatedSecs / 60)}m` : ""}
+                {" · You can navigate freely — upload continues in background"}
+              </p>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={() => updateJob(null)}
+          className="ml-3 flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm"
+        >✕</button>
+      </div>
+
+      {/* Progress Bar */}
+      {backgroundJob.status !== "error" && (
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mt-1 overflow-hidden">
+          <div
+            className={`h-2.5 rounded-full transition-all duration-1000 ${
+              backgroundJob.status === "done" ? "bg-green-500"
+              : "bg-gradient-to-r from-indigo-500 to-purple-500"
+            }`}
+            style={{ width: `${backgroundJob.progress}%` }}
+          />
+        </div>
+      )}
+      {backgroundJob.status !== "error" && backgroundJob.status !== "done" && (
+        <div className="flex justify-between mt-1">
+          <span className="text-xs text-indigo-400">{backgroundJob.progress}% complete</span>
+          {backgroundJob.totalChapters && (
+            <span className="text-xs text-indigo-400">{backgroundJob.totalChapters} chapter{backgroundJob.totalChapters > 1 ? "s" : ""} · ~2 min each</span>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+)}
 
       {/* Header */}
     {/* Header */}
