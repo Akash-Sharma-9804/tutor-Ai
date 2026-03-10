@@ -56,6 +56,7 @@ router.get("/books", bookController.listBooks);
 router.get("/books/statistics", bookController.getBookStatistics);
 router.get("/books/:id", bookController.getBookById);
 router.get("/books/:id/chapters", bookController.getBookChapters);
+router.get("/books/:id/progress", bookController.getBookProgress);
 router.post("/books", bookController.createBook);
 router.post(
   "/books/upload",

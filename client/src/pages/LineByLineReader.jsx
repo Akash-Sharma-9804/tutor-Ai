@@ -3,11 +3,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ChevronLeft, ChevronRight, Volume2, BookOpen, Lightbulb, ArrowLeft, Loader2, Play, Pause, Sparkles, X, MessageCircle } from 'lucide-react';
- 
+
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
 import TeacherAvatar from '../components/TeacherAvatar.jsx';
- 
+
 
 // Renders text that contains inline LaTeX ($...$) mixed with plain text
 const renderMixedText = (text) => {
@@ -244,17 +244,17 @@ const normalizeMathsContent = (content) => {
           // Build variables as derivation steps
           const varSteps = Array.isArray(item.variables)
             ? item.variables.map(v => ({
-                step: `${v.symbol} = ${v.meaning}`,
-                explanation: v.unit ? `Unit: ${v.unit}` : '',
-              }))
+              step: `${v.symbol} = ${v.meaning}`,
+              explanation: v.unit ? `Unit: ${v.unit}` : '',
+            }))
             : [];
 
           // If derivation steps exist, append them after variables
           const derivationSteps = Array.isArray(item.derivation)
             ? item.derivation.map(s => ({
-                step: s.step || '',
-                explanation: `${s.statement || ''} — ${s.reason || ''}`.replace(/^—\s*/, ''),
-              }))
+              step: s.step || '',
+              explanation: `${s.statement || ''} — ${s.reason || ''}`.replace(/^—\s*/, ''),
+            }))
             : [];
 
           const allSteps = [...varSteps, ...derivationSteps];
@@ -282,12 +282,12 @@ const normalizeMathsContent = (content) => {
         if (item.type === 'proof') {
           const proofSteps = Array.isArray(item.steps)
             ? item.steps.map(s => ({
-                step: s.step || s.action || `Step ${s.step_no || ''}`,
-                explanation: [
-                  s.statement || s.math || s.working || '',
-                  s.reason ? `Reason: ${s.reason}` : '',
-                ].filter(Boolean).join(' — '),
-              }))
+              step: s.step || s.action || `Step ${s.step_no || ''}`,
+              explanation: [
+                s.statement || s.math || s.working || '',
+                s.reason ? `Reason: ${s.reason}` : '',
+              ].filter(Boolean).join(' — '),
+            }))
             : [];
 
           return {
@@ -328,13 +328,13 @@ const normalizeMathsContent = (content) => {
             item.steps.forEach(s => {
               const stepNum = s.step_no || '';
               if (s.narration) solutionLines.push(`Step ${stepNum}: ${s.narration}`);
-              if (s.working)   solutionLines.push(`  ${s.working}`);
-              if (s.result)    solutionLines.push(`  → ${s.result}`);
+              if (s.working) solutionLines.push(`  ${s.working}`);
+              if (s.result) solutionLines.push(`  → ${s.result}`);
               // TTS: combine narration + working + result into one spoken chunk per step
               const spokenStep = [
                 s.narration ? `Step ${stepNum}: ${s.narration}` : '',
-                s.working   ? s.working : '',
-                s.result    ? `Result: ${s.result}` : '',
+                s.working ? s.working : '',
+                s.result ? `Result: ${s.result}` : '',
               ].filter(Boolean).join('. ');
               if (spokenStep.trim()) ttsSteps.push(spokenStep);
             });
@@ -386,12 +386,12 @@ const normalizeMathsContent = (content) => {
               if (Array.isArray(part.steps)) {
                 part.steps.forEach(s => {
                   if (s.narration) solutionLines.push(`  Step ${s.step_no || ''}: ${s.narration}`);
-                  if (s.working)   solutionLines.push(`    ${s.working}`);
-                  if (s.result)    solutionLines.push(`    → ${s.result}`);
+                  if (s.working) solutionLines.push(`    ${s.working}`);
+                  if (s.result) solutionLines.push(`    → ${s.result}`);
                   const spokenStep = [
                     s.narration ? `Step ${s.step_no || ''}: ${s.narration}` : '',
-                    s.working   ? s.working : '',
-                    s.result    ? `Result: ${s.result}` : '',
+                    s.working ? s.working : '',
+                    s.result ? `Result: ${s.result}` : '',
                   ].filter(Boolean).join('. ');
                   if (spokenStep.trim()) ttsSteps.push(spokenStep);
                 });
@@ -404,12 +404,12 @@ const normalizeMathsContent = (content) => {
           } else if (Array.isArray(item.steps)) {
             item.steps.forEach(s => {
               if (s.narration) solutionLines.push(`Step ${s.step_no || ''}: ${s.narration}`);
-              if (s.working)   solutionLines.push(`  ${s.working}`);
-              if (s.result)    solutionLines.push(`  → ${s.result}`);
+              if (s.working) solutionLines.push(`  ${s.working}`);
+              if (s.result) solutionLines.push(`  → ${s.result}`);
               const spokenStep = [
                 s.narration ? `Step ${s.step_no || ''}: ${s.narration}` : '',
-                s.working   ? s.working : '',
-                s.result    ? `Result: ${s.result}` : '',
+                s.working ? s.working : '',
+                s.result ? `Result: ${s.result}` : '',
               ].filter(Boolean).join('. ');
               if (spokenStep.trim()) ttsSteps.push(spokenStep);
             });
@@ -637,97 +637,98 @@ const LineByLineReader = () => {
 
   const [highlightedWordIndex, setHighlightedWordIndex] = useState(-1);
   const [currentWords, setCurrentWords] = useState([]);
+  const [mainTextWordCount, setMainTextWordCount] = useState(0); // how many words belong to main text (rest = explanation)
   const [currentChunk, setCurrentChunk] = useState({ current: 0, total: 0 });
   const [teacherBoardWords, setTeacherBoardWords] = useState([]);
   const [teacherBoardHighlightIndex, setTeacherBoardHighlightIndex] = useState(-1);
   const [equationStepChars, setEquationStepChars] = useState({});
   const [activeStepUnderline, setActiveStepUnderline] = useState(-1);
   const [explanationWords, setExplanationWords] = useState({});
-const [isFullscreen, setIsFullscreen] = useState(false);
-const fullscreenAttempted = useRef(false);
-const [showExitDialog, setShowExitDialog] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const fullscreenAttempted = useRef(false);
+  const [showExitDialog, setShowExitDialog] = useState(false);
 
 
-const enterFullscreen = async () => {
-  try {
-    const elem = document.documentElement;
-    if (elem.requestFullscreen) {
-      await elem.requestFullscreen();
-    } else if (elem.webkitRequestFullscreen) { /* Safari */
-      await elem.webkitRequestFullscreen();
-    } else if (elem.msRequestFullscreen) { /* IE11 */
-      await elem.msRequestFullscreen();
+  const enterFullscreen = async () => {
+    try {
+      const elem = document.documentElement;
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) { /* Safari */
+        await elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) { /* IE11 */
+        await elem.msRequestFullscreen();
+      }
+      setIsFullscreen(true);
+    } catch (err) {
+      console.error('Error attempting to enable fullscreen:', err);
     }
-    setIsFullscreen(true);
-  } catch (err) {
-    console.error('Error attempting to enable fullscreen:', err);
-  }
-};
+  };
 
-const exitFullscreen = () => {
-  if (document.exitFullscreen) {
-    document.exitFullscreen();
-  } else if (document.webkitExitFullscreen) { /* Safari */
-    document.webkitExitFullscreen();
-  } else if (document.msExitFullscreen) { /* IE11 */
-    document.msExitFullscreen();
-  }
-};
+  const exitFullscreen = () => {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) { /* Safari */
+      document.webkitExitFullscreen();
+    } else if (document.msExitFullscreen) { /* IE11 */
+      document.msExitFullscreen();
+    }
+  };
 
 
-const handleFullscreenChange = () => {
-  const isCurrentlyFullscreen = !!(
-    document.fullscreenElement ||
-    document.webkitFullscreenElement ||
-    document.msFullscreenElement
-  );
+  const handleFullscreenChange = () => {
+    const isCurrentlyFullscreen = !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.msFullscreenElement
+    );
 
-  // Always stop audio when fullscreen changes (exit or enter)
-  stopReading();
+    // Always stop audio when fullscreen changes (exit or enter)
+    stopReading();
 
-  setIsFullscreen(isCurrentlyFullscreen);
+    setIsFullscreen(isCurrentlyFullscreen);
 
-  // Navigate back when fullscreen is exited
-  if (!isCurrentlyFullscreen && !loading && fullscreenAttempted.current) {
-    // Check if device is mobile
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-                     (window.innerWidth <= 1024);
-    
-    if (isMobile) {
-      // On mobile, show exit confirmation dialog
-      setShowExitDialog(true);
-    } else {
-      // On desktop, navigate back to table of contents
-      if (chapter?.book_id) {
-        navigate(`/subjects`);
+    // Navigate back when fullscreen is exited
+    if (!isCurrentlyFullscreen && !loading && fullscreenAttempted.current) {
+      // Check if device is mobile
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (window.innerWidth <= 1024);
+
+      if (isMobile) {
+        // On mobile, show exit confirmation dialog
+        setShowExitDialog(true);
       } else {
-        navigate(-1);
+        // On desktop, navigate back to table of contents
+        if (chapter?.book_id) {
+          navigate(`/subjects`);
+        } else {
+          navigate(-1);
+        }
       }
     }
-  }
-};
-
-useEffect(() => {
-  // Add fullscreen change listeners
-  document.addEventListener('fullscreenchange', handleFullscreenChange);
-  document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-  document.addEventListener('msfullscreenchange', handleFullscreenChange);
-
-  // Auto-enter fullscreen
-  const timer = setTimeout(() => {
-    if (!fullscreenAttempted.current && !loading) {
-      fullscreenAttempted.current = true;
-      enterFullscreen();
-    }
-  }, 500);
-
-  return () => {
-    clearTimeout(timer);
-    document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.removeEventListener('msfullscreenchange', handleFullscreenChange);
   };
-}, [loading]);
+
+  useEffect(() => {
+    // Add fullscreen change listeners
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+    // Auto-enter fullscreen
+    const timer = setTimeout(() => {
+      if (!fullscreenAttempted.current && !loading) {
+        fullscreenAttempted.current = true;
+        enterFullscreen();
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+    };
+  }, [loading]);
 
 
 
@@ -834,7 +835,7 @@ useEffect(() => {
         setIsReading(true);
 
         // Start playing as soon as first chunk arrives
-        audio.play().catch(() => {});
+        audio.play().catch(() => { });
 
         const reader = response.body.getReader();
 
@@ -862,7 +863,7 @@ useEffect(() => {
         sourceBuffer.addEventListener("updateend", () => {
           isAppending = false;
           if (streamDone && chunkQueue.length === 0) {
-            try { mediaSource.endOfStream(); } catch (_) {}
+            try { mediaSource.endOfStream(); } catch (_) { }
           } else {
             tryAppendNext();
           }
@@ -879,7 +880,7 @@ useEffect(() => {
               streamDone = true;
               // If nothing is currently appending and queue is empty, end stream now
               if (!isAppending && chunkQueue.length === 0) {
-                try { mediaSource.endOfStream(); } catch (_) {}
+                try { mediaSource.endOfStream(); } catch (_) { }
               }
               return;
             }
@@ -1184,6 +1185,7 @@ useEffect(() => {
     setIsLoadingAudio(false);
     setHighlightedWordIndex(-1);
     setCurrentWords([]);
+    setMainTextWordCount(0);
     setActiveEquationStep(0);
     setExplanationWords({});
     setEquationStepChars({});
@@ -1514,9 +1516,9 @@ useEffect(() => {
         textToRead = cleanForTTS(currentSegment.title || 'Word Meanings') + '. ';
         if (Array.isArray(currentSegment.rows)) {
           currentSegment.rows.forEach(row => {
-            const word    = cleanForTTS(row[0] || '');
+            const word = cleanForTTS(row[0] || '');
             const meaning = cleanForTTS(row[1] || '');
-            const extra   = cleanForTTS(row[3] || row[2] || '');
+            const extra = cleanForTTS(row[3] || row[2] || '');
             if (word && meaning) {
               textToRead += `${word} means ${meaning}. `;
               if (extra) textToRead += `${extra}. `;
@@ -1537,9 +1539,13 @@ useEffect(() => {
       }
       else {
         // text — passage, author_note, concept, definition, theorem, note, topic_intro, etc.
-        textToRead = cleanForTTS(currentSegment?.text || '');
+        const mainText = cleanForTTS(currentSegment?.text || '');
+        textToRead = mainText;
         if (showExplanation && currentSegment?.explanation) {
+          setMainTextWordCount(mainText.split(/\s+/).filter(Boolean).length);
           textToRead += `. ${cleanForTTS(currentSegment.explanation)}`;
+        } else {
+          setMainTextWordCount(0); // 0 means all words are main text
         }
       }
 
@@ -1764,6 +1770,7 @@ useEffect(() => {
     setIsLoadingAudio(false);
     setHighlightedWordIndex(-1);
     setCurrentWords([]);
+    setMainTextWordCount(0);
     setTeacherBoardWords([]);
     setTeacherBoardHighlightIndex(-1);
     setCurrentChunk({ current: 0, total: 0 });
@@ -1909,7 +1916,7 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-   {/* Mobile Header - Ultra Compact */}
+      {/* Mobile Header - Ultra Compact */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 border-b-2 border-gray-200 dark:border-gray-700 shadow-lg">
         <div className="px-2 py-2">
           <div className="flex items-center gap-2">
@@ -1950,17 +1957,16 @@ useEffect(() => {
               className="flex-shrink-0 flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white rounded-md text-[10px] font-bold shadow-md"
             >
               <BookOpen className="h-3 w-3" />
-              {currentPageIndex + 1}/{chapterData?.sections?.length}
+              {currentSection?.page_range?.[0] ?? currentPageIndex + 1}/{chapterData?.sections?.[chapterData.sections.length - 1]?.page_range?.slice(-1)[0] ?? chapterData?.sections?.length}
             </button>
 
             {/* Tips Toggle */}
             <button
               onClick={() => setShowExplanation(!showExplanation)}
-              className={`flex-shrink-0 p-1.5 rounded-md transition-colors shadow-sm ${
-                showExplanation
+              className={`flex-shrink-0 p-1.5 rounded-md transition-colors shadow-sm ${showExplanation
                   ? 'bg-yellow-400 text-white'
                   : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}
+                }`}
             >
               <Lightbulb className="h-3.5 w-3.5" />
             </button>
@@ -1968,9 +1974,9 @@ useEffect(() => {
         </div>
       </div>
 
-     {/* Mobile Teacher Avatar (BELOW Chapter Info) */}
-     <div
-  className="
+      {/* Mobile Teacher Avatar (BELOW Chapter Info) */}
+      <div
+        className="
     lg:hidden
     fixed top-[42px] left-0 right-0 z-40
     shadow-lg
@@ -1978,20 +1984,20 @@ useEffect(() => {
     rounded-b-[15px]      /* mobile + tablet */
     lg:rounded-[20px]     /* desktop */
   "
-  style={{
-    background: 'linear-gradient(145deg, #f59e0b, #d97706)',
-    boxShadow:
-      '0 10px 40px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.2)',
-  }}
->
+        style={{
+          background: 'linear-gradient(145deg, #f59e0b, #d97706)',
+          boxShadow:
+            '0 10px 40px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.2)',
+        }}
+      >
 
         <div
-  className="
+          className="
     relative
     h-[160px]     /* mobile */
     md:h-[220px]  /* tablet */
   "
->
+        >
 
           <TeacherAvatar isSpeaking={isReading} audioRef={audioRef} />
           {/* Speaking indicator */}
@@ -2002,14 +2008,14 @@ useEffect(() => {
             </div>
           )}
         </div>
-           <div className="text-center  ">
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl  p-1 border-2 border-white/20">
-                  <p className="text-white text-xs mb-1" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
-                    Hi! I'm Andy Your study sidekick! 🚀
-                  </p>
-                 
-                </div>
-              </div>
+        <div className="text-center  ">
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl  p-1 border-2 border-white/20">
+            <p className="text-white text-xs mb-1" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+              Hi! I'm Andy Your study sidekick! 🚀
+            </p>
+
+          </div>
+        </div>
       </div>
 
       {/* Fixed Header - Hidden on mobile, shown on desktop */}
@@ -2031,7 +2037,7 @@ useEffect(() => {
                   {chapter?.chapter_title}
                 </h1>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">
-                  Ch {chapter?.chapter_no} • Page {currentPageIndex + 1}/{chapterData?.sections?.length}
+                  Ch {chapter?.chapter_no} • Page {currentSection?.page_range?.[0] ?? currentPageIndex + 1}/{chapterData?.sections?.[chapterData.sections.length - 1]?.page_range?.slice(-1)[0] ?? chapterData?.sections?.length}
                   {currentSection?.subheading && (
                     <span className="hidden sm:inline ml-2 font-semibold text-blue-600 dark:text-blue-400">
                       • {currentSection.subheading}
@@ -2068,7 +2074,7 @@ useEffect(() => {
 
       {/* Main Content - Two Column Layout */}
       <div className="w-full py-0 px-0 sm:px-1 lg:px-2 pt-[240px] sm:pt-[230px] md:pt-[280px] lg:pt-0">
-       <div className="flex flex-col w-full gap-0 lg:gap-2 lg:flex-row lg:h-[calc(100vh-9rem)]">
+        <div className="flex flex-col w-full gap-0 lg:gap-2 lg:flex-row lg:h-[calc(100vh-9rem)]">
 
           {/* LEFT SIDEBAR - Teacher + Page Numbers */}
           <div className="hidden lg:flex lg:flex-col lg:w-64 gap-4 p-4">
@@ -2083,7 +2089,7 @@ useEffect(() => {
                 border: '4px solid #78350f'
               }}
             >
-             
+
 
               {/* Teacher Avatar */}
               <div className="w-full h-[300px] flex items-end justify-center">
@@ -2134,7 +2140,7 @@ useEffect(() => {
                       }`}
                     style={{ fontFamily: 'Comic Sans MS, cursive' }}
                   >
-                    <div className="font-bold text-sm">Page {idx + 1}</div>
+                    <div className="font-bold text-sm">Page {section.page_range?.[0] ?? idx + 1}</div>
                     {section.heading && (
                       <div className="text-xs opacity-90 truncate mt-1">
                         {section.heading}
@@ -2147,7 +2153,7 @@ useEffect(() => {
           </div>
 
           {/* RIGHT COLUMN - Whiteboard (Full Width) */}
-       {/* RIGHT COLUMN - Whiteboard (Full Width) */}
+          {/* RIGHT COLUMN - Whiteboard (Full Width) */}
           <div className="relative flex-1 w-full lg:h-full">
 
             {/* Whiteboard Container */}
@@ -2190,7 +2196,7 @@ useEffect(() => {
                       }}
                     >
                       {/* Scrollable Content Area */}
-                     <div className="flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-4 md:p-6 pb-12 sm:pb-14">
+                      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-4 md:p-6 pb-12 sm:pb-14">
 
                         {/* Control Buttons - Top Left of Whiteboard */}
                         <div className="flex flex-wrap items-center gap-1 sm:gap-2 md:gap-3 mb-3 sm:mb-4 md:mb-6 pb-2 sm:pb-3 md:pb-4 border-b-2 sm:border-b-4 border-slate-600" style={{ borderStyle: 'dashed' }}>
@@ -2231,7 +2237,7 @@ useEffect(() => {
                               }`}
                             style={{ fontFamily: 'Comic Sans MS, cursive' }}
                           >
-                           {autoPlayCountdown > 0 ? `Next in ${autoPlayCountdown}s` : 'Auto-Play'}
+                            {autoPlayCountdown > 0 ? `Next in ${autoPlayCountdown}s` : 'Auto-Play'}
                           </button>
 
                           <button
@@ -2244,7 +2250,7 @@ useEffect(() => {
                             <span className="sm:hidden">Explain</span>
                           </button>
 
-                        
+
                         </div>
 
 
@@ -2257,78 +2263,78 @@ useEffect(() => {
 
                               {/* 📊 DIAGRAM LAYOUT - Two columns: Image (left) + Description (right) */}
                               {(currentSegment?.type === "diagram" ||
-  currentSegment?.type === "diagram_concept" ||
-  currentSegment?.type === "diagram_reference") && (() => {
-    // ✅ NEW: Use image_url directly from segment (Mistral OCR pipeline)
-    // Falls back to old pageSeg.image_path for backwards compatibility
-    const diagramImageUrl = currentSegment.image_url
-      || ((() => {
-        const pageNum = currentSegment.page || currentSegment.page_number || currentPdfPage;
-        const pageSeg = segments.find(s => s.page === pageNum);
-        return pageSeg?.image_path ? `${import.meta.env.VITE_CDN_URL}${pageSeg.image_path}` : null;
-      })());
+                                currentSegment?.type === "diagram_concept" ||
+                                currentSegment?.type === "diagram_reference") && (() => {
+                                  // ✅ NEW: Use image_url directly from segment (Mistral OCR pipeline)
+                                  // Falls back to old pageSeg.image_path for backwards compatibility
+                                  const diagramImageUrl = currentSegment.image_url
+                                    || ((() => {
+                                      const pageNum = currentSegment.page || currentSegment.page_number || currentPdfPage;
+                                      const pageSeg = segments.find(s => s.page === pageNum);
+                                      return pageSeg?.image_path ? `${import.meta.env.VITE_CDN_URL}${pageSeg.image_path}` : null;
+                                    })());
 
-    return (
-      <div className="mb-6">
-        {/* Two-column layout for diagrams */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-          {/* LEFT: Diagram Image */}
-          <div className="order-1">
-            <div className="bg-white rounded-2xl shadow-lg p-3 border-4 border-purple-400">
-              {(currentSegment.title || currentSegment.reference) && (
-                <p className="text-center mb-2 text-sm font-semibold text-purple-700 bg-purple-50 py-2 rounded-lg">
-                  📍 {currentSegment.title || currentSegment.reference}
-                </p>
-              )}
-              {diagramImageUrl ? (
-                <img
-                  src={diagramImageUrl}
-                  alt={currentSegment.title || currentSegment.reference || "Diagram"}
-                  className="w-full rounded-lg shadow-md object-contain max-h-72"
-                  onError={(e) => {
-                    console.error('Diagram image failed to load:', diagramImageUrl);
-                    e.target.style.display = 'none';
-                    e.target.nextSibling && (e.target.nextSibling.style.display = 'flex');
-                  }}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-48 text-purple-400 bg-purple-50 rounded-lg border-2 border-dashed border-purple-300">
-                  <span className="text-4xl mb-2">📊</span>
-                  <p className="text-sm text-purple-500 text-center px-4">
-                    {currentSegment.title || "Diagram"}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+                                  return (
+                                    <div className="mb-6">
+                                      {/* Two-column layout for diagrams */}
+                                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                                        {/* LEFT: Diagram Image */}
+                                        <div className="order-1">
+                                          <div className="bg-white rounded-2xl shadow-lg p-3 border-4 border-purple-400">
+                                            {(currentSegment.title || currentSegment.reference) && (
+                                              <p className="text-center mb-2 text-sm font-semibold text-purple-700 bg-purple-50 py-2 rounded-lg">
+                                                📍 {currentSegment.title || currentSegment.reference}
+                                              </p>
+                                            )}
+                                            {diagramImageUrl ? (
+                                              <img
+                                                src={diagramImageUrl}
+                                                alt={currentSegment.title || currentSegment.reference || "Diagram"}
+                                                className="w-full rounded-lg shadow-md object-contain max-h-72"
+                                                onError={(e) => {
+                                                  console.error('Diagram image failed to load:', diagramImageUrl);
+                                                  e.target.style.display = 'none';
+                                                  e.target.nextSibling && (e.target.nextSibling.style.display = 'flex');
+                                                }}
+                                              />
+                                            ) : (
+                                              <div className="flex flex-col items-center justify-center h-48 text-purple-400 bg-purple-50 rounded-lg border-2 border-dashed border-purple-300">
+                                                <span className="text-4xl mb-2">📊</span>
+                                                <p className="text-sm text-purple-500 text-center px-4">
+                                                  {currentSegment.title || "Diagram"}
+                                                </p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
 
-          {/* RIGHT: Explanation */}
-          <div className="order-2">
-            {(currentSegment.description || currentSegment.explanation) && (
-              <div className="bg-purple-100 rounded-2xl shadow-lg p-4 border-4 border-purple-400" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-purple-500 rounded-lg border-2 border-purple-600 shadow-md">
-                    <Lightbulb className="h-6 w-6 text-white" />
-                  </div>
-                  <h2 className="text-xl font-bold text-slate-800 chalk-text">💡 Understanding the Diagram</h2>
-                </div>
-                {currentSegment.description && (
-                  <p className="text-xs sm:text-sm leading-relaxed text-slate-700 chalk-text mb-4" style={{ wordSpacing: '0.15em' }}>
-                    {currentSegment.description}
-                  </p>
-                )}
-                {currentSegment.explanation && (
-                  <p className="text-xs sm:text-sm leading-relaxed text-slate-700 chalk-text" style={{ wordSpacing: '0.15em' }}>
-                    {renderMixedText(currentSegment.explanation)}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  })()}
+                                        {/* RIGHT: Explanation */}
+                                        <div className="order-2">
+                                          {(currentSegment.description || currentSegment.explanation) && (
+                                            <div className="bg-purple-100 rounded-2xl shadow-lg p-4 border-4 border-purple-400" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                                              <div className="flex items-center gap-3 mb-4">
+                                                <div className="p-2 bg-purple-500 rounded-lg border-2 border-purple-600 shadow-md">
+                                                  <Lightbulb className="h-6 w-6 text-white" />
+                                                </div>
+                                                <h2 className="text-xl font-bold text-slate-800 chalk-text">💡 Understanding the Diagram</h2>
+                                              </div>
+                                              {currentSegment.description && (
+                                                <p className="text-xs sm:text-sm leading-relaxed text-slate-700 chalk-text mb-4" style={{ wordSpacing: '0.15em' }}>
+                                                  {currentSegment.description}
+                                                </p>
+                                              )}
+                                              {currentSegment.explanation && (
+                                                <p className="text-xs sm:text-sm leading-relaxed text-slate-700 chalk-text" style={{ wordSpacing: '0.15em' }}>
+                                                  {renderMixedText(currentSegment.explanation)}
+                                                </p>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
 
                               {/* Show subheading if this segment is a subheading */}
                               {currentSegment?.type === 'subheading' && (
@@ -2388,34 +2394,39 @@ useEffect(() => {
                                   </div>
 
                                   {/* Text content - don't show for diagram-only, example, or equation segments (they have their own display) */}
-                                  {currentSegment?.type !== 'diagram' && currentSegment?.type !== 'example' && currentSegment?.type !== 'equation' && currentSegment?.type !== 'dialogue' && (
+                                  {currentSegment?.type !== 'diagram' && currentSegment?.type !== 'example' && currentSegment?.type !== 'equation' && currentSegment?.type !== 'dialogue' && currentSegment?.type !== 'table' && (
                                     <p
-  className="text-base sm:text-lg md:text-xl leading-relaxed transition-all text-slate-800 font-medium"
-  style={{ fontFamily: 'Comic Sans MS, cursive', wordSpacing: '0.15em' }}
->
-                                      {isReading && currentWords.length > 0 ? (
-                                        currentWords.map((word, idx) => (
+                                      className="text-base sm:text-lg md:text-xl leading-relaxed transition-all text-slate-800 font-medium"
+                                      style={{ fontFamily: 'Comic Sans MS, cursive', wordSpacing: '0.15em' }}
+                                    >
+                                      {isReading && currentWords.length > 0 ? (() => {
+                                        // Only show the main-text portion of currentWords here.
+                                        // If mainTextWordCount > 0, slice to that; else show all.
+                                        const mainWords = mainTextWordCount > 0
+                                          ? currentWords.slice(0, mainTextWordCount)
+                                          : currentWords;
+                                        return mainWords.map((word, idx) => (
                                           <span
                                             key={idx}
                                             className="inline-block transition-colors duration-100"
                                             style={{
                                               marginRight: '0.3em',
                                               color: idx === highlightedWordIndex
-                                                ? '#2563eb'          // current word — bright blue
+                                                ? '#2563eb'
                                                 : idx < highlightedWordIndex
-                                                ? 'rgba(30,41,59,0.45)'  // already spoken — faded
-                                                : 'rgb(30,41,59)',    // upcoming — normal
+                                                  ? 'rgba(30,41,59,0.45)'
+                                                  : 'rgb(30,41,59)',
                                               fontWeight: idx === highlightedWordIndex ? '700' : 'inherit',
                                               textShadow: idx === highlightedWordIndex ? '0 0 12px rgba(37,99,235,0.35)' : 'none',
                                             }}
                                           >
                                             {word}
                                           </span>
-                                        ))
-                                      ) : (
+                                        ));
+                                      })() : (
                                         (currentSegment?.text || currentSegment?.reference || currentSegment?.title || '')
                                           .split('\n').map((line, i) => line.trim()
-                                            ? <span key={i} style={{display:'block'}}>{renderMixedText(line)}</span>
+                                            ? <span key={i} style={{ display: 'block' }}>{renderMixedText(line)}</span>
                                             : null)
                                       )}
                                     </p>
@@ -2685,7 +2696,7 @@ useEffect(() => {
                           </div>
                         )}
 
-                      
+
 
 
                         {/* ── TABLE ─────────────────────────────────────────── */}
@@ -2721,21 +2732,45 @@ useEffect(() => {
                                 )}
                                 {/* Rows */}
                                 <tbody>
-                                  {(currentSegment.rows || []).map((row, ri) => (
-                                    <tr
-                                      key={ri}
-                                      className={ri % 2 === 0 ? 'bg-white' : 'bg-blue-50'}
-                                    >
-                                      {(Array.isArray(row) ? row : [row]).map((cell, ci) => (
-                                        <td
-                                          key={ci}
-                                          className="px-4 py-3 text-slate-700 chalk-text border-t border-blue-100 border-r last:border-r-0 leading-relaxed"
-                                        >
-                                          {renderMixedText(String(cell))}
-                                        </td>
-                                      ))}
-                                    </tr>
-                                  ))}
+                                  {(currentSegment.rows || []).map((row, ri) => {
+                                    // Highlight the row currently being read by TTS.
+                                    // TTS reads each row as "word means meaning. explanation."
+                                    // We divide total words evenly across rows to find active row.
+                                    const totalRows = (currentSegment.rows || []).length;
+                                    const wordsPerRow = currentWords.length > 0 && totalRows > 0
+                                      ? Math.ceil(currentWords.length / totalRows)
+                                      : 0;
+                                    const activeRowIndex = isReading && wordsPerRow > 0
+                                      ? Math.min(Math.floor(highlightedWordIndex / wordsPerRow), totalRows - 1)
+                                      : -1;
+                                    const isActiveRow = activeRowIndex === ri;
+                                    return (
+                                      <tr
+                                        key={ri}
+                                        style={{
+                                          background: isActiveRow
+                                            ? 'linear-gradient(90deg, #dbeafe, #eff6ff)'
+                                            : ri % 2 === 0 ? '#ffffff' : '#eff6ff',
+                                          transition: 'background 0.3s ease',
+                                          boxShadow: isActiveRow ? 'inset 3px 0 0 #2563eb' : 'none',
+                                        }}
+                                      >
+                                        {(Array.isArray(row) ? row : [row]).map((cell, ci) => (
+                                          <td
+                                            key={ci}
+                                            className="px-4 py-3 chalk-text border-t border-blue-100 border-r last:border-r-0 leading-relaxed"
+                                            style={{
+                                              color: isActiveRow ? '#1e40af' : '#374151',
+                                              fontWeight: isActiveRow && ci === 0 ? '700' : 'inherit',
+                                              transition: 'color 0.3s ease',
+                                            }}
+                                          >
+                                            {renderMixedText(String(cell))}
+                                          </td>
+                                        ))}
+                                      </tr>
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>
@@ -2768,7 +2803,29 @@ useEffect(() => {
                               <h2 className="text-sm md:text-xl font-bold text-slate-800 chalk-text">💡 Simple Explanation</h2>
                             </div>
                             <p className="text-sm sm:text-base leading-relaxed text-slate-700 chalk-text" style={{ wordSpacing: '0.15em' }}>
-                              {renderMixedText(currentSegment.explanation)}
+                              {isReading && currentWords.length > 0 && mainTextWordCount > 0 ? (() => {
+                                // Show explanation words (everything after mainTextWordCount)
+                                const expWords = currentWords.slice(mainTextWordCount);
+                                const expHighlightIdx = highlightedWordIndex - mainTextWordCount;
+                                return expWords.map((word, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-block transition-colors duration-100"
+                                    style={{
+                                      marginRight: '0.3em',
+                                      color: idx === expHighlightIdx
+                                        ? '#b45309'               // current word — amber
+                                        : idx < expHighlightIdx
+                                          ? 'rgba(120,80,20,0.45)'  // already spoken — faded
+                                          : 'rgb(92,61,12)',         // upcoming — normal dark amber
+                                      fontWeight: idx === expHighlightIdx ? '700' : 'inherit',
+                                      textShadow: idx === expHighlightIdx ? '0 0 10px rgba(180,83,9,0.3)' : 'none',
+                                    }}
+                                  >
+                                    {word}
+                                  </span>
+                                ));
+                              })() : renderMixedText(currentSegment.explanation)}
                             </p>
                           </div>
                         )}
@@ -2836,23 +2893,23 @@ useEffect(() => {
                                             <span className={`${activeStepUnderline === index ? 'underline-animation' : ''}`}>
                                               {activeStepUnderline === index && isReading && currentWords.length > 0
                                                 ? currentWords.map((word, widx) => (
-                                                    <span
-                                                      key={widx}
-                                                      className="inline-block transition-colors duration-100"
-                                                      style={{
-                                                        marginRight: '0.25em',
-                                                        color: widx === highlightedWordIndex
-                                                          ? '#2563eb'
-                                                          : widx < highlightedWordIndex
+                                                  <span
+                                                    key={widx}
+                                                    className="inline-block transition-colors duration-100"
+                                                    style={{
+                                                      marginRight: '0.25em',
+                                                      color: widx === highlightedWordIndex
+                                                        ? '#2563eb'
+                                                        : widx < highlightedWordIndex
                                                           ? 'rgba(30,41,59,0.45)'
                                                           : 'rgb(30,41,59)',
-                                                        fontWeight: widx === highlightedWordIndex ? '800' : 'inherit',
-                                                        textShadow: widx === highlightedWordIndex ? '0 0 10px rgba(37,99,235,0.3)' : 'none',
-                                                      }}
-                                                    >
-                                                      {word}
-                                                    </span>
-                                                  ))
+                                                      fontWeight: widx === highlightedWordIndex ? '800' : 'inherit',
+                                                      textShadow: widx === highlightedWordIndex ? '0 0 10px rgba(37,99,235,0.3)' : 'none',
+                                                    }}
+                                                  >
+                                                    {word}
+                                                  </span>
+                                                ))
                                                 : step.step}
                                             </span>
                                           </p>
@@ -3219,7 +3276,7 @@ useEffect(() => {
         </div>
 
         {/* Fixed Bottom Navigation */}
-        
+
 
         {/* Floating buttons removed - controls are in whiteboard */}
 
@@ -3243,7 +3300,7 @@ useEffect(() => {
                   Select Page
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {chapterData?.sections?.length} pages available
+                  {chapterData?.sections?.[chapterData.sections.length - 1]?.page_range?.slice(-1)[0] ?? chapterData?.sections?.length} pages available
                 </p>
               </div>
               <button
@@ -3274,19 +3331,19 @@ useEffect(() => {
                   backdrop?.classList.add('hidden');
                 }}
                 className={`w-full text-left p-3 rounded-xl transition-all ${currentPageIndex === idx
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-[1.02]'
-                    : 'bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-[1.02]'
+                  : 'bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600'
                   }`}
               >
                 <div className="flex items-center gap-3">
                   <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${currentPageIndex === idx
-                      ? 'bg-white/20 text-white'
-                      : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
                     }`}>
-                    {idx + 1}
+                    {section.page_range?.[0] ?? idx + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm mb-0.5">Page {idx + 1}</div>
+                    <div className="font-semibold text-sm mb-0.5">Page {section.page_range?.[0] ?? idx + 1}</div>
                     {section.heading && (
                       <div className={`text-xs line-clamp-2 ${currentPageIndex === idx ? 'text-white/90' : 'text-gray-600 dark:text-gray-400'
                         }`}>
@@ -3356,11 +3413,10 @@ useEffect(() => {
                     goToNextSegment();
                   }
                 }}
-                className={`flex cursor-pointer items-center justify-center gap-1.5 px-4 md:px-6 py-2.5 md:py-3 text-white rounded-xl font-medium transition-all shadow-lg min-w-[80px] md:min-w-[100px] ${
-                  isLastSegment()
+                className={`flex cursor-pointer items-center justify-center gap-1.5 px-4 md:px-6 py-2.5 md:py-3 text-white rounded-xl font-medium transition-all shadow-lg min-w-[80px] md:min-w-[100px] ${isLastSegment()
                     ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
                     : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'
-                }`}
+                  }`}
               >
                 <span className="text-sm md:text-base">{isLastSegment() ? '🎉 Finish' : 'Next'}</span>
                 <ChevronRight className="h-5 w-5" />
@@ -3473,7 +3529,7 @@ useEffect(() => {
                   If you exit now, you'll leave the current learning session and return to the table of contents.
                 </p>
               </div>
-              
+
               <div className="space-y-3">
                 <button
                   onClick={handleReturnToFullscreen}

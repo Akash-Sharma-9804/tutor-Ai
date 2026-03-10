@@ -175,37 +175,86 @@ const Books = () => {
     setBackgroundJob(job);
   };
 
-  // On mount, re-attach the ticker if a job is already running
+  // Poll /books/:id/progress every 5s — simple, reliable, works everywhere
+  const startProgressPolling = (bookId, bookTitle) => {
+    if (window.__uploadJobPoller) clearInterval(window.__uploadJobPoller);
+
+    const poll = async () => {
+      try {
+        const res = await adminAxios.get(`/books/${bookId}/progress`);
+        const d = res.data?.data;
+        if (!d) return;
+
+        if (d.status === "done") {
+          clearInterval(window.__uploadJobPoller);
+          window.__uploadJobPoller = null;
+          updateJob({ status: "done", message: `✅ "${bookTitle}" is ready! ${d.message}`, progress: 100, chapterName: bookTitle });
+          fetchBooks();
+          setTimeout(() => updateJob(null), 8000);
+
+        } else if (d.status === "error") {
+          clearInterval(window.__uploadJobPoller);
+          window.__uploadJobPoller = null;
+          updateJob({ status: "error", message: `❌ Processing failed for "${bookTitle}"`, progress: 0, chapterName: bookTitle });
+          setTimeout(() => updateJob(null), 8000);
+
+        } else {
+          updateJob({
+            ...window.__uploadJob,
+            status: "processing",
+            progress: d.progress,
+            message: `⚙️ ${d.message}`,
+            chapters_done: d.chapters_done,
+            chapters_total: d.chapters_total,
+          });
+        }
+      } catch (_) {}
+    };
+
+    poll(); // fire immediately
+    window.__uploadJobPoller = setInterval(poll, 5000);
+
+    // Safety stop after 25 min
+    setTimeout(() => {
+      if (window.__uploadJobPoller) {
+        clearInterval(window.__uploadJobPoller);
+        window.__uploadJobPoller = null;
+        fetchBooks();
+        updateJob(null);
+      }
+    }, 1500000);
+  };
+
+  // On mount: restore job and restart polling if still processing
   useEffect(() => {
-    if (
-      window.__uploadJob &&
-      (window.__uploadJob.status === "uploading" ||
-        window.__uploadJob.status === "processing")
-    ) {
-      setBackgroundJob({ ...window.__uploadJob });
+    const job = window.__uploadJob;
+    if (!job) return;
+    setBackgroundJob({ ...job });
+    if (job.status === "processing" && job.bookId && !window.__uploadJobPoller) {
+      startProgressPolling(job.bookId, job.chapterName);
     }
   }, []);
 
-  // Smooth ticker: runs every second, advances based on elapsed real time
+  // Fake ticker only runs during "uploading" phase (FTP upload, before SSE takes over)
+  // Once SSE is active (bookId is set), ticker stops and SSE drives the progress
   useEffect(() => {
     if (
       !backgroundJob ||
-      backgroundJob.status === "done" ||
-      backgroundJob.status === "error"
+      backgroundJob.status !== "uploading" // only during initial upload, not processing
     )
       return;
 
     const ticker = setInterval(() => {
       const job = window.__uploadJob;
-      if (!job || job.status === "done" || job.status === "error") {
+      if (!job || job.status !== "uploading") {
         clearInterval(ticker);
         return;
       }
-      const elapsed = (Date.now() - job.startedAt) / 1000; // seconds
+      const elapsed = (Date.now() - (job.startedAt || Date.now())) / 1000;
       const totalSecs = job.estimatedSecs || 300;
-      // Ease-out curve: fast early, slows near 90%
-      const raw = 1 - Math.exp(-3 * (elapsed / totalSecs));
-      const progress = Math.min(Math.round(raw * 90), 90);
+      // Only go up to 20% during upload phase — SSE takes over from there
+      const raw = 1 - Math.exp(-2.5 * (elapsed / totalSecs));
+      const progress = Math.min(Math.round(raw * 20) + 2, 20);
       const updated = { ...job, progress };
       window.__uploadJob = updated;
       setBackgroundJob({ ...updated });
@@ -215,24 +264,23 @@ const Books = () => {
   }, [backgroundJob?.status]);
 
 const handleUploadBook = async (formData, files) => {
-    // Close modal immediately so admin can keep working
     setShowUploadModal(false);
     setEditingBook(null);
 
     const totalChapters = files.length || formData.chapters.filter(ch => !ch.existing || ch.file).length || 1;
-    // Estimate ~2 min per chapter for Gemini processing
-    const estimatedSecs = totalChapters * 120;
+    // ~90s per chapter upload + OCR + Gemini + FTP save
+    const estimatedSecs = totalChapters * 90;
 
-    const initialJob = {
+    updateJob({
       status: "uploading",
-      message: `📤 Uploading "${formData.title}" — ${totalChapters} chapter${totalChapters > 1 ? "s" : ""}`,
+      message: `📤 Uploading "${formData.title}"…`,
       progress: 2,
       chapterName: formData.title || "Book",
       totalChapters,
       startedAt: Date.now(),
       estimatedSecs,
-    };
-    updateJob(initialJob);
+      bookId: null,
+    });
 
     try {
       const uploadFormData = new FormData();
@@ -252,55 +300,49 @@ const handleUploadBook = async (formData, files) => {
         uploadFormData.append("bookId", formData.bookId);
         uploadFormData.append("isEditMode", "true");
       }
-      files.forEach((file) => {
-        uploadFormData.append("chapter_files", file);
-      });
+      files.forEach((file) => uploadFormData.append("chapter_files", file));
 
-      // After ~5s switch message to "processing"
-      const msgTimer = setTimeout(() => {
-        if (window.__uploadJob?.status === "uploading") {
-          updateJob({ ...window.__uploadJob, status: "processing",
-            message: `⚙️ AI is processing "${formData.title}" (${totalChapters} chapter${totalChapters > 1 ? "s" : ""})…` });
-        }
-      }, 5000);
-
+      // Backend responds after FTP upload is done (can take 2-3min for large PDFs)
       const response = await adminAxios.post("/books/upload", uploadFormData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 900000 // 15 minutes
+        timeout: 600000, // 10 min — FTP upload of large multi-chapter PDFs takes time
       });
 
-      clearTimeout(msgTimer);
+      const bookId = response.data?.data?.book_id || null;
+      const isEditMode = formData.isEditMode;
 
-      const successMessage = formData.isEditMode
-        ? `✅ Book updated! ${response.data.chapters_created || 0} chapters processed`
-        : `✅ "${formData.title}" uploaded! ${response.data.chapters_created} chapters · ${response.data.total_pages} pages`;
+      // Switch to polling phase
+      updateJob({
+        ...window.__uploadJob,
+        status: "processing",
+        message: `⚙️ AI processing "${formData.title}" (${totalChapters} chapter${totalChapters > 1 ? "s" : ""})…`,
+        bookId,
+      });
 
-      updateJob({ status: "done", message: successMessage, progress: 100, chapterName: formData.title });
       fetchBooks();
-      setTimeout(() => updateJob(null), 8000);
+
+      // If edit mode the backend is synchronous (awaits processing), so we're done
+      if (isEditMode) {
+        const chaptersCreated = response.data?.chapters_created || 0;
+        updateJob({ status: "done", message: `✅ "${formData.title}" updated! ${chaptersCreated} chapter${chaptersCreated !== 1 ? "s" : ""} processed`, progress: 100, chapterName: formData.title });
+        fetchBooks();
+        setTimeout(() => updateJob(null), 8000);
+        return;
+      }
+
+      if (bookId) {
+        startProgressPolling(bookId, formData.title);
+      }
 
     } catch (error) {
-      clearTimeout(msgTimer ?? undefined);
       const isTimeout = error.code === "ECONNABORTED" || error.message?.includes("timeout");
       if (isTimeout) {
-        // Backend is still running — keep the progress bar alive and poll
-        const stalledJob = {
+        // Even upload request timed out — backend is still running, keep progress bar
+        updateJob({
           ...(window.__uploadJob || {}),
           status: "processing",
           message: `⚙️ Still processing "${formData.title}" in background…`,
-          chapterName: formData.title,
-        };
-        updateJob(stalledJob);
-
-        const pollInterval = setInterval(async () => {
-          try { await fetchBooks(); } catch (_) {}
-        }, 30000);
-
-        setTimeout(() => {
-          clearInterval(pollInterval);
-          updateJob(null);
-          fetchBooks();
-        }, 600000);
+        });
       } else {
         const errorMsg = error.response?.data?.message || error.message || "Upload failed";
         updateJob({ status: "error", message: `❌ ${errorMsg}`, progress: 0, chapterName: formData.title });
@@ -464,7 +506,10 @@ const handleEditChaptersOnly = async () => {
           </div>
         </div>
         <button
-          onClick={() => updateJob(null)}
+          onClick={() => {
+            if (window.__uploadJobPoller) { clearInterval(window.__uploadJobPoller); window.__uploadJobPoller = null; }
+            updateJob(null);
+          }}
           className="ml-3 flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm"
         >✕</button>
       </div>
@@ -484,9 +529,13 @@ const handleEditChaptersOnly = async () => {
       {backgroundJob.status !== "error" && backgroundJob.status !== "done" && (
         <div className="flex justify-between mt-1">
           <span className="text-xs text-indigo-400">{backgroundJob.progress}% complete</span>
-          {backgroundJob.totalChapters && (
-            <span className="text-xs text-indigo-400">{backgroundJob.totalChapters} chapter{backgroundJob.totalChapters > 1 ? "s" : ""} · ~2 min each</span>
-          )}
+          <span className="text-xs text-indigo-400">
+            {backgroundJob.chapters_done != null
+              ? `${backgroundJob.chapters_done}/${backgroundJob.chapters_total} chapters done`
+              : backgroundJob.totalChapters
+              ? `${backgroundJob.totalChapters} chapter${backgroundJob.totalChapters > 1 ? "s" : ""} · ~90s each`
+              : ""}
+          </span>
         </div>
       )}
     </div>

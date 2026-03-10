@@ -1068,6 +1068,59 @@ exports.uploadBookPdf = async (req, res) => {
   }
 };
 
+// @desc    Simple polling endpoint — returns real chapter progress from DB
+// @route   GET /api/admin/books/:id/progress
+// @access  Private
+exports.getBookProgress = async (req, res) => {
+  try {
+    const bookId = req.params.id;
+
+    const [[book]] = await db.query(
+      `SELECT 
+         b.id, b.status, b.chapters_count,
+         (SELECT COUNT(*) FROM book_chapters 
+          WHERE book_id = b.id 
+          AND segments_json_path IS NOT NULL 
+          AND segments_json_path != '') AS chapters_done,
+         (SELECT COUNT(*) FROM book_chapters WHERE book_id = b.id) AS chapters_total
+       FROM books b WHERE b.id = ?`,
+      [bookId]
+    );
+
+    if (!book) {
+      return res.status(404).json({ success: false, message: "Book not found" });
+    }
+
+    const chaptersDone = parseInt(book.chapters_done) || 0;
+    const chaptersTotal = parseInt(book.chapters_total) || parseInt(book.chapters_count) || 1;
+    const isDone = book.status === "active" || chaptersDone >= chaptersTotal;
+    const isError = book.status === "error";
+
+    const progress = isDone ? 100
+      : isError ? 0
+      : Math.min(10 + Math.round((chaptersDone / chaptersTotal) * 85), 95);
+
+    res.json({
+      success: true,
+      data: {
+        status: isDone ? "done" : isError ? "error" : "processing",
+        progress,
+        chapters_done: chaptersDone,
+        chapters_total: chaptersTotal,
+        message: isDone
+          ? `All ${chaptersTotal} chapter${chaptersTotal !== 1 ? "s" : ""} processed`
+          : chaptersDone > 0
+          ? `Chapter ${chaptersDone}/${chaptersTotal} done — processing next…`
+          : `Processing chapter 1 of ${chaptersTotal}…`,
+      }
+    });
+
+  } catch (err) {
+    console.error("Progress check error:", err.message);
+    res.status(500).json({ success: false, message: "Failed to get progress" });
+  }
+};
+
 // @desc    Get book chapters
 // @route   GET /api/books/:id/chapters
 // @access  Private
