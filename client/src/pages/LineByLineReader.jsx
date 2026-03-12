@@ -732,8 +732,8 @@ const LineByLineReader = () => {
 
 
 
-  // Deepgram TTS function — streams audio directly so playback starts instantly
-  const speakWithDeepgram = async (text, stepInfo = null, isTeacherBoard = false) => {
+  // Deepgram TTS function — uses cached FTP audio if available, else streams
+  const speakWithDeepgram = async (text, stepInfo = null, isTeacherBoard = false, segmentIndex = null) => {
     try {
       setIsLoadingAudio(true);
       const token = localStorage.getItem("token");
@@ -753,14 +753,11 @@ const LineByLineReader = () => {
       }
 
       const streamUrl = `${import.meta.env.VITE_BACKEND_URL}/api/books/chapters/${chapterId}/tts`;
-      const audio = new Audio();
-      audioRef.current = audio;
       const mediaSource = new MediaSource();
-      const audioUrl = URL.createObjectURL(mediaSource);
-      audio.src = audioUrl;
+      const blobUrl = URL.createObjectURL(mediaSource);
 
       // Words for highlight — show immediately, don't clear on end
-      const words = text.split(/\s+/);
+      const words = text.split(/\s+/).filter(Boolean);
       if (isTeacherBoard) {
         setTeacherBoardWords(words);
       } else {
@@ -771,36 +768,87 @@ const LineByLineReader = () => {
       // We estimate total duration as words * 0.35s average speaking pace
       // and update highlight index based on actual currentTime
       const estimatedDuration = words.length * 0.38;
-      let lastHighlightIndex = -1;
-      let rafId = null;
 
-      // Use requestAnimationFrame for smooth 60fps word tracking
-      const trackWords = () => {
-        if (!audioRef.current || audioRef.current !== audio) return;
-        const duration = audio.duration && isFinite(audio.duration) ? audio.duration : estimatedDuration;
-        const progress = audio.currentTime / Math.max(duration, 0.1);
-        const wordIndex = Math.min(Math.floor(progress * words.length), words.length - 1);
-        if (wordIndex !== lastHighlightIndex && wordIndex >= 0) {
-          lastHighlightIndex = wordIndex;
-          if (isTeacherBoard) {
-            setTeacherBoardHighlightIndex(wordIndex);
-          } else {
-            setHighlightedWordIndex(wordIndex);
+      // ── Check if backend returns a cached URL or a stream ──────────────────
+      let probeResponse;
+      try {
+        probeResponse = await fetch(streamUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ text, segmentIndex }),
+          signal: abortController.signal,
+        });
+      } catch (e) {
+        if (e.name === "AbortError") return;
+        console.error("TTS fetch failed:", e);
+        setIsLoadingAudio(false);
+        setIsReading(false);
+        return;
+      }
+
+      const contentType = probeResponse.headers.get("content-type") || "";
+
+      // ── CACHED: backend returned JSON with audioUrl → play directly ────────
+      if (contentType.includes("application/json")) {
+        const { audioUrl: cachedUrl } = await probeResponse.json();
+        const cachedAudio = new Audio(cachedUrl);
+        audioRef.current = cachedAudio;
+
+        // word highlight via rAF — same logic as streaming path
+        let cachedRafId = null;
+        let cachedLastIdx = -1;
+        const trackCached = () => {
+          if (!audioRef.current || audioRef.current !== cachedAudio) return;
+          const dur = cachedAudio.duration && isFinite(cachedAudio.duration) ? cachedAudio.duration : estimatedDuration;
+          const prog = cachedAudio.currentTime / Math.max(dur, 0.1);
+          const idx = Math.min(Math.floor(prog * words.length), words.length - 1);
+          if (idx !== cachedLastIdx && idx >= 0) {
+            cachedLastIdx = idx;
+            if (isTeacherBoard) setTeacherBoardHighlightIndex(idx);
+            else setHighlightedWordIndex(idx);
           }
-        }
-        rafId = requestAnimationFrame(trackWords);
-      };
+          cachedRafId = requestAnimationFrame(trackCached);
+        };
+        cachedAudio.addEventListener('timeupdate', () => {
+          if (cachedRafId === null) cachedRafId = requestAnimationFrame(trackCached);
+        });
 
-      const handleTimeUpdate = () => {
-        // Start rAF loop on first timeupdate (audio has started)
-        if (rafId === null) {
-          rafId = requestAnimationFrame(trackWords);
-        }
-      };
-      audio.addEventListener('timeupdate', handleTimeUpdate);
+        cachedAudio.onended = () => {
+          if (cachedRafId) { cancelAnimationFrame(cachedRafId); cachedRafId = null; }
+          if (isTeacherBoard) setTeacherBoardHighlightIndex(words.length - 1);
+          else setHighlightedWordIndex(words.length - 1);
+          setActiveStepUnderline(-1);
+          if (currentSegment?.type !== 'equation' || !stepInfo) setIsReading(false);
+          if (autoPlayRef.current && currentSegment?.type !== 'equation') {
+            const PAUSE_SECONDS = 5;
+            let remaining = PAUSE_SECONDS;
+            setAutoPlayCountdown(remaining);
+            const tick = () => {
+              remaining -= 1;
+              setAutoPlayCountdown(remaining);
+              if (remaining <= 0) {
+                setAutoPlayCountdown(0);
+                if (autoPlayRef.current) goToNextSegment();
+              } else { autoPlayTimerRef.current = setTimeout(tick, 1000); }
+            };
+            autoPlayTimerRef.current = setTimeout(tick, 1000);
+          }
+        };
+        cachedAudio.onerror = () => { setIsReading(false); setAutoPlayMode(false); };
 
-      // Store rafId for cleanup
-      audio.rafId = rafId;
+        setIsLoadingAudio(false);
+        setIsReading(true);
+        cachedAudio.play().catch((e) => console.error("Cached audio play failed:", e));
+        return;
+      }
+
+      // ── STREAMING: pipe Deepgram stream through MediaSource (existing path) ─
+      const audio = new Audio();
+      audioRef.current = audio;
+      audio.src = blobUrl;
 
       mediaSource.addEventListener("sourceopen", async () => {
         let sourceBuffer;
@@ -812,24 +860,8 @@ const LineByLineReader = () => {
           return;
         }
 
-        let response;
-        try {
-          response = await fetch(streamUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ text }),
-            signal: abortController.signal,
-          });
-        } catch (e) {
-          if (e.name === "AbortError") return;
-          console.error("TTS fetch failed:", e);
-          setIsLoadingAudio(false);
-          setIsReading(false);
-          return;
-        }
+        // reuse the already-fetched streaming response
+        const response = probeResponse;
 
         setIsLoadingAudio(false);
         setIsReading(true);
@@ -917,43 +949,128 @@ const LineByLineReader = () => {
         });
       }
 
+      const attachAudioHandlers = (audioEl, wordList, estDuration, sInfo, isBoard, urlToRevoke) => {
+        let handlerRafId = null;
+        let lastIdx = -1;
+
+        const trackW = () => {
+          if (!audioRef.current || audioRef.current !== audioEl) return;
+          const dur = audioEl.duration && isFinite(audioEl.duration) ? audioEl.duration : estDuration;
+          const prog = audioEl.currentTime / Math.max(dur, 0.1);
+          const idx = Math.min(Math.floor(prog * wordList.length), wordList.length - 1);
+          if (idx !== lastIdx && idx >= 0) {
+            lastIdx = idx;
+            if (isBoard) setTeacherBoardHighlightIndex(idx);
+            else setHighlightedWordIndex(idx);
+          }
+          handlerRafId = requestAnimationFrame(trackW);
+        };
+
+        const onTimeUpdate = () => {
+          if (handlerRafId === null) handlerRafId = requestAnimationFrame(trackW);
+        };
+        audioEl.addEventListener('timeupdate', onTimeUpdate);
+
+        if (sInfo) {
+          audioEl.addEventListener('loadedmetadata', () => {
+            const { stepIndex, stepText, explanationText } = sInfo;
+            const stepTypingDuration = 3000;
+            const charDuration = stepTypingDuration / stepText.length;
+            let charIndex = 0;
+            const typingInterval = setInterval(() => {
+              if (charIndex <= stepText.length) {
+                setEquationStepChars(prev => ({ ...prev, [stepIndex]: charIndex }));
+                charIndex++;
+              } else {
+                clearInterval(typingInterval);
+                if (explanationText) startExplanationReveal(sInfo.stepIndex, explanationText, audioEl.duration - stepTypingDuration);
+              }
+            }, charDuration);
+            setActiveStepUnderline(stepIndex);
+            audioEl.typingInterval = typingInterval;
+          });
+        }
+
+        audioEl.onended = () => {
+          if (audioEl.highlightInterval) clearInterval(audioEl.highlightInterval);
+          if (audioEl.typingInterval) clearInterval(audioEl.typingInterval);
+          if (audioEl.explanationInterval) clearInterval(audioEl.explanationInterval);
+          audioEl.removeEventListener('timeupdate', onTimeUpdate);
+          if (handlerRafId) { cancelAnimationFrame(handlerRafId); handlerRafId = null; }
+          if (isBoard) setTeacherBoardHighlightIndex(wordList.length - 1);
+          else setHighlightedWordIndex(wordList.length - 1);
+          setActiveStepUnderline(-1);
+          if (currentSegment?.type !== 'equation' || !sInfo) setIsReading(false);
+          if (urlToRevoke) URL.revokeObjectURL(urlToRevoke);
+          if (autoPlayRef.current && currentSegment?.type !== 'equation') {
+            const PAUSE_SECONDS = 5;
+            let remaining = PAUSE_SECONDS;
+            setAutoPlayCountdown(remaining);
+            const tick = () => {
+              remaining -= 1;
+              setAutoPlayCountdown(remaining);
+              if (remaining <= 0) {
+                setAutoPlayCountdown(0);
+                if (autoPlayRef.current) { goToNextSegment(); }
+              } else { autoPlayTimerRef.current = setTimeout(tick, 1000); }
+            };
+            autoPlayTimerRef.current = setTimeout(tick, 1000);
+          }
+        };
+
+        audioEl.onerror = (e) => {
+          console.error('Audio playback error:', e);
+          setIsReading(false);
+          setAutoPlayMode(false);
+          setActiveStepUnderline(-1);
+        };
+      };
+
+      // ── Streaming path word highlight ────────────────────────────────────
+      let streamRafId = null;
+      let streamLastIdx = -1;
+      const trackStream = () => {
+        if (!audioRef.current || audioRef.current !== audio) return;
+        const dur = audio.duration && isFinite(audio.duration) ? audio.duration : estimatedDuration;
+        const prog = audio.currentTime / Math.max(dur, 0.1);
+        const idx = Math.min(Math.floor(prog * words.length), words.length - 1);
+        if (idx !== streamLastIdx && idx >= 0) {
+          streamLastIdx = idx;
+          if (isTeacherBoard) setTeacherBoardHighlightIndex(idx);
+          else setHighlightedWordIndex(idx);
+        }
+        streamRafId = requestAnimationFrame(trackStream);
+      };
+      audio.addEventListener('timeupdate', () => {
+        if (streamRafId === null) streamRafId = requestAnimationFrame(trackStream);
+      });
+
       audio.onended = () => {
         if (audio.highlightInterval) clearInterval(audio.highlightInterval);
         if (audio.typingInterval) clearInterval(audio.typingInterval);
         if (audio.explanationInterval) clearInterval(audio.explanationInterval);
-        audio.removeEventListener('timeupdate', handleTimeUpdate);
-        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        if (streamRafId) { cancelAnimationFrame(streamRafId); streamRafId = null; }
 
-        // Highlight all words at end to show full text, don't clear
-        if (isTeacherBoard) {
-          setTeacherBoardHighlightIndex(words.length - 1);
-        } else {
-          setHighlightedWordIndex(words.length - 1);
-        }
+        if (isTeacherBoard) setTeacherBoardHighlightIndex(words.length - 1);
+        else setHighlightedWordIndex(words.length - 1);
         setActiveStepUnderline(-1);
 
-        // Only mark as not reading if not equation mid-steps
         if (currentSegment?.type !== 'equation' || !stepInfo) {
           setIsReading(false);
         }
 
-        URL.revokeObjectURL(audioUrl);
+        URL.revokeObjectURL(blobUrl);
 
         if (autoPlayRef.current && currentSegment?.type !== 'equation') {
-          // Wait 2 seconds with a visible countdown, then go to next segment
           const PAUSE_SECONDS = 5;
           let remaining = PAUSE_SECONDS;
           setAutoPlayCountdown(remaining);
-
           const tick = () => {
             remaining -= 1;
             setAutoPlayCountdown(remaining);
             if (remaining <= 0) {
               setAutoPlayCountdown(0);
-              if (autoPlayRef.current) {
-                goToNextSegment();
-                // readAloud() will be triggered by the useEffect that watches segment change
-              }
+              if (autoPlayRef.current) goToNextSegment();
             } else {
               autoPlayTimerRef.current = setTimeout(tick, 1000);
             }
@@ -1531,10 +1648,13 @@ const LineByLineReader = () => {
         currentSegment?.type === 'diagram_reference'
       ) {
         const title = cleanForTTS(currentSegment.title || currentSegment.reference || 'this diagram');
-        textToRead = `Looking at ${title}. `;
-        if (currentSegment.description) textToRead += cleanForTTS(currentSegment.description);
-        if (showExplanation && currentSegment.explanation) {
-          textToRead += ` ${cleanForTTS(currentSegment.explanation)}`;
+        textToRead = `${title}. `;
+        if (currentSegment.explanation) {
+          const mainText = cleanForTTS(currentSegment.explanation);
+          if (showExplanation) {
+            setMainTextWordCount(title.split(/\s+/).filter(Boolean).length + 1);
+          }
+          textToRead += mainText;
         }
       }
       else {
@@ -1594,8 +1714,7 @@ const LineByLineReader = () => {
         setSpeakingIndex(currentSegmentIndex);
       }
 
-      // Use Deepgram TTS
-      await speakWithDeepgram(textToRead);
+      await speakWithDeepgram(textToRead, null, false, currentSegmentIndex);
 
       if (stepInterval) clearInterval(stepInterval);
       setSpeakingIndex(null);
@@ -2325,7 +2444,33 @@ const LineByLineReader = () => {
                                               )}
                                               {currentSegment.explanation && (
                                                 <p className="text-xs sm:text-sm leading-relaxed text-slate-700 chalk-text" style={{ wordSpacing: '0.15em' }}>
-                                                  {renderMixedText(currentSegment.explanation)}
+                                                  {isReading && currentWords.length > 0 ? (() => {
+                                                    // title words are mainTextWordCount, rest is explanation
+                                                    const expWords = mainTextWordCount > 0
+                                                      ? currentWords.slice(mainTextWordCount)
+                                                      : currentWords;
+                                                    const expHighlightIdx = mainTextWordCount > 0
+                                                      ? highlightedWordIndex - mainTextWordCount
+                                                      : highlightedWordIndex;
+                                                    return expWords.map((word, idx) => (
+                                                      <span
+                                                        key={idx}
+                                                        className="inline-block transition-colors duration-100"
+                                                        style={{
+                                                          marginRight: '0.3em',
+                                                          color: idx === expHighlightIdx
+                                                            ? '#7c3aed'
+                                                            : idx < expHighlightIdx
+                                                              ? 'rgba(30,41,59,0.45)'
+                                                              : 'rgb(30,41,59)',
+                                                          fontWeight: idx === expHighlightIdx ? '700' : 'inherit',
+                                                          textShadow: idx === expHighlightIdx ? '0 0 12px rgba(124,58,237,0.35)' : 'none',
+                                                        }}
+                                                      >
+                                                        {word}
+                                                      </span>
+                                                    ));
+                                                  })() : renderMixedText(currentSegment.explanation)}
                                                 </p>
                                               )}
                                             </div>
@@ -2394,9 +2539,9 @@ const LineByLineReader = () => {
                                   </div>
 
                                   {/* Text content - don't show for diagram-only, example, or equation segments (they have their own display) */}
-                                  {currentSegment?.type !== 'diagram' && currentSegment?.type !== 'example' && currentSegment?.type !== 'equation' && currentSegment?.type !== 'dialogue' && currentSegment?.type !== 'table' && (
+                                  {currentSegment?.type !== 'diagram' && currentSegment?.type !== 'diagram_concept' && currentSegment?.type !== 'diagram_reference' && currentSegment?.type !== 'example' && currentSegment?.type !== 'equation' && currentSegment?.type !== 'dialogue' && currentSegment?.type !== 'table' && (
                                     <p
-                                      className="text-base sm:text-lg md:text-xl leading-relaxed transition-all text-slate-800 font-medium"
+                                      className="text-base sm:text-lg md:text-xl leading-relaxed transition-all text-slate-800"
                                       style={{ fontFamily: 'Comic Sans MS, cursive', wordSpacing: '0.15em' }}
                                     >
                                       {isReading && currentWords.length > 0 ? (() => {

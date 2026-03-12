@@ -18,7 +18,7 @@ async function uploadFileToFTP(
 ) {
   const client = new ftp.Client();
   client.ftp.timeout = 60000; // 60 second timeout per operation
-
+remoteDir = path.posix.join("/public_html/quantumedu-tutor", remoteDir);
   try {
     console.log("🔗 Connecting to FTP...");
     await client.access({
@@ -43,13 +43,15 @@ async function uploadFileToFTP(
     console.log("📤 Streaming file to FTP:", remotePath);
     await client.uploadFrom(source, remotePath);
     console.log("✅ Sent to FTP:", remotePath);
-
-    return {
-      success: true,
-      fileName,
-      remotePath,
-      url: `${process.env.FTP_BASE_URL}${remoteDir}/${fileName}`,
-    };
+const publicPath = `${remoteDir}/${fileName}`.replace("/public_html", "");
+const encodedPath = encodeURI(publicPath);
+console.log("🌐 Public URL:", `${process.env.FTP_BASE_URL}${encodedPath}`);
+return {
+  success: true,
+  fileName,
+  remotePath: `${remoteDir}/${fileName}`,
+  url: `${process.env.FTP_BASE_URL}${encodedPath}`,
+};
   } catch (error) {
     console.error("❌ FTP Upload Error:", error.message);
     throw error;

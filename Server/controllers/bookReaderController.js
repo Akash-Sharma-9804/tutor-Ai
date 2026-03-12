@@ -1,7 +1,9 @@
 // bookReaderController.js
 const db = require("../models/db");
 const axios = require("axios");
-
+// ─── TTS helpers ────────────────────────────────────────────────────────────
+const crypto = require("crypto");
+const { uploadFileToFTP } = require("../services/uploadToFTP");
 /**
  * GET /api/books/subject/:subjectId
  * Get all books for a subject
@@ -342,73 +344,118 @@ const explanation = geminiResponse.data.candidates[0].content.parts[0].text;
  * POST /api/books/chapters/:chapterId/tts
  * Convert text to speech using Deepgram
  */
+ // already used elsewhere in your stack
+
+function hashText(text) {
+  return crypto.createHash("md5").update(text).digest("hex").slice(0, 12);
+}
+
+// Build deterministic FTP path: mirrors your existing chapter folder structure
+// e.g.  quantumedu-tutor/books/.../ch01/tts/seg_42_a3f9c1d2b8e6.mp3
+async function getFtpTtsPath(chapterId, segmentIndex, hash) {
+  const [[chapter]] = await db.query(
+    `SELECT content_json_path FROM book_chapters WHERE id = ?`,
+    [chapterId]
+  );
+  // content_json_path is e.g.:
+  //   https://quantumedu.in/quantumedu-tutor/books/School/Class 12/Biology/ch01/content.json
+  // We extract everything between /quantumedu-tutor/ and /content.json to get the chapter folder
+  const url = chapter.content_json_path || "";
+  const match = url.match(/\/quantumedu-tutor\/(.+)\/[^/]+\.json/);
+  if (!match) throw new Error(`Cannot parse chapter folder from content_json_path: ${url}`);
+  // Decode so FTP gets real folder names (e.g. "harmony Public School"), not "%20" literals
+  const chapterFolder = decodeURIComponent(match[1]);
+  const remoteDir = `${chapterFolder}/tts`;
+  const fileName = `seg_${segmentIndex}_${hash}.mp3`;
+  return { remoteDir, fileName };
+}
+
+function buildFtpPublicUrl(remoteDir, fileName) {
+  // remoteDir is now decoded — re-encode only for the public HTTP URL
+  const encoded = encodeURI(`/quantumedu-tutor/${remoteDir}/${fileName}`);
+  return `${process.env.FTP_BASE_URL}${encoded}`;
+}
+async function uploadBufferToFtp(buffer, remoteDir, fileName) {
+  // Uses your existing uploadFileToFTP utility (basic-ftp based)
+  return uploadFileToFTP(buffer, fileName, remoteDir, false);
+}
+
+function cleanTextForTts(text) {
+  let cleanText = text
+    .replace(/\$\$[\s\S]*?\$\$/g, 'equation')
+    .replace(/\$([^$\n]+)\$/g, (_, inner) => inner
+      .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1 over $2')
+      .replace(/\\sqrt\{([^}]+)\}/g, 'square root of $1')
+      .replace(/\\sqrt/g, 'square root')
+      .replace(/\\theta/g, 'theta').replace(/\\alpha/g, 'alpha')
+      .replace(/\\beta/g, 'beta').replace(/\\gamma/g, 'gamma')
+      .replace(/\\pi/g, 'pi').replace(/\\sin/g, 'sine')
+      .replace(/\\cos/g, 'cosine').replace(/\\tan/g, 'tangent')
+      .replace(/\\circ/g, ' degrees').replace(/\\times/g, ' times ')
+      .replace(/\\div/g, ' divided by ').replace(/\\pm/g, ' plus or minus ')
+      .replace(/\\^2/g, ' squared').replace(/\\^3/g, ' cubed')
+      .replace(/\\^\{([^}]+)\}/g, ' to the power of $1')
+      .replace(/\\^(\w)/g, ' to the power of $1')
+      .replace(/\{|\}/g, '').replace(/\\/g, ' ')
+      .replace(/\s{2,}/g, ' ').trim()
+    )
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/^\* /gm, '')
+    .replace(/^- /gm, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/[✓✗⚠️💡👁🎭🔍📖💬📐💭📝✅]/g, '')
+    .replace(/→/g, ' equals ').replace(/≈/g, ' approximately ')
+    .replace(/≠/g, ' not equal to ').replace(/°/g, ' degrees ')
+    .replace(/\n+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  const MAX_TTS_CHARS = 1800;
+  if (cleanText.length > MAX_TTS_CHARS) {
+    const truncated = cleanText.substring(0, MAX_TTS_CHARS);
+    const lastSentenceEnd = Math.max(
+      truncated.lastIndexOf('. '),
+      truncated.lastIndexOf('? '),
+      truncated.lastIndexOf('! ')
+    );
+    cleanText = lastSentenceEnd > 0
+      ? truncated.substring(0, lastSentenceEnd + 1)
+      : truncated;
+  }
+  return cleanText;
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 exports.textToSpeech = async (req, res) => {
   try {
-    const { text } = req.body;
-    
+    const { text, segmentIndex } = req.body;
+    const { chapterId } = req.params;
+
     if (!text) {
       return res.status(400).json({ message: "Text is required" });
     }
 
-    // Clean text for TTS — strips LaTeX, markdown, emojis, HTML, symbols
-    let cleanText = text
-      // LaTeX display math $$...$$
-      .replace(/\$\$[\s\S]*?\$\$/g, 'equation')
-      // LaTeX inline math $...$ → spoken words
-      .replace(/\$([^$\n]+)\$/g, (_, inner) => inner
-        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1 over $2')
-        .replace(/\\sqrt\{([^}]+)\}/g, 'square root of $1')
-        .replace(/\\sqrt/g, 'square root')
-        .replace(/\\theta/g, 'theta').replace(/\\alpha/g, 'alpha')
-        .replace(/\\beta/g, 'beta').replace(/\\gamma/g, 'gamma')
-        .replace(/\\pi/g, 'pi').replace(/\\sin/g, 'sine')
-        .replace(/\\cos/g, 'cosine').replace(/\\tan/g, 'tangent')
-        .replace(/\\circ/g, ' degrees').replace(/\\times/g, ' times ')
-        .replace(/\\div/g, ' divided by ').replace(/\\pm/g, ' plus or minus ')
-        .replace(/\^2/g, ' squared').replace(/\^3/g, ' cubed')
-        .replace(/\^\{([^}]+)\}/g, ' to the power of $1')
-        .replace(/\^(\w)/g, ' to the power of $1')
-        .replace(/\{|\}/g, '').replace(/\\/g, ' ')
-        .replace(/\s{2,}/g, ' ').trim()
-      )
-      // Markdown
-      .replace(/\*\*([^*]+)\*\*/g, '$1')
-      .replace(/\*([^*]+)\*/g, '$1')
-      .replace(/#{1,6}\s/g, '')
-      .replace(/^\* /gm, '')
-      .replace(/^- /gm, '')
-      // HTML
-      .replace(/<[^>]+>/g, '')
-      // Emojis & symbols
-      .replace(/[✓✗⚠️💡👁🎭🔍📖💬📐💭📝✅]/g, '')
-      .replace(/→/g, ' equals ').replace(/≈/g, ' approximately ')
-      .replace(/≠/g, ' not equal to ').replace(/°/g, ' degrees ')
-      .replace(/\n+/g, ' ')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
+    const cleanText = cleanTextForTts(text);
+    const hash = hashText(cleanText);
 
-    // Deepgram has a ~2000 char limit — truncate at last sentence boundary
-    const MAX_TTS_CHARS = 1800;
-    if (cleanText.length > MAX_TTS_CHARS) {
-      const truncated = cleanText.substring(0, MAX_TTS_CHARS);
-      const lastSentenceEnd = Math.max(
-        truncated.lastIndexOf('. '),
-        truncated.lastIndexOf('? '),
-        truncated.lastIndexOf('! ')
+    // ── 1. Cache hit: return FTP URL immediately, frontend plays directly ──
+    if (segmentIndex !== undefined && segmentIndex !== null) {
+      const [[cached]] = await db.query(
+        `SELECT ftp_url FROM tts_cache WHERE chapter_id = ? AND segment_index = ? AND content_hash = ?`,
+        [chapterId, segmentIndex, hash]
       );
-      cleanText = lastSentenceEnd > 0
-        ? truncated.substring(0, lastSentenceEnd + 1)
-        : truncated;
+      if (cached) {
+        return res.json({ audioUrl: cached.ftp_url, cached: true });
+      }
     }
-    
-      
-    // ✅ Validate API key BEFORE calling Deepgram
-if (!process.env.DEEPGRAM_API_KEY) {
-  console.error("❌ DEEPGRAM_API_KEY is missing in environment variables");
-  return res.status(500).json({ message: "TTS service not configured" });
-}
 
-// Stream directly from Deepgram to client — no waiting for full buffer
+    // ── 2. Cache miss: stream Deepgram → client AND save to FTP in background ──
+    if (!process.env.DEEPGRAM_API_KEY) {
+      return res.status(500).json({ message: "TTS service not configured" });
+    }
+
     const dgResponse = await axios.post(
       "https://api.deepgram.com/v1/speak",
       { text: cleanText },
@@ -417,25 +464,56 @@ if (!process.env.DEEPGRAM_API_KEY) {
         headers: {
           Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
           Accept: "audio/mpeg",
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        responseType: "stream"
+        responseType: "stream",
       }
     );
 
+    // Stream to client immediately (same as before — zero latency change)
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Transfer-Encoding", "chunked");
     res.setHeader("Cache-Control", "no-cache");
-    dgResponse.data.pipe(res);
+
+    // Tee the stream: one copy to client, collect chunks for FTP upload
+    const chunks = [];
+    dgResponse.data.on("data", (chunk) => {
+      chunks.push(chunk);
+      if (!res.writableEnded) res.write(chunk);
+    });
+
+    dgResponse.data.on("end", () => {
+      if (!res.writableEnded) res.end();
+
+      // ── Background FTP upload + DB insert (non-blocking) ──
+      if (segmentIndex !== undefined && segmentIndex !== null) {
+        const buffer = Buffer.concat(chunks);
+        (async () => {
+       try {
+            const { remoteDir, fileName } = await getFtpTtsPath(chapterId, segmentIndex, hash);
+            await uploadBufferToFtp(buffer, remoteDir, fileName);
+            const publicUrl = buildFtpPublicUrl(remoteDir, fileName);
+            await db.query(
+              `INSERT IGNORE INTO tts_cache (chapter_id, segment_index, content_hash, ftp_url)
+               VALUES (?, ?, ?, ?)`,
+              [chapterId, segmentIndex, hash, publicUrl]
+            );
+            console.log(`[TTS cache] saved seg ${segmentIndex} ch ${chapterId}`);
+          } catch (e) {
+            console.error("[TTS cache] background save failed:", e.message);
+          }
+        })();
+      }
+    });
 
     dgResponse.data.on("error", (err) => {
       console.error("Deepgram stream error:", err);
-      res.end();
+      if (!res.writableEnded) res.end();
     });
-    
+
   } catch (err) {
     console.error("TTS failed:", err);
-    res.status(500).json({ message: "Text-to-speech conversion failed" });
+    if (!res.headersSent) res.status(500).json({ message: "Text-to-speech conversion failed" });
   }
 };
 
