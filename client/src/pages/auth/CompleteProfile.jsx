@@ -208,7 +208,11 @@ function LeftPanel({ step }) {
           background:"linear-gradient(135deg,#0d9488,#0f766e)",
           display:"flex", alignItems:"center", justifyContent:"center",
           boxShadow:"0 3px 12px rgba(13,148,136,0.4)" }}>
-          <Brain style={{ width:19, height:19, color:"#fff" }} />
+          <img
+    src="/logo3.png"
+    alt="QuantumEdu Logo"
+    className="w-12 h-12 object-contain"
+  />
         </div>
         <span className="cp-head" style={{ color:"#ffffff", fontWeight:700, fontSize:"1.05rem" }}>
           QuantumEdu
@@ -706,7 +710,11 @@ export default function CompleteProfile() {
             <div style={{ width:32, height:32, borderRadius:8,
               background:"linear-gradient(135deg,#0d9488,#0f766e)",
               display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <Brain style={{ width:16, height:16, color:"#fff" }} />
+              <img
+    src="/logo3.png"
+    alt="QuantumEdu Logo"
+    className="w-9 h-9 object-contain"
+  />
             </div>
             <span className="cp-head" style={{ fontWeight:700, color:"#0f172a", fontSize:"1rem" }}>
               QuantumEdu

@@ -210,8 +210,12 @@ const AdminLogin = () => {
             transition={{ duration: 0.8 }}
             className="flex items-center gap-3"
           >
-            <div className="p-3 rounded-2xl bg-white/20 backdrop-blur-sm">
-              <Shield className="h-8 w-8" />
+            <div className="  rounded-2xl bg-white/20 backdrop-blur-sm">
+              <img
+    src="/logo3.png"
+    alt="QuantumEdu Logo"
+    className="w-12 h-12 object-contain"
+  />
             </div>
             <div>
               <h1 className="text-2xl font-bold">Admin<span className="text-cyan-300">Pro</span></h1>

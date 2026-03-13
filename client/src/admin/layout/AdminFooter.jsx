@@ -136,8 +136,12 @@ const AdminFooter = () => {
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="relative">
-                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 shadow-lg">
-                    <Shield className="h-6 w-6 text-white" />
+                  <div className="  rounded-xl   shadow-lg">
+                    <img
+    src="/logo3.png"
+    alt="QuantumEdu Logo"
+    className="w-14 h-14 object-contain"
+  />
                   </div>
                   <motion.div
                     className="absolute -inset-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-0 group-hover:opacity-30 dark:group-hover:opacity-50"

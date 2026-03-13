@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { GoogleLogin } from '@react-oauth/google';
- 
+
 import {
   GraduationCap,
   User,
@@ -30,7 +30,7 @@ import axios from "axios";
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
 export default function Signup() {
- 
+
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -42,6 +42,7 @@ export default function Signup() {
   });
 
   const [showPassword, setShowPassword] = useState(false);
+
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [schools, setSchools] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -162,20 +163,26 @@ export default function Signup() {
     }
   }, [selectedClassId]);
 
-// Generate strong password
-const generateStrongPassword = () => {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
-  let password = "";
-  for (let i = 0; i < 12; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-
-  setForm((prev) => ({
-    ...prev,
-    password: password,
-  }));
-};
+  // Auto-fill strong password on focus (only if field is empty)
+  const generateStrongPassword = () => {
+    if (form.password) return;
+    const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const lower = "abcdefghijklmnopqrstuvwxyz";
+    const digits = "0123456789";
+    const symbols = "!@#$%^&*()_+";
+    const all = upper + lower + digits + symbols;
+    let password = [
+      upper[Math.floor(Math.random() * upper.length)],
+      lower[Math.floor(Math.random() * lower.length)],
+      digits[Math.floor(Math.random() * digits.length)],
+      symbols[Math.floor(Math.random() * symbols.length)],
+    ];
+    for (let i = 4; i < 14; i++) {
+      password.push(all[Math.floor(Math.random() * all.length)]);
+    }
+    password = password.sort(() => Math.random() - 0.5).join("");
+    setForm((prev) => ({ ...prev, password }));
+  };
 
   const calculatePasswordStrength = (password) => {
     let strength = 0;
@@ -200,7 +207,7 @@ const generateStrongPassword = () => {
     return "Strong";
   };
 
-  
+
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -320,8 +327,12 @@ const generateStrongPassword = () => {
         <div className="relative z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 animate-slide-in-left">
-              <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm border border-white/30 hover:scale-110 transition-transform">
-                <GraduationCap className="w-6 h-6 text-white animate-spin-slow" />
+              <div className="  bg-white/20 rounded-xl backdrop-blur-sm border border-white/30 hover:scale-110 transition-transform">
+                <img
+                  src="/logo3.png"
+                  alt="QuantumEdu Logo"
+                  className="w-12 h-12 object-contain"
+                />
               </div>
               <h1 className="text-xl font-bold text-white">QuantumEdu</h1>
             </div>
@@ -388,9 +399,13 @@ const generateStrongPassword = () => {
           <div className="relative z-10 p-12 flex flex-col justify-between h-full">
             {/* Logo */}
             <div>
-              <div className="flex items-center gap-3 mb-16 animate-fade-in-up">
-                <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm border border-white/30 hover:scale-110 transition-transform duration-300">
-                  <GraduationCap className="w-8 h-8 text-white animate-wiggle" />
+              <Link to ="/home" className="flex items-center gap-3 mb-16 animate-fade-in-up">
+                <div className="  bg-white/20 rounded-2xl backdrop-blur-sm border border-white/30 hover:scale-110 transition-transform duration-300">
+                  <img
+                    src="/logo3.png"
+                    alt="QuantumEdu Logo"
+                    className="w-12 h-12 object-contain"
+                  />
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold text-white animate-gradient-x">
@@ -400,7 +415,7 @@ const generateStrongPassword = () => {
                     Intelligent Learning Platform
                   </p>
                 </div>
-              </div>
+              </Link >
 
               {/* Main Content */}
               <div className="max-w-lg">
@@ -420,11 +435,10 @@ const generateStrongPassword = () => {
                   {features.map((feature, index) => (
                     <div
                       key={index}
-                      className={`feature-card bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20 hover:bg-white/15 transition-all duration-300 cursor-pointer animate-stagger-children ${
-                        currentFeature === index
+                      className={`feature-card bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20 hover:bg-white/15 transition-all duration-300 cursor-pointer animate-stagger-children ${currentFeature === index
                           ? "ring-2 ring-white/50 scale-105"
                           : "hover:scale-[1.02]"
-                      } ${feature.bgColor}`}
+                        } ${feature.bgColor}`}
                       onMouseEnter={() => setCurrentFeature(index)}
                       onClick={() => handleFeatureClick(index)}
                     >
@@ -641,11 +655,10 @@ const generateStrongPassword = () => {
                         setForm({ ...form, className: selectedCls ? selectedCls.class_name : "" });
                       }}
                       disabled={!form.schoolName}
-                      className={`w-full px-3 py-2.5 border-2 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none text-sm appearance-none transition-all duration-300 ${
-                        !form.schoolName
+                      className={`w-full px-3 py-2.5 border-2 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none text-sm appearance-none transition-all duration-300 ${!form.schoolName
                           ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
                           : "bg-white border-gray-200 hover:border-indigo-300"
-                      }`}
+                        }`}
                       required
                     >
                       <option value="">
@@ -678,15 +691,13 @@ const generateStrongPassword = () => {
                             key={subject.id}
                             type="button"
                             onClick={() => toggleSubject(subject.id)}
-                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200 ${
-                              isSelected
+                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200 ${isSelected
                                 ? "border-indigo-500 bg-indigo-50 text-indigo-700"
                                 : "border-gray-200 bg-white text-gray-600 hover:border-indigo-300"
-                            }`}
+                              }`}
                           >
-                            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                              isSelected ? "border-indigo-500 bg-indigo-500" : "border-gray-300"
-                            }`}>
+                            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? "border-indigo-500 bg-indigo-500" : "border-gray-300"
+                              }`}>
                               {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
                             </div>
                             <span className="text-xs font-medium">{subject.name}</span>
@@ -740,10 +751,9 @@ const generateStrongPassword = () => {
                     <input
                       type={showPassword ? "text" : "password"}
                       value={form.password}
-                      onChange={(e) =>
-                        setForm({ ...form, password: e.target.value })
-                      }
-                      placeholder="Create a strong password or generate one"
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      onFocus={generateStrongPassword}
+                      placeholder="Click to get a strong password suggestion"
                       className="w-full pl-10 pr-12 py-2.5 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none text-sm placeholder:text-xs transition-all duration-300 hover:border-indigo-300"
                       required
                     />
@@ -758,28 +768,11 @@ const generateStrongPassword = () => {
                         <Eye className="h-4 w-4 text-gray-500 hover:text-indigo-600 transition-colors" />
                       )}
                     </button>
+                  </div>
 
 
 
-</div>
-
-<div className="flex items-center justify-between mt-2">
-
-<button
-  type="button"
-  onClick={generateStrongPassword}
-  className="flex items-center gap-1 text-xs bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-3 py-1.5 rounded-lg shadow hover:scale-105 hover:shadow-md transition"
->
-  ⚡ Generate Strong Password
-</button>
-
-<span className="text-[10px] text-gray-400">
-  Tip: Use letters, numbers & symbols
-</span>
-
-</div>
-
-<div className="mt-2">
+                  <div className="mt-2">
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className={`h-full transition-all duration-500 ${getPasswordStrengthColor(
@@ -837,13 +830,11 @@ const generateStrongPassword = () => {
                 disabled={isLoading}
                 onMouseEnter={() => handleHover("signupButton", true)}
                 onMouseLeave={() => handleHover("signupButton", false)}
-                className={`w-full cursor-pointer disabled:cursor-not-allowed bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white py-3.5 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform transition-all duration-300 ${
-                  hoverStates.signupButton ? "-translate-y-1 scale-[1.02]" : ""
-                } ${
-                  isLoading
+                className={`w-full cursor-pointer disabled:cursor-not-allowed bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white py-3.5 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform transition-all duration-300 ${hoverStates.signupButton ? "-translate-y-1 scale-[1.02]" : ""
+                  } ${isLoading
                     ? "opacity-75 cursor-not-allowed"
                     : "hover:-translate-y-1"
-                }`}
+                  }`}
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -860,7 +851,7 @@ const generateStrongPassword = () => {
               </button>
             </form>
 
-             
+
 
             {/* Google Signup */}
             <div className="my-4 flex justify-center animate-fade-in delay-850">

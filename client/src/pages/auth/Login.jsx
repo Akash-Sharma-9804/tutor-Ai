@@ -5,7 +5,7 @@ import axios from "axios";
 import { loginSuccess } from "../../store/authSlice";
 import { useDispatch } from "react-redux";
 import { GoogleLogin } from '@react-oauth/google';
- 
+
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -159,7 +159,7 @@ export default function Login() {
             </div>
           );
         })}
-        
+
         {/* Animated gradient orbs */}
         <div className="absolute top-1/4 -left-20 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
         <div className="absolute bottom-1/4 -right-20 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse delay-1000"></div>
@@ -169,14 +169,18 @@ export default function Login() {
       {/* Left side - Brand/Info */}
       <div className="md:w-1/2 flex flex-col justify-center p-6 md:p-8 lg:p-12 xl:p-20 relative z-10">
         <div className="max-w-md mx-auto md:ml-auto animate-fade-in-up">
-          <div className="flex items-center gap-3 mb-8 animate-bounce-in">
-            <div className="p-3 bg-indigo-100 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110">
-              <Sparkles className="w-8 h-8 text-indigo-600 animate-pulse" />
+          <Link to ="/home" className="flex items-center gap-3 mb-8 animate-bounce-in">
+            <div className="  bg-indigo-100 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110">
+              <img
+                src="/logo3.png"
+                alt="QuantumEdu Logo"
+                className="w-12 h-12 object-contain"
+              />
             </div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent animate-gradient-x">
               QuantumEdu
             </h1>
-          </div>
+          </Link>
 
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 animate-slide-in-left">
             Welcome Back, <span className="text-indigo-600 animate-color-change">Young Learner!</span>
@@ -220,7 +224,11 @@ export default function Login() {
 
           <div className="text-center mb-8">
             <div className="inline-block p-3 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl mb-4 animate-pulse-slow">
-              <Lock className="w-8 h-8 text-indigo-600" />
+              <img
+                src="/logo3.png"
+                alt="QuantumEdu Logo"
+                className="w-12 h-12 object-contain"
+              />
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
               Student Login
@@ -257,7 +265,7 @@ export default function Login() {
                   <Lock className="w-4 h-4 animate-bounce-slow delay-100" />
                   Password
                 </label>
-               <button
+                <button
                   type="button"
                   onClick={() => { setForgotMode("email"); setForgotMsg(""); }}
                   className="text-sm text-indigo-600 hover:text-indigo-800 hover:underline transition-colors"
@@ -296,9 +304,8 @@ export default function Login() {
               disabled={isLoading}
               onMouseEnter={() => handleHover('loginButton', true)}
               onMouseLeave={() => handleHover('loginButton', false)}
-              className={`w-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white py-3.5 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform transition-all duration-300 ${
-                hoverStates.loginButton ? '-translate-y-1 scale-[1.02]' : ''
-              } ${isLoading ? 'opacity-75 cursor-not-allowed' : 'hover:-translate-y-1'}`}
+              className={`w-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white py-3.5 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform transition-all duration-300 ${hoverStates.loginButton ? '-translate-y-1 scale-[1.02]' : ''
+                } ${isLoading ? 'opacity-75 cursor-not-allowed' : 'hover:-translate-y-1'}`}
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -358,7 +365,7 @@ export default function Login() {
             </div>
           </form>
 
-            {/* Forgot Password Modal */}
+          {/* Forgot Password Modal */}
           {forgotMode && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md animate-bounce-in">

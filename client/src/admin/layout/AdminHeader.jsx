@@ -94,8 +94,12 @@ const AdminHeader = () => {
 
               {/* Logo */}
               <div className="flex items-center gap-3">
-                <div className="hidden sm:block p-2 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600">
-                  <Shield className="h-6 w-6 text-white" />
+                <div className="hidden sm:block   rounded-xl  ">
+                  <img
+    src="/logo3.png"
+    alt="QuantumEdu Logo"
+    className="w-12 h-12 object-contain"
+  />
                 </div>
                 <div className="hidden lg:block">
                   <h1 className="text-lg font-bold text-gray-900 dark:text-white">

@@ -203,7 +203,11 @@ const features = [
             >
               <div className="relative">
                 <div className="relative">
-                  <div className="text-5xl filter drop-shadow-2xl">⚛️</div>
+                  <img
+    src="/logo3.png"
+    alt="QuantumEdu Logo"
+    className="w-14 h-14 object-contain"
+  />
                 </div>
                 <motion.div
                   className="absolute -inset-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-0 group-hover:opacity-30 dark:group-hover:opacity-50"
@@ -231,7 +235,7 @@ const features = [
               </div>
             </motion.div>
             
-          <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
+          <p className="text-black dark:text-gray-100 mb-8 leading-relaxed">
   QuantumEdu is an AI-driven eLearning platform designed to deliver personalized
   courses, real-time insights, and career-focused learning to help you grow faster.
 </p>

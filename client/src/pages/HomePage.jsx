@@ -141,9 +141,9 @@ function TypingWord() {
   useEffect(() => {
     const w = WORDS[idx];
     let t;
-    if (!del && text.length < w.length)      t = setTimeout(() => setText(w.slice(0, text.length + 1)), 85);
+    if (!del && text.length < w.length) t = setTimeout(() => setText(w.slice(0, text.length + 1)), 85);
     else if (!del && text.length === w.length) t = setTimeout(() => setDel(true), 2000);
-    else if (del && text.length > 0)           t = setTimeout(() => setText(text.slice(0, -1)), 45);
+    else if (del && text.length > 0) t = setTimeout(() => setText(text.slice(0, -1)), 45);
     else { setDel(false); setIdx(i => (i + 1) % WORDS.length); }
     return () => clearTimeout(t);
   }, [text, del, idx]);
@@ -216,10 +216,10 @@ const FEATURES = [
 
 const SUBJECTS = [
   { e: "➗", n: "Mathematics" }, { e: "⚛️", n: "Physics" },
-  { e: "🧪", n: "Chemistry" },  { e: "🧬", n: "Biology" },
-  { e: "🌍", n: "Geography" },  { e: "📜", n: "History" },
+  { e: "🧪", n: "Chemistry" }, { e: "🧬", n: "Biology" },
+  { e: "🌍", n: "Geography" }, { e: "📜", n: "History" },
   { e: "💻", n: "Computer Sci" }, { e: "📗", n: "English" },
-  { e: "🏛️", n: "Civics" },    { e: "📊", n: "Economics" },
+  { e: "🏛️", n: "Civics" }, { e: "📊", n: "Economics" },
   { e: "🌱", n: "Env. Science" }, { e: "🎨", n: "Arts" },
 ];
 
@@ -237,15 +237,15 @@ const TESTIMONIALS = [
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const [menuOpen, setMenuOpen]       = useState(false);
-  const [scrolled, setScrolled]       = useState(false);
-  const [statsVis, setStatsVis]       = useState(false);
-  const [activeF, setActiveF]         = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [statsVis, setStatsVis] = useState(false);
+  const [activeF, setActiveF] = useState(0);
   const statsRef = useRef(null);
-  const heroRef  = useRef(null);
+  const heroRef = useRef(null);
 
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const heroY   = useTransform(scrollYProgress, [0, 1], ["0%", "25%"]);
+  const heroY = useTransform(scrollYProgress, [0, 1], ["0%", "25%"]);
   const heroOpa = useTransform(scrollYProgress, [0, 0.85], [1, 0]);
 
   useEffect(() => {
@@ -276,17 +276,24 @@ export default function HomePage() {
 
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center btn-glow-blue">
-              <Brain className="w-5 h-5 text-white" />
+            <div className="flex items-center justify-center">
+              <img
+                src="/logo3.png"
+                alt="QuantumEdu Logo"
+                className="w-12 h-12 object-contain"
+              />
             </div>
-            <span className="font-outfit text-lg font-700 tracking-tight group-hover:text-blue-300 transition-colors">
+            <div className="flex-col">
+            <span className="font-outfit text-2xl font-700 tracking-tight group-hover:text-blue-300 transition-colors">
               QuantumEdu
             </span>
+            <p className="text-[9px]">Your personal Educator</p>
+            </div>
           </Link>
 
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-7">
-            {[["Features","#features"],["Subjects","#subjects"],["How it Works","#how"],["About","#about"]].map(([l,h]) => (
+            {[["Features", "#features"], ["Subjects", "#subjects"], ["How it Works", "#how"], ["About", "#about"]].map(([l, h]) => (
               <a key={l} href={h} className="text-sm text-slate-400 hover:text-white transition-colors">{l}</a>
             ))}
           </div>
@@ -308,7 +315,7 @@ export default function HomePage() {
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }} className="md:hidden nav-glass border-t border-white/5 overflow-hidden">
               <div className="px-5 py-5 space-y-4">
-                {[["Features","#features"],["Subjects","#subjects"],["How it Works","#how"]].map(([l,h]) => (
+                {[["Features", "#features"], ["Subjects", "#subjects"], ["How it Works", "#how"]].map(([l, h]) => (
                   <a key={l} href={h} className="block text-slate-300 text-sm" onClick={() => setMenuOpen(false)}>{l}</a>
                 ))}
                 <hr className="border-white/10" />
@@ -329,17 +336,21 @@ export default function HomePage() {
         <div className="absolute inset-0 pointer-events-none">
           {STARS.map((s, i) => (
             <div key={i} className="star-particle absolute rounded-full bg-white"
-              style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.size, height: s.size,
-                animationDelay: `${s.delay}s`, animationDuration: `${s.dur}s` }} />
+              style={{
+                left: `${s.x}%`, top: `${s.y}%`, width: s.size, height: s.size,
+                animationDelay: `${s.delay}s`, animationDuration: `${s.dur}s`
+              }} />
           ))}
         </div>
 
         {/* Orbit rings */}
         {[420, 620, 820].map((sz, i) => (
           <div key={i} className="orbit-ring"
-            style={{ width: sz, height: sz, top: "50%", left: "50%",
-              animationDuration: `${18 + i * 14}s`, animationDirection: i % 2 ? "reverse" : "normal" }}>
-            <div className="orbit-dot" style={{ background: ["#60a5fa","#a78bfa","#34d399"][i] }} />
+            style={{
+              width: sz, height: sz, top: "50%", left: "50%",
+              animationDuration: `${18 + i * 14}s`, animationDirection: i % 2 ? "reverse" : "normal"
+            }}>
+            <div className="orbit-dot" style={{ background: ["#60a5fa", "#a78bfa", "#34d399"][i] }} />
           </div>
         ))}
 
@@ -407,7 +418,7 @@ export default function HomePage() {
             className="relative max-w-[640px] mx-auto">
 
             {/* Floating chips */}
-            <motion.div animate={{ y: [0,-10,0] }} transition={{ duration: 3.5, repeat: Infinity }}
+            <motion.div animate={{ y: [0, -10, 0] }} transition={{ duration: 3.5, repeat: Infinity }}
               className="hidden sm:flex absolute -top-6 -left-10 card-glass rounded-2xl px-4 py-3 items-center gap-2.5 z-10">
               <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center">
                 <Trophy className="w-4 h-4 text-amber-400" />
@@ -418,7 +429,7 @@ export default function HomePage() {
               </div>
             </motion.div>
 
-            <motion.div animate={{ y: [0,-8,0] }} transition={{ duration: 4.5, repeat: Infinity, delay: 1 }}
+            <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 4.5, repeat: Infinity, delay: 1 }}
               className="hidden sm:flex absolute -top-6 -right-10 card-glass rounded-2xl px-4 py-3 items-center gap-2 z-10">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute h-full w-full rounded-full bg-green-400 opacity-70" />
@@ -473,7 +484,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <motion.div animate={{ y: [0,-7,0] }} transition={{ duration: 5, repeat: Infinity, delay: 0.8 }}
+            <motion.div animate={{ y: [0, -7, 0] }} transition={{ duration: 5, repeat: Infinity, delay: 0.8 }}
               className="hidden sm:flex absolute -bottom-5 left-1/2 -translate-x-1/2 card-glass rounded-2xl px-4 py-2.5 items-center gap-2 z-10">
               <TrendingUp className="w-4 h-4 text-green-400" />
               <span className="text-xs font-outfit font-700 text-white">50,000+ students learning now</span>
@@ -497,9 +508,9 @@ export default function HomePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
               { val: 50000, suf: "+", label: "Active Students", icon: Users, c: "#60a5fa" },
-              { val: 94,    suf: "%", label: "Improve Their Grades", icon: TrendingUp, c: "#34d399" },
-              { val: 200,   suf: "+", label: "Books & Chapters", icon: BookOpen, c: "#a78bfa" },
-              { val: 24,    suf: "/7", label: "AI Always Available", icon: Zap, c: "#fbbf24" },
+              { val: 94, suf: "%", label: "Improve Their Grades", icon: TrendingUp, c: "#34d399" },
+              { val: 200, suf: "+", label: "Books & Chapters", icon: BookOpen, c: "#a78bfa" },
+              { val: 24, suf: "/7", label: "AI Always Available", icon: Zap, c: "#fbbf24" },
             ].map(({ val, suf, label, icon: Icon, c }, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }} transition={{ delay: i * 0.1 }}>
@@ -654,13 +665,14 @@ export default function HomePage() {
             <div className="lg:col-span-2 space-y-2">
               {FEATURES.map((f, i) => (
                 <motion.button key={i} onClick={() => setActiveF(i)} whileHover={{ x: 3 }}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-left transition-all duration-300 ${
-                    activeF === i ? "card-glass border-l-2 bg-white/4" : "hover:bg-white/3 border-l-2 border-transparent"
-                  }`}
-                  style={ activeF === i ? { borderLeftColor: f.color } : {} }>
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-left transition-all duration-300 ${activeF === i ? "card-glass border-l-2 bg-white/4" : "hover:bg-white/3 border-l-2 border-transparent"
+                    }`}
+                  style={activeF === i ? { borderLeftColor: f.color } : {}}>
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: activeF === i ? f.bgColor : "rgba(255,255,255,0.04)",
-                      border: `1px solid ${activeF === i ? f.color + "40" : "transparent"}` }}>
+                    style={{
+                      background: activeF === i ? f.bgColor : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${activeF === i ? f.color + "40" : "transparent"}`
+                    }}>
                     <f.icon className="w-4 h-4" style={{ color: activeF === i ? f.color : "#475569" }} />
                   </div>
                   <span className={`font-outfit text-sm font-500 ${activeF === i ? "text-white" : "text-slate-500"}`}>
@@ -743,9 +755,11 @@ export default function HomePage() {
         </div>
         {[320, 520].map((sz, i) => (
           <div key={i} className="orbit-ring"
-            style={{ width: sz, height: sz, top: "50%", left: "50%",
-              animationDuration: `${18 + i * 10}s`, animationDirection: i % 2 ? "reverse" : "normal" }}>
-            <div className="orbit-dot" style={{ background: ["#60a5fa","#a78bfa"][i] }} />
+            style={{
+              width: sz, height: sz, top: "50%", left: "50%",
+              animationDuration: `${18 + i * 10}s`, animationDirection: i % 2 ? "reverse" : "normal"
+            }}>
+            <div className="orbit-dot" style={{ background: ["#60a5fa", "#a78bfa"][i] }} />
           </div>
         ))}
 

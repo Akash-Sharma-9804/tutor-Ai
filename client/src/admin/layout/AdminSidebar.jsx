@@ -1,6 +1,8 @@
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   School,
@@ -24,6 +26,7 @@ import {
   HelpCircle,
   Database,
 } from "lucide-react";
+import { adminLogout } from "../../store/adminAuthSlice";
 
 const menuItems = [
   {
@@ -59,11 +62,19 @@ const menuItems = [
 ];
 
 const AdminSidebar = () => {
+   const dispatch = useDispatch();
+   const navigate = useNavigate();  
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
+  };
+
+    // Handle logout
+  const handleLogout = () => {
+    dispatch(adminLogout());
+    navigate("/admin/login", { replace: true });
   };
 
   return (
@@ -91,8 +102,12 @@ const AdminSidebar = () => {
           <div className="flex items-center justify-between">
             {!isCollapsed && (
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600">
-                  <Shield className="h-6 w-6 text-white" />
+                <div className="  rounded-xl ">
+                  <img
+    src="/logo3.png"
+    alt="QuantumEdu Logo"
+    className="w-12 h-12 object-contain"
+  />
                 </div>
                 <div>
                   <h1 className="text-lg font-bold text-gray-900 dark:text-white">
@@ -101,9 +116,7 @@ const AdminSidebar = () => {
                       Pro
                     </span>
                   </h1>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    v2.1
-                  </p>
+                
                 </div>
               </div>
             )}
@@ -155,7 +168,9 @@ const AdminSidebar = () => {
         {/* Footer */}
         {!isCollapsed && (
           <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800">
-            <button className="w-full cursor-pointer flex items-center gap-3 px-3 py-3 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+            <button 
+             onClick={handleLogout}
+            className="w-full cursor-pointer flex items-center gap-3 px-3 py-3 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
               <LogOut className="h-5 w-5" />
               <span className="text-sm font-medium">Logout</span>
             </button>
@@ -186,8 +201,12 @@ const AdminSidebar = () => {
               {/* Header */}
               <div className="p-6 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600">
-                    <Shield className="h-7 w-7 text-white" />
+                  <div className=" rounded-2xl  ">
+                   <img
+    src="/logo3.png"
+    alt="QuantumEdu Logo"
+    className="w-12 h-12 object-contain"
+  />
                   </div>
                   <div>
                     <h1 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -230,7 +249,7 @@ const AdminSidebar = () => {
 
               {/* Footer */}
               <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800">
-                <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                <button  onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                   <LogOut className="h-5 w-5" />
                   <span className="text-sm font-medium">Logout</span>
                 </button>

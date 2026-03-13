@@ -73,7 +73,11 @@ navigate("/login", { replace: true });
           <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'}`}>
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center flex-shrink-0">
-                <div className="text-4xl">🎓</div>
+                <img
+    src="/logo3.png"
+    alt="QuantumEdu Logo"
+    className="w-10 h-10 object-contain"
+  />
               </div>
               {!collapsed && (
                 <div className="flex flex-col flex-shrink-0">
