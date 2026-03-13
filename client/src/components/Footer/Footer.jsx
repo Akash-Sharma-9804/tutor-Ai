@@ -294,12 +294,12 @@ const features = [
                   <motion.a
                     href={link.href}
                     whileHover={{ x: 8 }}
-                    className="group flex items-center gap-3 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all duration-300"
+                    className="group flex items-center gap-3 text-gray-800 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all duration-300"
                   >
                     <span className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800/50 group-hover:bg-gradient-to-r group-hover:from-blue-500 group-hover:to-purple-500 group-hover:text-white transition-all duration-300">
                       {link.icon}
                     </span>
-                    <span className="font-medium group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 dark:group-hover:from-blue-400 dark:group-hover:to-purple-400 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">
+                    <span className="font-medium   group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 dark:group-hover:from-blue-400 dark:group-hover:to-purple-400 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">
                       {link.name}
                     </span>
                     <ArrowUpRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:translate-x-1 group-hover:-translate-y-1" />
@@ -332,7 +332,7 @@ const features = [
                   viewport={{ once: true }}
                   transition={{ delay: 0.3 + index * 0.1 }}
                   whileHover={{ x: 5 }}
-                  className="group flex items-center gap-3 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all duration-300 cursor-pointer"
+                  className="group flex items-center gap-3 text-gray-800 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all duration-300 cursor-pointer"
                 >
                   <div className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800/50 group-hover:bg-gradient-to-r group-hover:from-purple-500 group-hover:to-pink-500 group-hover:text-white transition-all duration-300">
                     {info.icon}

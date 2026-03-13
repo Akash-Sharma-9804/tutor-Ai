@@ -82,14 +82,14 @@ navigate("/login", { replace: true });
               {!collapsed && (
                 <div className="flex flex-col flex-shrink-0">
                   <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">QuantumEdu</h1>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Learning Platform</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Your personal Educator</p>
                 </div>
               )}
             </div>
             {!collapsed && (
               <button
                 onClick={toggleSidebar}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex-shrink-0"
+                className="p-1 cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex-shrink-0"
               >
                 <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
               </button>

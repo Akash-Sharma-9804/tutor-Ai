@@ -284,10 +284,10 @@ export default function HomePage() {
               />
             </div>
             <div className="flex-col">
-            <span className="font-outfit text-2xl font-700 tracking-tight group-hover:text-blue-300 transition-colors">
-              QuantumEdu
-            </span>
-            <p className="text-[9px]">Your personal Educator</p>
+              <span className="font-outfit text-2xl font-700 tracking-tight group-hover:text-blue-300 transition-colors">
+                QuantumEdu
+              </span>
+              <p className="text-[9px]">Your personal Educator</p>
             </div>
           </Link>
 
@@ -377,12 +377,23 @@ export default function HomePage() {
           </motion.div>
 
           {/* Headline */}
-          <motion.h1 initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }}
+          <motion.h1
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.18 }}
-            className="font-outfit text-5xl sm:text-6xl lg:text-[4.5rem] font-800 leading-[1.06] mb-5">
-            <span className="gradient-text-hero">Master </span>
-            <TypingWord /><br />
-            <span className="gradient-text-hero">with Your Personal AI</span>
+            className="font-outfit text-5xl sm:text-6xl lg:text-[4.5rem] font-800 leading-[1.06] mb-5"
+          >
+
+            {/* Master + TypingWord */}
+            <span className="flex flex-col sm:flex-row sm:items-center justify-center gap-2">
+              <span className="gradient-text-hero">Master</span>
+              <TypingWord />
+            </span>
+
+            <span className="gradient-text-hero block">
+              with Your Personal AI
+            </span>
+
           </motion.h1>
 
           <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
