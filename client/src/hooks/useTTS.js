@@ -152,18 +152,32 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
 
       const estimatedDuration = words.length * TTS_WORD_PACE_ESTIMATE;
 
-      // ── Probe: cached JSON URL vs streaming ─────────────────────────────────
+      // ── Probe: cached JSON URL vs streaming with retry logic ────────────────
       let probeResponse;
-      try {
-        probeResponse = await fetch(streamUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ text, segmentIndex }),
-          signal: abortController.signal,
-        });
-      } catch (e) {
-        if (e.name === 'AbortError') return;
-        console.error('TTS fetch failed:', e);
+      const maxRetries = 3;
+      let lastError;
+      
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          probeResponse = await fetch(streamUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ text, segmentIndex }),
+            signal: abortController.signal,
+          });
+          break; // Success, exit retry loop
+        } catch (e) {
+          if (e.name === 'AbortError') return;
+          lastError = e;
+          // Exponential backoff: 500ms, 1000ms, 1500ms
+          if (attempt < maxRetries - 1) {
+            await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+          }
+        }
+      }
+      
+      if (!probeResponse) {
+        console.error('TTS fetch failed after retries:', lastError);
         setIsLoadingAudio(false);
         setIsReading(false);
         return;
@@ -371,6 +385,10 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
       if (customText) {
         textToRead = cleanForTTS(String(customText));
       } else if (currentSegment?.type === 'equation') {
+        // Disable autoplay during multi-step equation reading
+        const wasAutoPlayEnabled = autoPlayRef.current;
+        autoPlayRef.current = false;
+        
         setActiveEquationStep(0);
         setEquationStepChars({});
         const waitForAudio = () => new Promise(resolve => {
@@ -380,7 +398,7 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
 
         await speakWithDeepgram(cleanForTTS(`Equation: ${currentSegment.equation || ''}`));
         await waitForAudio();
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 1200)); // Longer delay in autoplay
 
         if (showExplanation && Array.isArray(currentSegment.derivation)) {
           for (let idx = 0; idx < currentSegment.derivation.length; idx++) {
@@ -390,7 +408,7 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
             if (stepText.trim()) {
               await speakWithDeepgram(stepText, { stepIndex: idx, stepText: step.step, explanationText: step.explanation });
               await waitForAudio();
-              await new Promise(r => setTimeout(r, 600));
+              await new Promise(r => setTimeout(r, 1200)); // Longer delay in autoplay
             }
           }
         }
@@ -403,9 +421,19 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
 
         setSpeakingIndex(null);
         setIsReading(false);
+        
+        // Re-enable autoplay and start countdown after ALL steps are read
+        if (wasAutoPlayEnabled) {
+          autoPlayRef.current = true;
+          startAutoPlayCountdown();
+        }
         return;
 
       } else if (currentSegment?.type === 'example') {
+        // Disable autoplay during multi-step reading to prevent premature skipping
+        const wasAutoPlayEnabled = autoPlayRef.current;
+        autoPlayRef.current = false;
+        
         const waitForAudio = () => new Promise(resolve => {
           if (audioRef.current) audioRef.current.addEventListener('ended', resolve, { once: true });
           else resolve();
@@ -415,7 +443,7 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
         if (problemText) {
           await speakWithDeepgram(problemText);
           await waitForAudio();
-          await new Promise(r => setTimeout(r, 500));
+          await new Promise(r => setTimeout(r, 1000)); // Longer delay in autoplay
         }
 
         if (showExplanation) {
@@ -427,12 +455,18 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
             if (!spoken.trim()) continue;
             await speakWithDeepgram(spoken);
             await waitForAudio();
-            await new Promise(r => setTimeout(r, 400));
+            await new Promise(r => setTimeout(r, 1000)); // Longer delay in autoplay
           }
         }
 
         setSpeakingIndex(null);
         setIsReading(false);
+        
+        // Re-enable autoplay and start countdown after ALL parts are read
+        if (wasAutoPlayEnabled) {
+          autoPlayRef.current = true;
+          startAutoPlayCountdown();
+        }
         return;
 
       } else if (currentSegment?.type === 'subheading') {
@@ -442,6 +476,35 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
         textToRead = cleanForTTS(speaker + (currentSegment.text || ''));
         if (showExplanation && currentSegment.what_it_reveals) textToRead += `. ${cleanForTTS(currentSegment.what_it_reveals)}`;
         if (showExplanation && currentSegment.tone) textToRead += `. Tone: ${cleanForTTS(currentSegment.tone)}`;
+      } else if (Array.isArray(currentSegment?._ttsSteps) && currentSegment._ttsSteps.length > 0) {
+        // Handle segments with multiple TTS steps (e.g., vocabulary definitions, multi-part content)
+        // Temporarily disable autoplay to prevent skipping between steps
+        const wasAutoPlayEnabled = autoPlayRef.current;
+        autoPlayRef.current = false; // Disable so onended handlers don't trigger countdown
+        
+        const waitForAudio = () => new Promise(resolve => {
+          if (audioRef.current) audioRef.current.addEventListener('ended', resolve, { once: true });
+          else resolve();
+        });
+
+        for (const step of currentSegment._ttsSteps) {
+          const spoken = cleanForTTS(step);
+          if (!spoken.trim()) continue;
+          await speakWithDeepgram(spoken);
+          await waitForAudio();
+          await new Promise(r => setTimeout(r, 1000)); // Longer delay in autoplay to prevent connection reset
+        }
+
+        setSpeakingIndex(null);
+        setIsReading(false);
+        
+        // Re-enable autoplay and trigger countdown after ALL steps are done
+        if (wasAutoPlayEnabled) {
+          autoPlayRef.current = true;
+          startAutoPlayCountdown();
+        }
+        return;
+
       } else if (currentSegment?.type === 'table') {
         textToRead = cleanForTTS(currentSegment.title || 'Word Meanings') + '. ';
         if (Array.isArray(currentSegment.rows)) {

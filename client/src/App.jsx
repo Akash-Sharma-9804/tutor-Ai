@@ -19,7 +19,7 @@ import HomePage from "./pages/HomePage";
 
 // ===== Book Reader Imports =====
 import TableOfContents from "./pages/TableOfContents";
-import BookReader from "./pages/BookReader";
+ 
 import LineByLineReader from "./pages/LineByLineReader";
 
 // ===== Admin Imports =====
@@ -74,7 +74,7 @@ export default function App() {
 
           {/* ================= BOOK READER (FULL SCREEN) ================= */}
           <Route path="/book/:bookId" element={<TableOfContents />} />
-          {/* <Route path="/reader/:chapterId" element={<BookReader />} /> */}
+           
           <Route path="/reader/:chapterId" element={<LineByLineReader />} />
         </Route>
 

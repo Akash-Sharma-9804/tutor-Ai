@@ -208,23 +208,140 @@ export const ExampleSegment = ({ segment }) => (
 // EQUATION SEGMENT
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Strips outer $ or $$ from a string and returns the inner content.
+ */
+const stripDollars = (s) => {
+  if (s.startsWith('$$') && s.endsWith('$$') && s.length > 4) return s.slice(2, -2).trim();
+  if (s.startsWith('$') && s.endsWith('$') && s.length > 2) return s.slice(1, -1).trim();
+  return s.trim();
+};
+
+/**
+ * Tries BlockMath, returns null on failure so caller can fallback.
+ */
+const SafeBlockMath = ({ math }) => {
+  try { return <div className="overflow-x-auto py-2"><BlockMath math={math} /></div>; }
+  catch { return null; }
+};
+
+/**
+ * Used when the equation string is a mix of a LaTeX block + trailing plain text,
+ * e.g.: $\begin{array}...\end{array}WhenP = 1bar, K_H = S. Thus, K_H is...$
+ *
+ * Strategy: find the last \end{...} → everything before+including it is pure LaTeX
+ * → render with BlockMath. Everything after is plain prose → render with renderMixedText.
+ */
+const DirtyEquation = ({ raw }) => {
+  const inner = stripDollars(raw);
+
+  // Split at the last \end{...}
+  const endIdx = inner.lastIndexOf('\\end{');
+  if (endIdx !== -1) {
+    // find closing } of \end{...}
+    const closeIdx = inner.indexOf('}', endIdx + 5);
+    if (closeIdx !== -1) {
+      const latexPart = inner.slice(0, closeIdx + 1).trim();
+      const plainPart = inner.slice(closeIdx + 1).trim();
+      return (
+        <div className="space-y-3 py-2">
+          {(() => { try { return <div className="overflow-x-auto"><BlockMath math={latexPart} /></div>; } catch { return <p className="font-mono text-sm text-slate-600 break-all p-2 bg-gray-50 rounded">{latexPart}</p>; } })()}
+          {plainPart && (
+            <p className="text-base sm:text-lg text-slate-800 leading-relaxed" style={{ fontFamily: 'Comic Sans MS, cursive', wordSpacing: '0.1em' }}>
+              {renderMixedText(plainPart)}
+            </p>
+          )}
+        </div>
+      );
+    }
+  }
+
+  // No \end{} — render entire inner as plain mixed text (inline math will still render)
+  return (
+    <p className="text-base sm:text-lg text-slate-800 leading-relaxed py-2" style={{ fontFamily: 'Comic Sans MS, cursive', wordSpacing: '0.1em' }}>
+      {renderMixedText(inner)}
+    </p>
+  );
+};
+
+/**
+ * Detects whether the content inside a single $...$ is "dirty" —
+ * i.e. contains plain English prose mixed with LaTeX (KaTeX will choke).
+ */
+const isDirtyInner = (inner) =>
+  /\\end\{[^}]+\}/.test(inner) ||          // has \end{...} → likely an array/aligned block with trailing text
+  /[a-zA-Z]{4,}\s+[a-zA-Z]{3,}/.test(      // two consecutive plain words (not LaTeX commands)
+    inner.replace(/\\[a-zA-Z]+\{[^}]*\}/g, '').replace(/\\[a-zA-Z]+/g, '')
+  );
+
+const renderEquationField = (raw) => {
+  if (!raw) return null;
+  const s = raw.trim();
+
+  // ── Case 1: $$...$$ ──────────────────────────────────────────────────────
+  if (s.startsWith('$$') && s.endsWith('$$') && s.length > 4) {
+    const inner = s.slice(2, -2).trim();
+    if (isDirtyInner(inner)) return <DirtyEquation raw={inner} />;
+    const el = <SafeBlockMath math={inner} />;
+    return el || <DirtyEquation raw={inner} />;
+  }
+
+  // ── Case 2: multiple $...$ tokens → render inline with renderMixedText ──
+  // e.g. "$P_1 = x_1 P_1^0$ and $P_2 = x_2 P_2^0$"
+  const tokens = s.match(/\$[^$]+\$/g) || [];
+  if (tokens.length > 1) {
+    return (
+      <p className="text-base sm:text-lg font-semibold text-slate-800 leading-relaxed text-center py-2" style={{ wordSpacing: '0.1em' }}>
+        {renderMixedText(s)}
+      </p>
+    );
+  }
+
+  // ── Case 3: single $...$ ─────────────────────────────────────────────────
+  if (s.startsWith('$') && s.endsWith('$') && s.length > 2) {
+    const inner = s.slice(1, -1).trim();
+    if (isDirtyInner(inner)) return <DirtyEquation raw={inner} />;
+    const el = <SafeBlockMath math={inner} />;
+    return el || <DirtyEquation raw={inner} />;
+  }
+
+  // ── Case 4: no $ wrappers — bare LaTeX string ────────────────────────────
+  const el = <SafeBlockMath math={s} />;
+  return el || <DirtyEquation raw={s} />;
+};
+
 export const EquationSegment = ({
   segment, activeEquationStep, activeStepUnderline,
   isReading, currentWords, highlightedWordIndex,
   equationStepChars, explanationWords, showFinalResult,
 }) => {
-  const rawEq = (segment.equation || '').trim().replace(/^\$\$/, '').replace(/\$\$$/, '').trim();
+  // Determine if this is a proof/derivation (has steps but equation is plain text title)
+  const isDerivation = segment.derivation?.length > 0;
+  const equationIsPlainText = segment.equation && !/[\\$^_{}]/.test(segment.equation);
+  const headerTitle = isDerivation && equationIsPlainText
+    ? segment.equation
+    : 'Mathematical Equation';
 
   return (
     <div className="mb-4 animate-slideIn" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
       <div className="flex items-center gap-3 mb-4 pb-3 border-b-4 border-blue-400">
-        <span className="text-3xl">🔢</span>
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Mathematical Equation</h2>
+        <span className="text-3xl">{isDerivation ? '📐' : '🔢'}</span>
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-800">{headerTitle}</h2>
       </div>
 
-      <div className="p-4 mb-4 overflow-x-auto">
-        {(() => { try { return <BlockMath math={rawEq} />; } catch { return <p className="font-mono text-center font-bold text-slate-800">{segment.equation}</p>; } })()}
-      </div>
+      {/* Only show the equation block if it's actual LaTeX math, not a plain text title */}
+      {segment.equation && !equationIsPlainText && (
+        <div className="p-4 mb-4">
+          {renderEquationField(segment.equation)}
+        </div>
+      )}
+
+      {/* Show proof setup if present */}
+      {segment._proofSetup && (
+        <div className="bg-slate-50 rounded-xl p-4 mb-4 border-2 border-slate-200">
+          <p className="text-sm text-slate-600 leading-relaxed">{renderMixedText(segment._proofSetup)}</p>
+        </div>
+      )}
 
       {segment.derivation?.length > 0 && (
         <div className="space-y-4 mb-4">
@@ -232,8 +349,11 @@ export const EquationSegment = ({
             <span>📝</span> Step-by-Step:
           </h3>
           {segment.derivation.slice(0, activeEquationStep + 1).map((step, idx) => {
-            const cleanExp = String(step.explanation || '').replace(/\*\*/g, '').replace(/##/g, '').replace(/^- /gm, '').replace(/\n+/g, ' ').trim();
-            const expWords = cleanExp.split(/\s+/);
+            // Split explanation on newline so statement ($$...$$) and reason render separately
+            const rawExp = String(step.explanation || '');
+            // For word-reveal TTS: strip math markers to get plain words
+            const cleanExp = rawExp.replace(/\$\$[\s\S]+?\$\$/g, '').replace(/\$[^$]+\$/g, '').replace(/\*\*/g, '').replace(/##/g, '').replace(/^- /gm, '').replace(/\n+/g, ' ').trim();
+            const expWords = cleanExp.split(/\s+/).filter(Boolean);
             const revealed = explanationWords[idx] || 0;
             return (
               <div key={idx} className="p-5 border-l-4 border-blue-400 pl-6 animate-chalkWrite" style={{ animationDelay: `${idx * 0.25}s` }}>
@@ -244,18 +364,24 @@ export const EquationSegment = ({
                       <span className={activeStepUnderline === idx ? 'underline-animation' : ''}>
                         {activeStepUnderline === idx && isReading && currentWords.length > 0
                           ? <HighlightedWords words={currentWords} highlightedIndex={highlightedWordIndex} />
-                          : step.step}
+                          : renderMixedText(step.step)}
                       </span>
                     </p>
-                    <p className="text-sm sm:text-base leading-relaxed text-slate-700">
+                    <div className="text-sm sm:text-base leading-relaxed text-slate-700 space-y-1">
                       {revealed === 0
-                        ? renderMixedText(cleanExp)
+                        ? rawExp.split('\n').map((line, li) =>
+                            line.trim() ? (
+                              <div key={li} className={line.trim().startsWith('Reason:') ? 'text-slate-500 italic text-xs mt-1' : ''}>
+                                {renderMixedText(line)}
+                              </div>
+                            ) : null
+                          )
                         : expWords.map((word, wi) => (
                           <span key={wi} style={{ color: wi < revealed ? 'rgb(51,65,85)' : 'rgba(51,65,85,0.25)', transition: 'color 0.3s' }}>
                             {word}{' '}
                           </span>
                         ))}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -267,7 +393,7 @@ export const EquationSegment = ({
       {segment.final_result && showFinalResult && (
         <div className="p-5 border-4 border-green-400 rounded-xl mb-4 bg-green-50">
           <p className="text-xs font-bold text-slate-600 mb-1">✅ Final Result</p>
-          <p className="text-xl font-mono font-bold text-slate-800">{segment.final_result}</p>
+          <div className="text-base font-semibold text-slate-800">{renderMixedText(segment.final_result)}</div>
         </div>
       )}
 

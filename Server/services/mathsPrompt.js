@@ -1,26 +1,5 @@
 // mathsPrompt.js
-// ─────────────────────────────────────────────────────────────────────────────
-// Specialized Gemini prompt for Mathematics.
-//
-// Philosophy: Every segment = one pause in a great teacher's video lesson.
-// The student reads it, understands it completely, and moves on.
-//
-// Output types and their frontend rendering:
-//
-//   subheading      → blue section title banner
-//   topic_intro     → yellow "What we'll learn" card  (renders as text)
-//   definition      → purple definition card           (renders as text, styled)
-//   concept         → white explanation card           (renders as text)
-//   theorem         → teal theorem card                (renders as text)
-//   formula         → blue equation card with variable breakdown
-//   proof           → equation card, step-by-step with reasons
-//   worked_example  → green problem card + blue solution with narrated steps
-//   exercise        → green problem card + blue solution (all parts solved)
-//   diagram         → two-column image + explanation   (renders as diagram_concept)
-//   note            → amber "remember" box             (renders as text)
-//   summary_table   → data table                       (renders as table)
-//   activity        → teal activity card               (renders as text)
-// ─────────────────────────────────────────────────────────────────────────────
+ 
 
 function isMathsSubject(subjectName) {
   if (!subjectName) return false;
@@ -160,7 +139,7 @@ STEP 3: CONVERT EACH BLOCK
 {
   "type": "formula",
   "name": "Name of this formula (e.g. 'Arc Length Formula')",
-  "formula_latex": "Exact formula. LaTeX preserved (e.g. '$s = r\\theta$')",
+ "formula_latex": "Exact formula, wrapped in double dollars (e.g. '$$s = r\\theta$$')",
   "variables": [
     { "symbol": "s", "meaning": "arc length", "unit": "cm or m (same unit as r)" },
     { "symbol": "r", "meaning": "radius of the circle", "unit": "cm or m" },
@@ -195,7 +174,7 @@ RULE: Only include "derivation" if derivation steps are VISIBLE on this page. If
       "step_no": 1,
       "narration": "What a teacher says BEFORE writing this line: why are we doing this step?",
       "working": "The actual mathematical working. LaTeX preserved.",
-      "result": "The outcome of this step (e.g. '$\\theta = \\frac{\\pi}{3}$')"
+     "result": "The outcome of this step as a display equation (e.g. '$$\\theta = \\frac{\\pi}{3}$$')"
     }
   ],
   "final_answer": "Final answer, clearly stated with units",
@@ -299,8 +278,16 @@ CRITICAL: Solve EVERY sub-part. NEVER say "solve similarly" or "left as exercise
 NON-NEGOTIABLE QUALITY RULES
 ═══════════════════════════════════════════════════
 
-LATEX — COPY EXACTLY:
+LATEX — COPY EXACTLY AND WRAP CORRECTLY:
 Every mathematical expression must be copied verbatim from the OCR. Never simplify, rearrange, or rewrite any equation or symbol.
+
+LaTeX WRAPPING RULES (strictly follow):
+- Inline expressions (variable names, short terms mid-sentence): wrap with single dollar signs → $x$, $\theta$, $r^2$
+- Standalone equations, formulas, results on their own line: wrap with double dollar signs → $$s = r\theta$$
+- For "formula_latex" field: ALWAYS use $$...$$ (double dollars), never single.
+- For "equation" field: ALWAYS use $$...$$ (double dollars).
+- For "working" and "result" fields inside steps: use $$...$$ if the expression is a full equation, $...$ if it is a short inline term.
+- NEVER mix prose and LaTeX inside the same $...$ or $$...$$ — put the prose outside the dollar signs.
 
 EXPLANATIONS MUST TEACH, NOT JUST DESCRIBE:
 ✅ Good: "We multiply by π/180 because a full rotation equals both 360° and 2π radians — so 1° = π/180 by direct proportion, the same logic as unit conversion."

@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios'; // shared axios instance
-import { normalizeMathsContent, normalizeEnglishContent } from '../utils/normalizeContent';
+import { normalizeMathsContent, normalizeEnglishContent, normalizePhysicsContent } from '../utils/normalizeContent';
+
+// Picks the right normalizer based on subject name from chapter metadata
+const normalizeBySubject = (content, chapter) => {
+  const subject = (chapter?.subject_name || chapter?.subject || '').toLowerCase();
+  if (/physics/i.test(subject))  return normalizePhysicsContent(content);
+  if (/math/i.test(subject))     return normalizeMathsContent(content);
+  if (/english/i.test(subject))  return normalizeEnglishContent(normalizeMathsContent(content));
+  // Default: run both maths + english normalizers for generic subjects
+  return normalizeEnglishContent(normalizeMathsContent(content));
+};
 
 // ─── API calls (inlined, no separate service file) ────────────────────────────
 
@@ -51,7 +61,7 @@ const useChapterData = (chapterId) => {
       const { content: data, progress: saved } = await fetchChapterContent(chapterId);
 
       setChapter(data.chapter);
-      setChapterData(normalizeEnglishContent(normalizeMathsContent(data.content)));
+      setChapterData(normalizeBySubject(data.content, data.chapter));
       setNavigation(data.navigation);
 
       const imageMap = {};

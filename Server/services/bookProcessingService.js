@@ -23,6 +23,8 @@ const {
 } = require("./mistralOCRService");
 const { isMathsSubject, buildMathsPrompt } = require("./mathsPrompt");
 const { isEnglishSubject, buildEnglishPrompt } = require("./englishPrompt");
+const { isPhysicsSubject, buildPhysicsPrompt } = require("./physicsPrompt");
+
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const EMBEDDING_MODEL = "text-embedding-3-small";
@@ -122,20 +124,24 @@ async function processPageChunk(
 
     // ── Choose prompt: maths-specific, english-specific, or general ──────────
     const effectiveSubject = subjectName || bookMetadata.subject || "";
-    const useMathsPrompt = isMathsSubject(effectiveSubject);
-    const useEnglishPrompt = !useMathsPrompt && isEnglishSubject(effectiveSubject);
-
+    const useMathsPrompt   = isMathsSubject(effectiveSubject);
+    const usePhysicsPrompt = !useMathsPrompt && isPhysicsSubject(effectiveSubject);
+    const useEnglishPrompt = !useMathsPrompt && !usePhysicsPrompt && isEnglishSubject(effectiveSubject);
+ 
     if (useMathsPrompt) {
       console.log(`🔢 Using MATHS prompt for page ${pageNumber} (subject: ${effectiveSubject})`);
+    } else if (usePhysicsPrompt) {
+      console.log(`⚛️  Using PHYSICS prompt for page ${pageNumber} (subject: ${effectiveSubject})`);
     } else if (useEnglishPrompt) {
       console.log(`📖 Using ENGLISH prompt for page ${pageNumber} (subject: ${effectiveSubject})`);
     }
-
     // Build parts array: text prompt + diagram images inline
     const parts = [
       {
         text: useMathsPrompt
           ? buildMathsPrompt(pageMarkdown, pageImages, pageNumber, bookMetadata, retryMode)
+          : usePhysicsPrompt
+          ? buildPhysicsPrompt(pageMarkdown, pageImages, pageNumber, bookMetadata, retryMode)
           : useEnglishPrompt
           ? buildEnglishPrompt(pageMarkdown, pageImages, pageNumber, bookMetadata, retryMode)
           : `${
@@ -507,7 +513,12 @@ QUALITY REQUIREMENTS:
       // \tau, \times, \text etc. If \f and \t are treated as valid JSON escapes,
       // JSON.parse converts them to form-feed (U+000C) and tab characters, corrupting
       // all LaTeX. Raw tabs are caught below by the ch==='\t' check instead.
-      const VALID_ESCAPES = new Set(['"', '/', '\\', 'b', 'n', 'r', 'u']);
+      // Exclude ALL single-letter sequences that are valid JSON escapes BUT also
+// appear as LaTeX command prefixes: \b (→ backspace), \n (→ \nabla, \nu),
+// \r (→ \rho, \right, \rangle), \f (→ \frac), \t (→ \theta, \times).
+// We only allow \\ (escaped backslash), \" (escaped quote), \/ (escaped slash),
+// \uXXXX (unicode), and raw \n/\r/\t that appear OUTSIDE strings (handled below).
+const VALID_ESCAPES = new Set(['"', '/', '\\', 'u']);
       let result = "";
       let inString = false;
       let i = 0;
@@ -589,6 +600,18 @@ QUALITY REQUIREMENTS:
         throw new Error("RETRY_CHUNK");
       }
     }
+
+      const restoreNewlines = (obj) => {
+      if (typeof obj === 'string') return obj.replace(/\\n/g, '\n');
+      if (Array.isArray(obj)) return obj.map(restoreNewlines);
+      if (obj && typeof obj === 'object') {
+        const out = {};
+        for (const k of Object.keys(obj)) out[k] = restoreNewlines(obj[k]);
+        return out;
+      }
+      return obj;
+    };
+    chunkData = restoreNewlines(chunkData);
 
     // Normalize subheading structure
     const mathsTypes = new Set([

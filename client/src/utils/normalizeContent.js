@@ -126,10 +126,16 @@ export const normalizeMathsContent = (content) => {
             item.common_mistake ? `⚠️ Common mistake: ${item.common_mistake}` : '',
           ].filter(Boolean).join('\n');
 
+          // Ensure the equation field always has $$ wrapping for BlockMath
+          const rawLatex = item.formula_latex || item.formula || '';
+          const wrappedLatex = rawLatex.startsWith('$$') ? rawLatex
+            : rawLatex.startsWith('$') ? `$${rawLatex}$`  // promote $...$ to $$...$$
+            : rawLatex ? `$$${rawLatex}$$`
+            : '';
           return {
             ...item,
             type: 'equation',
-            equation: item.formula_latex || item.formula || '',
+            equation: wrappedLatex,
             derivation: allSteps.length > 0 ? allSteps : undefined,
             final_result: finalParts || undefined,
             application: item.when_to_use || undefined,
@@ -138,20 +144,35 @@ export const normalizeMathsContent = (content) => {
         }
 
         if (item.type === 'proof') {
+          // Each step: "step" = narration title, "statement" = the LaTeX math line,
+          // "explanation" = the reason. We split them so the renderer shows
+          // the math expression properly via renderMixedText.
           const proofSteps = Array.isArray(item.steps)
             ? item.steps.map(s => ({
+              // step title: plain narration label (e.g. "Step 1: Forces on the bob")
               step: s.step || s.action || `Step ${s.step_no || ''}`,
+              // explanation: the LaTeX statement + the reason, both rendered via renderMixedText
               explanation: [
                 s.statement || s.math || s.working || '',
                 s.reason ? `Reason: ${s.reason}` : '',
-              ].filter(Boolean).join(' — '),
+              ].filter(Boolean).join('\n'),
             }))
             : [];
+
+          // "proving" is plain English (e.g. "Derivation of the Ideal Gas Equation")
+          // Do NOT wrap in $$...$$ — that makes KaTeX choke on English text.
+          // Use it as the equation title instead, rendered as plain text.
+          const rawProving = item.proving || item.for || '';
+          // Only wrap in $$ if it looks like actual LaTeX (contains \ or ^  or _)
+          const looksLikeLatex = /[\\^_{}]/.test(rawProving);
+          const wrappedProving = looksLikeLatex
+            ? (rawProving.startsWith('$') ? rawProving : `$$${rawProving}$$`)
+            : rawProving; // leave plain English as-is; renderer will show it as text
 
           return {
             ...item,
             type: 'equation',
-            equation: item.proving || item.for || '',
+            equation: wrappedProving,
             derivation: proofSteps.length > 0 ? proofSteps : undefined,
             final_result: [
               item.conclusion || '',
@@ -292,7 +313,6 @@ export const normalizeMathsContent = (content) => {
     })),
   };
 };
-
 /**
  * normalizeEnglishContent
  * Maps English prompt types into renderer types.
@@ -387,4 +407,40 @@ export const normalizeEnglishContent = (content) => {
       }),
     })),
   };
+};
+
+/**
+ * normalizePhysicsContent
+ * Maps Physics-prompt-specific types to renderer types the frontend understands.
+ *
+ * Physics-only → Renderer mapping:
+ *   law         → theorem   (teal "law/principle" card)
+ *   derivation  → proof     (equation card with step-by-step reasons)
+ *
+ * All other types (concept, definition, formula, worked_example, exercise,
+ * diagram, note, summary_table, topic_intro, activity, subheading) are shared
+ * with the maths prompt and pass through normalizeMathsContent unchanged.
+ */
+export const normalizePhysicsContent = (content) => {
+  if (!content?.sections) return content;
+
+  // Step 1: Alias Physics-only types to their Maths/renderer equivalents
+  const aliased = {
+    ...content,
+    sections: content.sections.map(section => ({
+      ...section,
+      content: (section.content || []).map(item => {
+        if (item.type === 'law') {
+          return { ...item, type: 'theorem' };
+        }
+        if (item.type === 'derivation') {
+          return { ...item, type: 'proof' };
+        }
+        return item;
+      }),
+    })),
+  };
+
+  // Step 2: Run through normalizeMathsContent for all shared type handling
+  return normalizeMathsContent(aliased);
 };

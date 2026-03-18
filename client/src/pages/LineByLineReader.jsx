@@ -143,13 +143,15 @@ const LineByLineReader = () => {
   if (!chapterData) return <ErrorScreen />;
 
   // ── Segment type flags ─────────────────────────────────────────────────────
-  const isDiagram   = ['diagram', 'diagram_concept', 'diagram_reference'].includes(currentSegment?.type);
-  const isEquation  = currentSegment?.type === 'equation';
-  const isExample   = currentSegment?.type === 'example';
-  const isDialogue  = currentSegment?.type === 'dialogue';
-  const isTable     = currentSegment?.type === 'table';
+  const isDiagram    = ['diagram', 'diagram_concept', 'diagram_reference'].includes(currentSegment?.type);
+  // 'derivation' is a physics proof → renders as EquationSegment (safety net if normalization didn't run)
+  const isEquation   = ['equation', 'derivation'].includes(currentSegment?.type);
+  const isExample    = currentSegment?.type === 'example';
+  const isDialogue   = currentSegment?.type === 'dialogue';
+  const isTable      = currentSegment?.type === 'table';
   const isSubheading = currentSegment?.type === 'subheading';
-  const isText      = !isDiagram && !isEquation && !isExample && !isDialogue && !isTable && !isSubheading;
+  // 'law', 'concept', 'definition', 'theorem', 'note', 'topic_intro', 'text' all render as TextSegment
+  const isText       = !isDiagram && !isEquation && !isExample && !isDialogue && !isTable && !isSubheading;
 
   // ─────────────────────────────────────────────────────────────────────────
 

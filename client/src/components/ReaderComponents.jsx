@@ -272,14 +272,23 @@ export const TeacherBoard = ({ detailedExplanation, loadingExplanation, isReadin
     ? detailedExplanation.replace(/\*\*/g, '').replace(/##/g, '').replace(/^\* /gm, '').replace(/^- /gm, '').split('\n\n')
     : [];
 
-  const fullText = detailedExplanation
-    ? detailedExplanation.replace(/\*\*/g, '').replace(/##/g, '').replace(/^\* /gm, '').replace(/^- /gm, '').replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim()
-    : '';
+  // Build a complete word map: word index → {paragraphIndex, wordIndexInParagraph}
+  let globalWordIndex = 0;
+  const wordMap = {};
+  paragraphs.forEach((para, parIdx) => {
+    const cleanText = para.replace(/\*\*/g, '').replace(/##/g, '').trim();
+    const words = cleanText.split(/\s+/).filter(Boolean);
+    words.forEach((_, wordIdx) => {
+      wordMap[globalWordIndex] = { parIdx, wordIdx };
+      globalWordIndex++;
+    });
+  });
 
   const renderParagraph = (paragraph, idx) => {
     const isHeading = /^(\*\*|##|\d+\.)/.test(paragraph.trim());
     const isBullet = paragraph.trim().startsWith('*') && !paragraph.trim().startsWith('**');
     const cleanText = paragraph.replace(/\*\*/g, '').replace(/##/g, '').trim();
+    const words = cleanText.split(/\s+/).filter(Boolean);
 
     if (isHeading) return (
       <div key={idx} className="animate-chalkWrite mb-4 pb-3 border-b-4 border-yellow-400" style={{ animationDelay: `${idx * 0.15}s`, fontFamily: 'Comic Sans MS, cursive' }}>
@@ -293,64 +302,77 @@ export const TeacherBoard = ({ detailedExplanation, loadingExplanation, isReadin
       </div>
     );
 
-    // Regular paragraph — find word position for highlight
-    const startIdx = fullText.indexOf(cleanText);
-    let content;
-    if (isReading && teacherBoardWords.length > 0 && startIdx !== -1) {
-      const wordsBefore = fullText.substring(0, startIdx) ? fullText.substring(0, startIdx).split(/\s+/).length : 0;
-      content = cleanText.split(/\s+/).map((word, wi) => {
-        const gi = wordsBefore + wi;
-        const isActive = gi === teacherBoardHighlightIndex;
-        const isPast = gi < teacherBoardHighlightIndex;
-        return (
-          <span key={wi} style={{ color: isActive ? '#2563eb' : isPast ? 'rgba(30,41,59,0.4)' : 'rgb(30,41,59)', fontWeight: isActive ? '700' : 'inherit', textShadow: isActive ? '0 0 12px rgba(37,99,235,0.3)' : 'none', transition: 'color 0.15s', marginRight: '0.25em' }}>
-            {word}
-          </span>
-        );
-      });
-    } else {
-      content = paragraph.split('\n').map((line, li) => <span key={li}>{line}{li < paragraph.split('\n').length - 1 && <br />}</span>);
-    }
+    // Regular paragraph with highlighting
+    const content = words.map((word, wordIdx) => {
+      // Find this word's global index
+      let globalIdx = -1;
+      for (const [gIdx, { parIdx, wordIdx: wIdx }] of Object.entries(wordMap)) {
+        if (parIdx === idx && wIdx === wordIdx) {
+          globalIdx = parseInt(gIdx);
+          break;
+        }
+      }
+
+      const isActive = isReading && globalIdx === teacherBoardHighlightIndex;
+      const isPast = isReading && globalIdx < teacherBoardHighlightIndex;
+
+      return (
+        <span
+          key={wordIdx}
+          className="inline transition-all duration-150"
+          style={{
+            color: isActive ? '#2563eb' : isPast ? 'rgba(30,41,59,0.45)' : 'rgb(30,41,59)',
+            fontWeight: isActive ? '700' : 'inherit',
+            textShadow: isActive ? '0 0 8px rgba(37,99,235,0.25)' : 'none',
+            backgroundColor: isActive ? 'rgba(37,99,235,0.1)' : 'transparent',
+            padding: isActive ? '0 2px' : '0',
+            borderRadius: isActive ? '2px' : '0',
+          }}
+        >
+          {word}{wordIdx < words.length - 1 ? '\u00A0' : ''}
+        </span>
+      );
+    });
 
     return (
-      <div key={idx} className="animate-chalkWrite bg-white/70 rounded-lg p-3 sm:p-4 shadow-sm" style={{ animationDelay: `${idx * 0.15}s`, fontFamily: 'Comic Sans MS, cursive' }}>
-        <p className="text-sm sm:text-base text-slate-700 leading-relaxed">{content}</p>
+      <div key={idx} className="animate-chalkWrite bg-white/70 rounded-lg p-3 sm:p-4 shadow-sm overflow-hidden" style={{ animationDelay: `${idx * 0.15}s`, fontFamily: 'Comic Sans MS, cursive' }}>
+        <p className="text-sm sm:text-base text-slate-700 leading-relaxed break-words overflow-x-hidden">{content}</p>
       </div>
     );
   };
 
   return (
-    <div className="bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 rounded-3xl shadow-2xl p-4 sm:p-6 border-4 border-slate-600 animate-slideIn sticky top-4 relative overflow-hidden">
+    <div className="bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl p-3 sm:p-6 border-4 border-slate-600 animate-slideIn sticky top-4 overflow-hidden max-w-full">
       <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.3'/%3E%3C/svg%3E\")" }} />
-      <div className="flex items-start justify-between mb-6 relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-green-500 rounded-xl shadow-lg border-2 border-white"><MessageCircle className="h-7 w-7 text-white" /></div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white" style={{ fontFamily: 'Comic Sans MS, cursive' }}>🎓 Teacher's Board</h2>
-            <p className="text-sm text-green-300 mt-1">Step-by-step classroom explanation</p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 sm:mb-6 relative z-10">
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+          <div className="p-2 sm:p-3 bg-green-500 rounded-lg sm:rounded-xl shadow-lg border-2 border-white flex-shrink-0"><MessageCircle className="h-5 sm:h-7 w-5 sm:w-7 text-white" /></div>
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold text-white truncate" style={{ fontFamily: 'Comic Sans MS, cursive' }}>🎓 Teacher's Board</h2>
+            <p className="text-xs sm:text-sm text-green-300 mt-0.5 truncate">Step-by-step explanation</p>
           </div>
         </div>
-        <button onClick={onClose} className="p-2 bg-red-500 hover:bg-red-600 rounded-lg transition-all hover:scale-110 shadow-lg"><X className="h-6 w-6 text-white" /></button>
+        <button onClick={onClose} className="p-2 bg-red-500 hover:bg-red-600 rounded-lg transition-all hover:scale-110 shadow-lg flex-shrink-0"><X className="h-5 sm:h-6 w-5 sm:w-6 text-white" /></button>
       </div>
 
       {loadingExplanation ? (
-        <div className="flex items-center justify-center py-16">
+        <div className="flex items-center justify-center py-12 sm:py-16">
           <div className="text-center">
-            <Loader2 className="h-12 w-12 animate-spin text-purple-600 mx-auto mb-4" />
-            <p className="text-gray-600 dark:text-gray-400 text-lg">Generating comprehensive explanation...</p>
+            <Loader2 className="h-10 sm:h-12 w-10 sm:w-12 animate-spin text-purple-600 mx-auto mb-3 sm:mb-4" />
+            <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">Generating explanation...</p>
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-inner relative z-10" style={{ backgroundImage: 'linear-gradient(0deg,rgba(0,0,0,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.02) 1px,transparent 1px)', backgroundSize: '20px 20px' }}>
-          <div className="flex items-center justify-between p-4 border-b-4 border-slate-700 bg-slate-100">
-            <h3 className="text-base sm:text-lg font-bold text-slate-800" style={{ fontFamily: 'Comic Sans MS, cursive' }}>📝 Comprehensive Breakdown</h3>
+        <div className="bg-white rounded-2xl shadow-inner relative z-10 overflow-hidden">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 p-3 sm:p-4 border-b-4 border-slate-300 bg-slate-100 flex-wrap">
+            <h3 className="text-sm sm:text-base font-bold text-slate-800" style={{ fontFamily: 'Comic Sans MS, cursive' }}>📝 Comprehensive Breakdown</h3>
             <button onClick={isReading ? onStopReading : onReadAloud} disabled={!detailedExplanation || loadingExplanation || isLoadingAudio}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50 shadow-md border-2 border-blue-300">
-              {isLoadingAudio ? <><Loader2 className="h-4 w-4 animate-spin" /><span className="hidden sm:inline">Loading...</span></> : isReading ? <><Pause className="h-4 w-4" /><span className="hidden sm:inline">{currentChunk.total > 1 ? `Stop (${currentChunk.current}/${currentChunk.total})` : 'Stop'}</span></> : <><Volume2 className="h-4 w-4" /><span className="hidden sm:inline">Read Aloud</span></>}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg text-xs sm:text-sm font-semibold transition-all disabled:opacity-50 shadow-md border-2 border-blue-300 flex-shrink-0 whitespace-nowrap">
+              {isLoadingAudio ? <><Loader2 className="h-4 w-4 animate-spin" /><span className="hidden sm:inline text-xs">Loading...</span></> : isReading ? <><Pause className="h-4 w-4" /><span className="hidden sm:inline text-xs">{currentChunk.total > 1 ? `Stop (${currentChunk.current}/${currentChunk.total})` : 'Stop'}</span></> : <><Volume2 className="h-4 w-4" /><span className="hidden sm:inline text-xs">Read</span></>}
             </button>
           </div>
-          <div className="max-h-[60vh] overflow-y-auto p-4 sm:p-6 custom-scrollbar">
-            <div className="space-y-6">{paragraphs.map((p, i) => renderParagraph(p, i))}</div>
+          <div className="max-h-[55vh] sm:max-h-[60vh] overflow-y-auto p-3 sm:p-6 custom-scrollbar">
+            <div className="space-y-4 sm:space-y-6 w-full">{paragraphs.map((p, i) => renderParagraph(p, i))}</div>
           </div>
         </div>
       )}
