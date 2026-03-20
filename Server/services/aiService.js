@@ -195,11 +195,12 @@ ${contentSummary}
 The student asked: "${query}"
 
 Your job: Answer the student's question based on the text above.
-- Write exactly 2-3 complete sentences
+- Write 2 to 3 complete sentences. Always finish your last sentence fully — never cut off mid-thought.
+- Each sentence should be clear and no longer than 35 words.
 - ${simpleLang}
-- Be direct — no intro phrases like "This question asks..." or "The chapter reveals..."
-- Only say "That's not covered here" if the topic truly doesn't appear anywhere in the chapter content
-- No markdown, no lists, no asterisks
+- Be direct — no filler like "That's a great question!" or "The chapter reveals..."
+- Only say "That's not covered here" if the topic truly doesn't appear anywhere
+- No markdown, no lists, no asterisks, no incomplete sentences
 
 Speak directly to the student now:`.trim();
 

@@ -269,10 +269,6 @@ const VoiceController = ({
       onCommand?.(cmd);
       if (cmd === 'repeat') setAnswer(null);
     },
-    onStopNarration: () => {
-      narration.stopNarration();
-      onStopNarration?.();
-    },
     onError: handleError,
   });
 
@@ -411,6 +407,7 @@ const VoiceController = ({
 
         {/* Main mic button */}
         <button
+          data-tour="voice"
           style={S.micBtn(voice.isListening, false)}
           onClick={handleToggle}
           title={voice.isListening ? 'Stop' : 'Ask a question'}

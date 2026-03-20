@@ -26,6 +26,7 @@ import { SUBHEADING_SKIP_DELAY_MS } from '../constants/readerConfig';
 
 // Import your existing TeacherAvatar component
 import TeacherAvatar from '../components/TeacherAvatar';
+import OnboardingTour from '../components/OnboardingTour';
 
 const READER_CSS = `
   @keyframes slideIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
@@ -49,6 +50,8 @@ const LineByLineReader = () => {
   // ── UI state ───────────────────────────────────────────────────────────────
   const [showExplanation, setShowExplanation]               = useState(true);
   const [showDetailedExplanation, setShowDetailedExplanation] = useState(false);
+  const greetingFiredRef = useRef(false);
+  const greetingAudioRef = useRef(null);
   const [detailedExplanation, setDetailedExplanation]       = useState('');
   const [loadingExplanation, setLoadingExplanation]         = useState(false);
   const [showCompletionModal, setShowCompletionModal]       = useState(false);
@@ -125,6 +128,63 @@ const LineByLineReader = () => {
     }
   }, [currentSegment, currentSegmentIndex, currentPageIndex]); // eslint-disable-line
 
+  // Stop greeting audio if user navigates away or exits fullscreen
+  const stopGreeting = () => {
+    if (greetingAudioRef.current) {
+      greetingAudioRef.current.pause();
+      greetingAudioRef.current = null;
+    }
+  };
+
+  // Welcome greeting - plays once when chapter data loads
+  useEffect(() => {
+    if (greetingFiredRef.current || !chapterData) return;
+    greetingFiredRef.current = true;
+    const getFirstName = () => {
+      try {
+        const raw = localStorage.getItem('student') || sessionStorage.getItem('student');
+        if (raw) { const full = (JSON.parse(raw)?.name || '').trim(); return full.split(' ')[0] || null; }
+      } catch (_) {} return null;
+    };
+    const firstName = getFirstName();
+    const chapterTitle = chapterData?.chapter_title || chapter?.chapter_title || 'this chapter';
+    const lines = ["Let's dive in and make this chapter fun together!","Let's explore this chapter step by step.","Ready to learn something awesome? Let's go!","Learning is an adventure and it starts right now!"];
+    const greetText = (firstName
+      ? `Hi ${firstName}! Welcome to AI Tutor. We are starting ${chapterTitle}. `
+      : `Welcome to AI Tutor! We are starting ${chapterTitle}. `
+    ) + lines[Math.floor(Math.random() * lines.length)];
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    fetch(`${API_BASE}/api/voice/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ text: greetText }),
+    }).then(r => r.ok ? r.blob() : Promise.reject()).then(blob => {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      greetingAudioRef.current = audio;
+      audio.onended = () => { URL.revokeObjectURL(url); greetingAudioRef.current = null; };
+      audio.play().catch(() => {});
+    }).catch(() => {});
+    // Stop greeting when component unmounts
+    return stopGreeting;
+  }, [chapterData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Stop greeting on fullscreen exit or chapterId change
+  useEffect(() => { return stopGreeting; }, [chapterId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const onFsChange = () => {
+      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+      if (!isFs) stopGreeting();
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      document.removeEventListener('webkitfullscreenchange', onFsChange);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Progress stats ─────────────────────────────────────────────────────────
   const totalSegments = chapterData?.sections?.reduce((sum, s) => sum + (s.content?.length || 0), 0) || 0;
   const currentSegmentGlobal =
@@ -169,22 +229,22 @@ const LineByLineReader = () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
 
       <MobileHeader chapter={chapter} chapterData={chapterData} currentSection={currentSection} currentPageIndex={currentPageIndex} progressPercentage={progressPercentage} showExplanation={showExplanation} onToggleExplanation={() => setShowExplanation(v => !v)} />
       <MobileTeacherAvatar isReading={tts.isReading} audioRef={tts.audioRef} TeacherAvatarComponent={TeacherAvatar} />
       <MobilePageSelector chapterData={chapterData} currentPageIndex={currentPageIndex} onPageSelect={handlePageSelect} />
       <DesktopHeader chapter={chapter} chapterData={chapterData} currentSection={currentSection} currentPageIndex={currentPageIndex} currentSegmentGlobal={currentSegmentGlobal} totalSegments={totalSegments} progressPercentage={progressPercentage} showExplanation={showExplanation} onToggleExplanation={() => setShowExplanation(v => !v)} />
 
-      <div className="w-full py-0 px-0 sm:px-1 lg:px-2 pt-[240px] sm:pt-[230px] md:pt-[280px] lg:pt-0">
-        <div className="flex flex-col w-full gap-0 lg:gap-2 lg:flex-row lg:h-[calc(100vh-9rem)]">
+      <div className="w-full py-0 px-0 sm:px-1 lg:px-2 pt-[240px] sm:pt-[230px] md:pt-[280px] lg:pt-0 overflow-hidden">
+        <div className="flex flex-col w-full gap-0 lg:gap-2 lg:flex-row lg:h-[calc(100vh-9rem)] overflow-hidden">
 
-          <SidebarTeacher isReading={tts.isReading} audioRef={tts.audioRef} chapterData={chapterData} currentPageIndex={currentPageIndex} onPageSelect={handlePageSelect} TeacherAvatarComponent={TeacherAvatar} />
+          <div data-tour="pages"><SidebarTeacher isReading={tts.isReading} audioRef={tts.audioRef} chapterData={chapterData} currentPageIndex={currentPageIndex} onPageSelect={handlePageSelect} TeacherAvatarComponent={TeacherAvatar} /></div>
 
-          <div className="relative flex-1 w-full lg:h-full">
-            <div className="flex flex-col gap-0 h-full">
+          <div className="relative flex-1 w-full lg:h-full overflow-hidden">
+            <div className="flex flex-col gap-0 h-full overflow-hidden">
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar min-h-[calc(100vh-220px)] lg:min-h-0"
+              <div className="flex-1 overflow-hidden custom-scrollbar h-[calc(100vh-220px)] lg:h-auto"
                 style={{ background: 'linear-gradient(180deg,#e8d4b8 0%,#d4c4a8 50%,#c4b498 100%)' }}>
                 <div className="relative p-2 sm:p-3 md:p-4 lg:p-6 pb-6">
                   <div className="relative" style={{ background: 'linear-gradient(145deg,#2d3748,#1a202c)', padding: '12px', borderRadius: '8px', boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}>
@@ -193,16 +253,18 @@ const LineByLineReader = () => {
                       <div key={i} className={`absolute w-8 h-8 border-gray-600 ${cls}`} />
                     ))}
 
-                    <div className="rounded-lg shadow-inner flex flex-col h-auto lg:h-[calc(100vh-20rem)]"
+                    <div className="rounded-lg shadow-inner flex flex-col h-full lg:h-[calc(100vh-20rem)]"
                       style={{ background: '#fff', boxShadow: 'inset 0 4px 15px rgba(0,0,0,0.15)', border: '3px solid #5a6a5a' }}>
-                      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-4 md:p-6 pb-12">
+                      <div className="flex-1 overflow-hidden p-2 sm:p-4 md:p-6 pb-12">
 
+                        <div data-tour="read-aloud">
                         <ControlButtons
                           isReading={tts.isReading} isLoadingAudio={tts.isLoadingAudio}
                           autoPlayMode={tts.autoPlayMode} autoPlayCountdown={tts.autoPlayCountdown}
                           onReadAloud={() => tts.readAloud()} onStopReading={tts.stopReading}
                           onToggleAutoPlay={tts.toggleAutoPlay} onGetDetailedExplanation={getDetailedExplanation}
                         />
+                        </div>
 
                         {/* Section badge */}
                         {!isSubheading && (
@@ -257,12 +319,14 @@ const LineByLineReader = () => {
                 </div>
               </div>
 
+              <div data-tour="next">
               <NavigationFooter
                 currentSegmentGlobal={currentSegmentGlobal} totalSegments={totalSegments}
                 progressPercentage={progressPercentage} isLastSegment={isLastSegment()}
                 onPrevious={goToPreviousSegment} onNext={goToNextSegment}
                 onFinish={() => { saveProgress(currentSegmentIndex, currentPageIndex); setShowCompletionModal(true); }}
               />
+              </div>
             </div>
           </div>
         </div>
@@ -271,6 +335,7 @@ const LineByLineReader = () => {
       {showCompletionModal && <CompletionModal chapter={chapter} onClose={() => setShowCompletionModal(false)} />}
       {showExitDialog && <ExitDialog onContinue={handleReturnToFullscreen} onExit={handleExitClass} />}
 
+<OnboardingTour isReady={!loading} />
 <VoiceController
   chapterId={chapterId}
   getVisibleText={() => visibleTextRef.current}

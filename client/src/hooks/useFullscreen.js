@@ -61,12 +61,24 @@ const useFullscreen = ({ loading, chapter, onStopReading, onShowExitDialog }) =>
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('msfullscreenchange', handleFullscreenChange);
 
-    const timer = setTimeout(() => {
-      if (!fullscreenAttempted.current && !loading) {
-        fullscreenAttempted.current = true;
-        enterFullscreen();
-      }
-    }, FULLSCREEN_ENTER_DELAY_MS);
+    let timer;
+    if (!loading && !fullscreenAttempted.current) {
+      // Chapter just finished loading: enter fullscreen after a short DOM-settle delay
+      timer = setTimeout(() => {
+        if (!fullscreenAttempted.current) {
+          fullscreenAttempted.current = true;
+          enterFullscreen();
+        }
+      }, 300); // 300ms: enough for paint, short enough to feel immediate
+    } else if (!fullscreenAttempted.current) {
+      // Still loading: fall back to the configured delay
+      timer = setTimeout(() => {
+        if (!fullscreenAttempted.current && !loading) {
+          fullscreenAttempted.current = true;
+          enterFullscreen();
+        }
+      }, FULLSCREEN_ENTER_DELAY_MS);
+    }
 
     return () => {
       clearTimeout(timer);
