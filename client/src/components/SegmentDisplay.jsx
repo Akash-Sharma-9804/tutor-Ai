@@ -1,23 +1,5 @@
-import { BlockMath, InlineMath } from 'react-katex';
 import { Lightbulb } from 'lucide-react';
 import renderMixedText from '../utils/renderMixedText';
-
-// ─── Shared inline renderer (math + bold/italic markdown) ────────────────────
-
-const renderInline = (text) => {
-  if (!text) return null;
-  return text.split(/(\$[^$]+\$)/g).map((part, i) => {
-    if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
-      try { return <InlineMath key={i} math={part.slice(1, -1).trim()} />; }
-      catch { return <span key={i}>{part}</span>; }
-    }
-    return part.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).map((mp, j) => {
-      if (mp.startsWith('**') && mp.endsWith('**')) return <strong key={`${i}-${j}`}>{mp.slice(2, -2)}</strong>;
-      if (mp.startsWith('*') && mp.endsWith('*'))   return <em key={`${i}-${j}`}>{mp.slice(1, -1)}</em>;
-      return <span key={`${i}-${j}`}>{mp}</span>;
-    });
-  });
-};
 
 // ─── Shared word-highlight renderer ──────────────────────────────────────────
 
@@ -126,13 +108,13 @@ const renderSolutionBlock = (text, borderColor = 'border-blue-300', headerColor 
           <table className="w-full border-collapse text-sm">
             {headers.length > 0 && (
               <thead><tr className={headerColor}>
-                {headers.map((h, hi) => <th key={hi} className={`border ${borderColor} px-3 py-2 text-left font-bold text-slate-700`}>{renderInline(h)}</th>)}
+                {headers.map((h, hi) => <th key={hi} className={`border ${borderColor} px-3 py-2 text-left font-bold text-slate-700`}>{renderMixedText(h)}</th>)}
               </tr></thead>
             )}
             <tbody>
               {dataRows.map((row, ri) => (
                 <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
-                  {parseRow(row).map((cell, ci) => <td key={ci} className={`border ${borderColor} px-3 py-2 text-slate-700`}>{renderInline(cell)}</td>)}
+                  {parseRow(row).map((cell, ci) => <td key={ci} className={`border ${borderColor} px-3 py-2 text-slate-700`}>{renderMixedText(cell)}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -141,16 +123,16 @@ const renderSolutionBlock = (text, borderColor = 'border-blue-300', headerColor 
       );
     } else {
       if (line.trim().match(/^\d+\./)) {
-        result.push(<p key={i} className="text-sm font-bold text-slate-700 mb-1 mt-2">{renderInline(line)}</p>);
+        result.push(<p key={i} className="text-sm font-bold text-slate-700 mb-1 mt-2">{renderMixedText(line)}</p>);
       } else if (line.trim().match(/^\*\s/)) {
         result.push(
           <div key={i} className="mb-1 pl-4 flex gap-2">
             <span className="text-slate-400 mt-1">•</span>
-            <p className="text-sm text-slate-600">{renderInline(line.replace(/^\*\s*/, ''))}</p>
+            <p className="text-sm text-slate-600">{renderMixedText(line.replace(/^\*\s*/, ''))}</p>
           </div>
         );
       } else if (line.trim()) {
-        result.push(<p key={i} className="text-sm text-slate-700 mb-1 leading-relaxed">{renderInline(line)}</p>);
+        result.push(<p key={i} className="text-sm text-slate-700 mb-1 leading-relaxed">{renderMixedText(line)}</p>);
       }
       i++;
     }

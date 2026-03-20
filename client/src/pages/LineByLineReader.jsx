@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect ,useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import "katex/dist/katex.min.css";
 
@@ -7,6 +7,7 @@ import useChapterData, { fetchDetailedExplanation, saveSegmentProgress } from '.
 import useSegmentNavigation from '../hooks/useSegmentNavigation';
 import useTTS from '../hooks/useTTS';
 import useFullscreen from '../hooks/useFullscreen';
+import VoiceController from '../components/VoiceController';
 
 // ── Segment display ───────────────────────────────────────────────────────────
 import { TextSegment, DialogueSegment, ExampleSegment, EquationSegment, DiagramSegment, TableSegment } from '../components/SegmentDisplay';
@@ -74,6 +75,18 @@ const LineByLineReader = () => {
 
   // ── TTS hook ───────────────────────────────────────────────────────────────
   const tts = useTTS({ chapterId, currentSegment, currentSegmentIndex, showExplanation, goToNextSegment });
+
+  // ── Voice ref — tracks currently visible text for voice Q&A ──────────────
+  const visibleTextRef = useRef('');
+  useEffect(() => {
+    if (currentSegment) {
+      visibleTextRef.current =
+        currentSegment.text ||
+        currentSegment.problem ||
+        currentSegment.equation ||
+        currentSegment.subheading || '';
+    }
+  }, [currentSegment]);
 
   // ── Fullscreen hook ────────────────────────────────────────────────────────
   const { enterFullscreen } = useFullscreen({
@@ -258,6 +271,25 @@ const LineByLineReader = () => {
       {showCompletionModal && <CompletionModal chapter={chapter} onClose={() => setShowCompletionModal(false)} />}
       {showExitDialog && <ExitDialog onContinue={handleReturnToFullscreen} onExit={handleExitClass} />}
 
+<VoiceController
+  chapterId={chapterId}
+  getVisibleText={() => visibleTextRef.current}
+  getCurrentSegment={() => currentSegment}
+        onCommand={(cmd) => {
+          if (cmd === 'next')      goToNextSegment();
+          if (cmd === 'prev')      goToPreviousSegment();
+          if (cmd === 'pause')     tts.stopReading();
+          if (cmd === 'stop')      { tts.stopReading(); tts.autoPlayRef && (tts.autoPlayRef.current = false); }
+          if (cmd === 'resume')    tts.readAloud();
+          if (cmd === 'auto-play') tts.toggleAutoPlay();
+        }}
+        autoNarrate={false}
+        currentSegmentText={currentSegment?.text || currentSegment?.problem || currentSegment?.equation || ''}
+        onNarrationEnd={goToNextSegment}
+        onStopNarration={() => {
+          tts.stopReading();
+        }}
+      />
       <style>{READER_CSS}</style>
     </div>
   );

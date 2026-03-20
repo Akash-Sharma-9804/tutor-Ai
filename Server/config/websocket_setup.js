@@ -3,7 +3,7 @@
  */
 
 const socketIO = require('socket.io');
-
+const { registerVoiceSocket } = require('../sockets/voiceSocket');
 /**
  * Initialize WebSocket with Express server
  */
@@ -196,10 +196,14 @@ function initializeWebSocket(httpServer, app) {
     return room ? room.size : 0;
   };
 
+  // ── VOICE INTERACTION ──────────────────────────────────────────────
+  registerVoiceSocket(io);
+
   console.log('✅ WebSocket initialized successfully');
   console.log('   Supported events:');
   console.log('   • Chat: join_chat, leave_chat, stream_chunk, page_chunk, etc.');
   console.log('   • Scan: join_scan, leave_scan');
+  console.log('   • Voice: voice:join, voice:audio_chunk, voice:update_context');
   console.log('   • Connection: ping, get_socket_info');
 
   return io;

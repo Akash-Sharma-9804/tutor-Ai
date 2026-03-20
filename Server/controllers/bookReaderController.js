@@ -456,6 +456,7 @@ exports.textToSpeech = async (req, res) => {
       return res.status(500).json({ message: "TTS service not configured" });
     }
 
+    const https = require('https');
     const dgResponse = await axios.post(
       "https://api.deepgram.com/v1/speak",
       { text: cleanText },
@@ -467,6 +468,7 @@ exports.textToSpeech = async (req, res) => {
           "Content-Type": "application/json",
         },
         responseType: "stream",
+        httpsAgent: new https.Agent({ keepAlive: false }),
       }
     );
 

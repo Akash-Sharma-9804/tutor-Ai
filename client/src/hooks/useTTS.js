@@ -396,7 +396,7 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
           else resolve();
         });
 
-        await speakWithDeepgram(cleanForTTS(`Equation: ${currentSegment.equation || ''}`));
+        await speakWithDeepgram(cleanForTTS(`Equation: ${currentSegment.equation || ''}`), null, false, currentSegmentIndex);
         await waitForAudio();
         await new Promise(r => setTimeout(r, 1200)); // Longer delay in autoplay
 
@@ -406,7 +406,7 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
             setActiveEquationStep(idx);
             const stepText = cleanForTTS(`Step ${idx + 1}: ${step.step || ''}. ${step.explanation || ''}`);
             if (stepText.trim()) {
-              await speakWithDeepgram(stepText, { stepIndex: idx, stepText: step.step, explanationText: step.explanation });
+              await speakWithDeepgram(stepText, { stepIndex: idx, stepText: step.step, explanationText: step.explanation }, false, currentSegmentIndex);
               await waitForAudio();
               await new Promise(r => setTimeout(r, 1200)); // Longer delay in autoplay
             }
@@ -415,7 +415,7 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
 
         if (currentSegment.final_result) {
           setShowFinalResult(true);
-          await speakWithDeepgram(cleanForTTS(`Final result: ${currentSegment.final_result}`));
+          await speakWithDeepgram(cleanForTTS(`Final result: ${currentSegment.final_result}`), null, false, currentSegmentIndex);
           await waitForAudio();
         }
 
@@ -441,7 +441,7 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
 
         const problemText = cleanForTTS(currentSegment.problem || '');
         if (problemText) {
-          await speakWithDeepgram(problemText);
+          await speakWithDeepgram(problemText, null, false, currentSegmentIndex);
           await waitForAudio();
           await new Promise(r => setTimeout(r, 1000)); // Longer delay in autoplay
         }
@@ -453,7 +453,7 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
           for (const step of steps) {
             const spoken = cleanForTTS(step);
             if (!spoken.trim()) continue;
-            await speakWithDeepgram(spoken);
+            await speakWithDeepgram(spoken, null, false, currentSegmentIndex);
             await waitForAudio();
             await new Promise(r => setTimeout(r, 1000)); // Longer delay in autoplay
           }
@@ -490,7 +490,7 @@ const useTTS = ({ chapterId, currentSegment, currentSegmentIndex, showExplanatio
         for (const step of currentSegment._ttsSteps) {
           const spoken = cleanForTTS(step);
           if (!spoken.trim()) continue;
-          await speakWithDeepgram(spoken);
+          await speakWithDeepgram(spoken, null, false, currentSegmentIndex);
           await waitForAudio();
           await new Promise(r => setTimeout(r, 1000)); // Longer delay in autoplay to prevent connection reset
         }

@@ -16,6 +16,7 @@ const adminRoutes = require("./routes/Admin/adminRoutes");
 const scanRoutes = require('./routes/ScanRoutes');
 const chatRoutes = require('./routes/ChatRoutes');
 const schoolRoutes = require('./routes/schoolRoutes');
+const voiceRoutes = require('./routes/voiceRoutes');
 const app = express();
 
 // Create HTTP server
@@ -48,6 +49,7 @@ app.use("/api/books", bookRoutes);
 app.use('/api/scans', scanRoutes);
 app.use('/api/chat', chatRoutes);
 app.use("/api/school", schoolRoutes);
+app.use('/api/voice', voiceRoutes);
 // Health check
 app.get("/", (req, res) => {
   res.send("AI Tutor Backend is running 🚀");
