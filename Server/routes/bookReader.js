@@ -15,6 +15,12 @@ router.get("/subject/:subjectId", bookReaderController.getBooksBySubject);
 // Get table of contents (all chapters) for a book
 router.get("/:bookId/chapters", bookReaderController.getBookChapters);
 
+// ✅ Get worksheets for a chapter
+router.get("/chapters/:chapterId/worksheets", bookReaderController.getChapterWorksheets);
+
+// ✅ Get single worksheet
+router.get("/chapters/:chapterId/worksheets/:worksheetId", bookReaderController.getWorksheetById);
+
 // Get full chapter content with pages and paragraphs
 router.get("/chapters/:chapterId/content", bookReaderController.getChapterContent);
 

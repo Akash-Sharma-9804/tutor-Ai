@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const adminAuth = require("../../middleware/adminAuth");
-
+const worksheetController = require("../../controllers/Admin/adminWorksheetController");
+const summaryController = require("../../controllers/Admin/adminSummaryController");
 const dashboardController = require("../../controllers/Admin/adminDashboardController");
 const schoolController = require("../../controllers/Admin/adminSchoolController");
 const classController = require("../../controllers/Admin/adminClassController");
@@ -87,5 +88,49 @@ router.put("/students/:id", userController.updateUser);
 router.put("/students/:id/status", userController.updateUserStatus);
 router.delete("/students/:id", userController.deleteUser);
 router.get("/students/:id/details", userController.getStudentDetails);
+
+// ── Worksheet routes ──────────────────────────────────────────────────────────
+ 
+// Generate a new worksheet for a chapter (triggers Gemini)
+router.post(
+  "/books/:bookId/chapters/:chapterId/worksheets",
+  worksheetController.generateWorksheet
+);
+ 
+// List all worksheets for a chapter
+router.get(
+  "/books/:bookId/chapters/:chapterId/worksheets",
+  worksheetController.listWorksheets
+);
+ 
+// Get a single worksheet with full questions
+router.get(
+  "/books/:bookId/chapters/:chapterId/worksheets/:id",
+  worksheetController.getWorksheet
+);
+ 
+// Delete a worksheet
+router.delete(
+  "/books/:bookId/chapters/:chapterId/worksheets/:id",
+  worksheetController.deleteWorksheet
+);
+ 
+// List ALL worksheets for a book across all chapters (for overview page)
+router.get(
+  "/books/:bookId/worksheets",
+  worksheetController.listBookWorksheets
+);
+
+// Generate summary for one chapter
+router.post(
+  "/chapters/:chapterId/generate-summary",
+  summaryController.generateSummaryForChapter
+);
+
+// Generate summary for ALL chapters
+router.post(
+  "/chapters/generate-all-summaries",
+  summaryController.generateSummaryForAllChapters
+);
 
 module.exports = router;

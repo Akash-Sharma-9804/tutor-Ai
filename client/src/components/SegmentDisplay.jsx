@@ -61,7 +61,7 @@ export const TextSegment = ({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const DialogueSegment = ({ segment }) => (
-  <div className="mb-4 space-y-3" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+  <div className="mb-4 space-y-3"  >
     {segment.speakers && (
       <div className="flex items-center gap-2">
         <span className="text-2xl">💬</span>
@@ -141,7 +141,7 @@ const renderSolutionBlock = (text, borderColor = 'border-blue-300', headerColor 
 };
 
 export const ExampleSegment = ({ segment }) => (
-  <div className="mb-4 space-y-4" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+  <div className="mb-4 space-y-4"  >
     <div className="bg-green-100 rounded-2xl p-4 sm:p-6 border-4 border-green-400 shadow-lg">
       <div className="flex items-center gap-3 mb-4">
         <span className="p-2 bg-green-500 rounded-lg border-2 border-green-600 shadow-md text-2xl">📝</span>
@@ -305,7 +305,7 @@ export const EquationSegment = ({
     : 'Mathematical Equation';
 
   return (
-    <div className="mb-4 animate-slideIn" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+    <div className="mb-4 animate-slideIn"  >
       <div className="flex items-center gap-3 mb-4 pb-3 border-b-4 border-blue-400">
         <span className="text-3xl">{isDerivation ? '📐' : '🔢'}</span>
         <h2 className="text-xl sm:text-2xl font-bold text-slate-800">{headerTitle}</h2>
@@ -423,7 +423,7 @@ export const DiagramSegment = ({
         }
       </div>
       {(segment.description || segment.explanation) && (
-        <div className="bg-purple-100 rounded-2xl p-4 border-4 border-purple-400 shadow-lg" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+        <div className="bg-purple-100 rounded-2xl p-4 border-4 border-purple-400 shadow-lg"  >
           <div className="flex items-center gap-3 mb-4">
             <Lightbulb className="h-6 w-6 text-purple-600" />
             <h2 className="text-lg font-bold text-slate-800">💡 Understanding the Diagram</h2>
@@ -457,7 +457,7 @@ export const TableSegment = ({
     ? Math.min(Math.floor(highlightedWordIndex / wordsPerRow), rows.length - 1) : -1;
 
   return (
-    <div className="mb-4 animate-slideIn" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+    <div className="mb-4 animate-slideIn"  >
       {segment.title && (
         <div className="flex items-center gap-2 mb-3">
           <span className="text-2xl">📊</span>

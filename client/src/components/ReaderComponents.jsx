@@ -84,14 +84,14 @@ export const MobilePageSelector = ({ chapterData, currentPageIndex, onPageSelect
       <div id="mobile-page-selector-backdrop" className="hidden fixed inset-0 z-[60] bg-black/50" onClick={hide} />
       <div id="mobile-page-selector" className="translate-y-full fixed bottom-0 left-0 right-0 z-[70] bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl transition-transform duration-300 max-h-[70vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="font-bold text-gray-900 dark:text-white text-lg" style={{ fontFamily: 'Comic Sans MS, cursive' }}>📖 Jump to Page</h3>
+          <h3 className="font-bold text-gray-900 dark:text-white text-lg"  >📖 Jump to Page</h3>
           <button onClick={hide} className="text-gray-500 hover:text-gray-900 font-bold text-xl">✕</button>
         </div>
         <div className="overflow-y-auto p-4 space-y-2 custom-scrollbar">
           {chapterData?.sections?.map((section, idx) => (
             <button key={idx} onClick={() => { onPageSelect(idx); hide(); }}
               className={`w-full text-left p-3 rounded-xl transition-all ${currentPageIndex === idx ? 'bg-indigo-600 text-white font-bold shadow-lg' : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-indigo-50'}`}
-              style={{ fontFamily: 'Comic Sans MS, cursive' }}
+               
             >
               <div className="font-bold text-sm">Page {section.page_range?.[0] ?? idx + 1}</div>
               {section.heading && <div className="text-xs mt-0.5 opacity-80 truncate">{section.heading}</div>}
@@ -151,26 +151,26 @@ export const DesktopHeader = ({ chapter, chapterData, currentSection, currentPag
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const SidebarTeacher = ({ isReading, audioRef, chapterData, currentPageIndex, onPageSelect, TeacherAvatarComponent }) => (
-  <div className="hidden lg:flex lg:flex-col lg:w-64 gap-4 p-4">
-    <div className="relative" style={{ background: 'linear-gradient(145deg, #f59e0b, #d97706)', padding: '12px', borderRadius: '20px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', border: '4px solid #78350f' }}>
+  <div className="hidden lg:flex lg:flex-col lg:w-64 lg:h-full gap-4 p-4 overflow-hidden">
+    <div className="flex-shrink-0 relative" style={{ background: 'linear-gradient(145deg, #f59e0b, #d97706)', padding: '12px', borderRadius: '20px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', border: '4px solid #78350f' }}>
       <div className="w-full h-[300px] flex items-end justify-center">
         {TeacherAvatarComponent && <TeacherAvatarComponent isSpeaking={isReading} audioRef={audioRef} />}
       </div>
       <div className="text-center">
         <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border-2 border-white/20">
-          <p className="text-white text-xs mb-1" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Hi! I'm</p>
+          <p className="text-white text-xs mb-1"  >Hi! I'm</p>
           <h3 className="text-white font-black text-2xl tracking-wide" style={{ fontFamily: 'Comic Sans MS, cursive', textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>Andy</h3>
-          <p className="text-amber-200 font-semibold text-sm mt-1" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Your study sidekick! 🚀</p>
+          <p className="text-amber-200 font-semibold text-sm mt-1"  >Your study sidekick! 🚀</p>
         </div>
       </div>
     </div>
-    <div className="flex-1 rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(145deg,#e0e7ff,#c7d2fe)', border: '3px solid #6366f1', boxShadow: '0 4px 20px rgba(99,102,241,0.3)' }}>
-      <h3 className="text-lg font-bold text-indigo-900 p-4 pb-3 text-center sticky top-0 bg-gradient-to-b from-indigo-200 to-indigo-100 z-10" style={{ fontFamily: 'Comic Sans MS, cursive' }}>📖 Pages</h3>
-      <div className="space-y-2 p-4 pt-0 overflow-y-auto custom-scrollbar max-h-[calc(100%-4rem)]">
+    <div className="flex-1 min-h-0 rounded-2xl overflow-hidden flex flex-col" style={{ background: 'linear-gradient(145deg,#e0e7ff,#c7d2fe)', border: '3px solid #6366f1', boxShadow: '0 4px 20px rgba(99,102,241,0.3)' }}>
+      <h3 className="flex-shrink-0 text-lg font-bold text-indigo-900 p-4 pb-3 text-center bg-gradient-to-b from-indigo-200 to-indigo-100 z-10"  >📖 Pages</h3>
+      <div className="flex-1 min-h-0 space-y-2 p-4 pt-0 overflow-y-auto custom-scrollbar">
         {chapterData?.sections?.map((section, idx) => (
           <button key={idx} onClick={() => onPageSelect(idx)}
             className={`w-full text-left p-3 rounded-lg transition-all ${currentPageIndex === idx ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'bg-white text-indigo-900 hover:bg-indigo-100'}`}
-            style={{ fontFamily: 'Comic Sans MS, cursive' }}
+             
           >
             <div className="font-bold text-sm">Page {section.page_range?.[0] ?? idx + 1}</div>
             {section.heading && <div className="text-xs opacity-90 truncate mt-1">{section.heading}</div>}
@@ -186,20 +186,81 @@ export const SidebarTeacher = ({ isReading, audioRef, chapterData, currentPageIn
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const MobileTeacherAvatar = ({ isReading, audioRef, TeacherAvatarComponent }) => (
-  <div className="lg:hidden fixed top-[42px] left-0 right-0 z-40 rounded-b-[15px]"
-    style={{ background: 'linear-gradient(145deg, #f59e0b, #d97706)', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
-    <div className="relative h-[160px] md:h-[220px]">
-      {TeacherAvatarComponent && <TeacherAvatarComponent isSpeaking={isReading} audioRef={audioRef} />}
+  <div className="lg:hidden fixed top-[42px] left-0 right-0 z-40 overflow-hidden"
+    style={{
+      background: 'linear-gradient(160deg, #92400e 0%, #b45309 30%, #f59e0b 70%, #fbbf24 100%)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+      borderBottom: '2px solid rgba(251,191,36,0.4)',
+    }}>
+
+    {/* Decorative background glow rings */}
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-[220px] h-[220px] rounded-full opacity-20"
+        style={{ background: 'radial-gradient(circle, #fff 0%, transparent 70%)' }} />
+      <div className="absolute top-2 left-6 w-3 h-3 rounded-full bg-white/20" />
+      <div className="absolute top-5 left-16 w-1.5 h-1.5 rounded-full bg-white/15" />
+      <div className="absolute top-3 right-10 w-2 h-2 rounded-full bg-white/20" />
+      <div className="absolute bottom-8 right-6 w-2.5 h-2.5 rounded-full bg-white/10" />
+    </div>
+
+    {/* Avatar area */}
+    <div className="relative h-[160px] md:h-[200px] flex items-center justify-center">
+      <div className="w-full h-full">
+        {TeacherAvatarComponent && <TeacherAvatarComponent isSpeaking={isReading} audioRef={audioRef} />}
+      </div>
+
+      {/* Sound wave bars when speaking */}
       {isReading && (
-        <div className="absolute bottom-3 right-3 flex items-center gap-2 bg-red-500/95 px-3 py-1.5 rounded-full shadow-lg">
-          <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-          <span className="text-white text-xs font-semibold">Speaking...</span>
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-end gap-[3px]">
+          {[10, 18, 26, 18, 12, 22, 16, 24, 14].map((h, i) => (
+            <div key={i}
+              className="w-[3px] rounded-full bg-white/80"
+              style={{
+                height: `${h}px`,
+                animation: `soundBar 0.6s ease-in-out ${i * 0.07}s infinite alternate`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Idle pulse ring when not speaking */}
+      {!isReading && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white/15 backdrop-blur-sm px-3 py-1 rounded-full border border-white/25">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-200 animate-pulse" />
+          <span className="text-white/90 text-[10px] font-semibold tracking-wide">READY</span>
         </div>
       )}
     </div>
-    <div className="text-center bg-white/10 backdrop-blur-sm p-1 border-t-2 border-white/20">
-      <p className="text-white text-xs" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Hi! I'm Andy – Your study sidekick! 🚀</p>
+
+    {/* Name strip */}
+    <div className="relative flex items-center justify-between px-4 py-1.5"
+      style={{ background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(8px)', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-sm">🎓</div>
+        <div>
+          <p className="text-white font-bold text-xs leading-none">Andy</p>
+          <p className="text-amber-200 text-[9px] leading-none mt-0.5">AI Study Buddy</p>
+        </div>
+      </div>
+      {isReading ? (
+        <div className="flex items-center gap-1.5 bg-red-500/80 px-2.5 py-1 rounded-full">
+          <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
+          <span className="text-white text-[10px] font-bold">LIVE</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 bg-white/15 px-2.5 py-1 rounded-full">
+          <span className="text-white/80 text-[10px]">Your study sidekick 🚀</span>
+        </div>
+      )}
     </div>
+
+    <style>{`
+      @keyframes soundBar {
+        from { transform: scaleY(0.4); opacity: 0.5; }
+        to   { transform: scaleY(1.2); opacity: 1; }
+      }
+    `}</style>
   </div>
 );
 
@@ -211,17 +272,17 @@ export const ControlButtons = ({ isReading, isLoadingAudio, autoPlayMode, autoPl
   <div className="flex flex-wrap items-center gap-1 sm:gap-2 md:gap-3 mb-3 sm:mb-4 pb-2 sm:pb-3 border-b-2 sm:border-b-4 border-slate-600" style={{ borderStyle: 'dashed' }}>
     <button onClick={isReading ? onStopReading : onReadAloud} disabled={isLoadingAudio}
       className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md border-2 ${isReading ? 'bg-red-500 hover:bg-red-600 text-white border-red-700' : isLoadingAudio ? 'bg-gray-400 cursor-not-allowed text-white border-gray-600' : 'bg-blue-500 hover:bg-blue-600 text-white border-blue-700'}`}
-      style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+       >
       {isLoadingAudio ? <><Loader2 className="h-4 w-4 animate-spin" /> Loading...</> : isReading ? <><Pause className="h-4 w-4" /> Stop</> : <><Play className="h-4 w-4" /> Read Aloud</>}
     </button>
     <button onClick={onToggleAutoPlay}
       className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md border-2 hover:scale-105 ${autoPlayMode ? 'bg-green-500 text-white border-green-700' : 'bg-slate-300 text-slate-700 hover:bg-slate-400 border-slate-500'}`}
-      style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+       >
       {autoPlayCountdown > 0 ? `Next in ${autoPlayCountdown}s` : 'Auto-Play'}
     </button>
     <button onClick={onGetDetailedExplanation}
       className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md bg-purple-500 hover:bg-purple-600 text-white hover:scale-105 border-2 border-purple-700"
-      style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+       >
       <Sparkles className="h-4 w-4" />
       <span className="hidden sm:inline">Explain in Detail</span>
       <span className="sm:hidden">Explain</span>
@@ -247,7 +308,7 @@ export const ExplanationCard = ({ segment, isReading, currentWords, highlightedW
   const expWords = currentWords.slice(mainTextWordCount);
   const expIdx = highlightedWordIndex - mainTextWordCount;
   return (
-    <div className="bg-yellow-100 rounded-2xl shadow-lg p-4 border-4 border-yellow-400 mb-4 animate-chalkWrite" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+    <div className="bg-yellow-100 rounded-2xl shadow-lg p-4 border-4 border-yellow-400 mb-4 animate-chalkWrite"  >
       <div className="flex items-center gap-3 mb-4">
         <div className="p-2 bg-yellow-500 rounded-lg border-2 border-yellow-600 shadow-md"><Lightbulb className="h-6 w-6 text-white" /></div>
         <h2 className="text-sm md:text-xl font-bold text-slate-800">💡 Simple Explanation</h2>
@@ -348,7 +409,7 @@ export const TeacherBoard = ({ detailedExplanation, loadingExplanation, isReadin
         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
           <div className="p-2 sm:p-3 bg-green-500 rounded-lg sm:rounded-xl shadow-lg border-2 border-white flex-shrink-0"><MessageCircle className="h-5 sm:h-7 w-5 sm:w-7 text-white" /></div>
           <div className="min-w-0">
-            <h2 className="text-xl sm:text-2xl font-bold text-white truncate" style={{ fontFamily: 'Comic Sans MS, cursive' }}>🎓 Teacher's Board</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-white truncate"  >🎓 Teacher's Board</h2>
             <p className="text-xs sm:text-sm text-green-300 mt-0.5 truncate">Step-by-step explanation</p>
           </div>
         </div>
@@ -365,7 +426,7 @@ export const TeacherBoard = ({ detailedExplanation, loadingExplanation, isReadin
       ) : (
         <div className="bg-white rounded-2xl shadow-inner relative z-10 overflow-hidden">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 p-3 sm:p-4 border-b-4 border-slate-300 bg-slate-100 flex-wrap">
-            <h3 className="text-sm sm:text-base font-bold text-slate-800" style={{ fontFamily: 'Comic Sans MS, cursive' }}>📝 Comprehensive Breakdown</h3>
+            <h3 className="text-sm sm:text-base font-bold text-slate-800"  >📝 Comprehensive Breakdown</h3>
             <button onClick={isReading ? onStopReading : onReadAloud} disabled={!detailedExplanation || loadingExplanation || isLoadingAudio}
               className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg text-xs sm:text-sm font-semibold transition-all disabled:opacity-50 shadow-md border-2 border-blue-300 flex-shrink-0 whitespace-nowrap">
               {isLoadingAudio ? <><Loader2 className="h-4 w-4 animate-spin" /><span className="hidden sm:inline text-xs">Loading...</span></> : isReading ? <><Pause className="h-4 w-4" /><span className="hidden sm:inline text-xs">{currentChunk.total > 1 ? `Stop (${currentChunk.current}/${currentChunk.total})` : 'Stop'}</span></> : <><Volume2 className="h-4 w-4" /><span className="hidden sm:inline text-xs">Read</span></>}
@@ -385,7 +446,7 @@ export const TeacherBoard = ({ detailedExplanation, loadingExplanation, isReadin
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const NavigationFooter = ({ currentSegmentGlobal, totalSegments, progressPercentage, isLastSegment, onPrevious, onNext, onFinish }) => (
-  <div className="flex items-center gap-2 sm:gap-3 md:gap-4 px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-white dark:bg-gray-800 border-t-2 border-gray-200 dark:border-gray-700 shadow-inner">
+  <div className="flex items-center gap-2 sm:gap-3 md:gap-4 px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-white dark:bg-gray-800 border-t-2 border-gray-200 dark:border-gray-700 shadow-inner lg:relative fixed bottom-0 left-0 right-0 z-50">
     <button onClick={onPrevious} className="flex items-center justify-center gap-1.5 px-4 md:px-6 py-2.5 md:py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-200 transition-all shadow min-w-[80px] md:min-w-[100px]">
       <ChevronLeft className="h-5 w-5" /><span className="text-sm md:text-base">Prev</span>
     </button>
@@ -412,7 +473,7 @@ export const CompletionModal = ({ chapter, onClose }) => {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-md mx-4 shadow-2xl border-4 border-green-400 text-center">
         <div className="text-7xl mb-4">🏆</div>
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Chapter Complete!</h2>
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2"  >Chapter Complete!</h2>
         <p className="text-gray-600 dark:text-gray-400 mb-6">You've finished <strong className="text-gray-900 dark:text-white">{chapter?.chapter_title}</strong>. Amazing work! 🌟</p>
         <div className="flex items-center justify-center mb-6">
           <div className="relative w-28 h-28">

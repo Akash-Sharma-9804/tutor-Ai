@@ -229,22 +229,22 @@ const LineByLineReader = () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
 
       <MobileHeader chapter={chapter} chapterData={chapterData} currentSection={currentSection} currentPageIndex={currentPageIndex} progressPercentage={progressPercentage} showExplanation={showExplanation} onToggleExplanation={() => setShowExplanation(v => !v)} />
       <MobileTeacherAvatar isReading={tts.isReading} audioRef={tts.audioRef} TeacherAvatarComponent={TeacherAvatar} />
       <MobilePageSelector chapterData={chapterData} currentPageIndex={currentPageIndex} onPageSelect={handlePageSelect} />
       <DesktopHeader chapter={chapter} chapterData={chapterData} currentSection={currentSection} currentPageIndex={currentPageIndex} currentSegmentGlobal={currentSegmentGlobal} totalSegments={totalSegments} progressPercentage={progressPercentage} showExplanation={showExplanation} onToggleExplanation={() => setShowExplanation(v => !v)} />
 
-      <div className="w-full py-0 px-0 sm:px-1 lg:px-2 pt-[240px] sm:pt-[230px] md:pt-[280px] lg:pt-0 overflow-hidden">
-        <div className="flex flex-col w-full gap-0 lg:gap-2 lg:flex-row lg:h-[calc(100vh-9rem)] overflow-hidden">
+      <div className="w-full py-0 px-0 sm:px-1 lg:px-2 pt-[240px] sm:pt-[230px] md:pt-[280px] lg:pt-0">
+        <div className="flex flex-col w-full gap-0 lg:gap-2 lg:flex-row lg:h-[calc(100vh-9rem)]">
 
           <div data-tour="pages"><SidebarTeacher isReading={tts.isReading} audioRef={tts.audioRef} chapterData={chapterData} currentPageIndex={currentPageIndex} onPageSelect={handlePageSelect} TeacherAvatarComponent={TeacherAvatar} /></div>
 
-          <div className="relative flex-1 w-full lg:h-full overflow-hidden">
-            <div className="flex flex-col gap-0 h-full overflow-hidden">
+          <div className="relative flex-1 w-full lg:h-full">
+            <div className="flex flex-col gap-0 h-full">
 
-              <div className="flex-1 overflow-hidden custom-scrollbar h-[calc(100vh-220px)] lg:h-auto"
+              <div className="flex-1 overflow-y-auto custom-scrollbar h-[calc(100vh-220px)] lg:h-auto"
                 style={{ background: 'linear-gradient(180deg,#e8d4b8 0%,#d4c4a8 50%,#c4b498 100%)' }}>
                 <div className="relative p-2 sm:p-3 md:p-4 lg:p-6 pb-6">
                   <div className="relative" style={{ background: 'linear-gradient(145deg,#2d3748,#1a202c)', padding: '12px', borderRadius: '8px', boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}>
@@ -255,7 +255,7 @@ const LineByLineReader = () => {
 
                     <div className="rounded-lg shadow-inner flex flex-col h-full lg:h-[calc(100vh-20rem)]"
                       style={{ background: '#fff', boxShadow: 'inset 0 4px 15px rgba(0,0,0,0.15)', border: '3px solid #5a6a5a' }}>
-                      <div className="flex-1 overflow-hidden p-2 sm:p-4 md:p-6 pb-12">
+                      <div className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 pb-12">
 
                         <div data-tour="read-aloud">
                         <ControlButtons
@@ -269,18 +269,18 @@ const LineByLineReader = () => {
                         {/* Section badge */}
                         {!isSubheading && (
                           <div className="flex items-center gap-2 mb-3">
-                            <div className="text-sm font-bold text-slate-700 uppercase tracking-wider px-3 py-1 bg-yellow-200 rounded-lg border-2 border-yellow-400 shadow-sm" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                            <div className="text-sm font-bold text-slate-700 uppercase tracking-wider px-3 py-1 bg-yellow-200 rounded-lg border-2 border-yellow-400 shadow-sm"  >
                               📖 {currentSection.heading || `Section ${currentPageIndex + 1}`}
                             </div>
-                            {isDialogue && <span className="px-3 py-1 bg-orange-300 text-orange-900 text-xs font-bold rounded-lg border-2 border-orange-500" style={{ fontFamily: 'Comic Sans MS, cursive' }}>💬 DIALOGUE</span>}
-                            {isEquation && <span className="px-3 py-1 bg-blue-300 text-blue-900 text-xs font-bold rounded-lg border-2 border-blue-500" style={{ fontFamily: 'Comic Sans MS, cursive' }}>🔢 EQUATION</span>}
-                            {isExample && <span className="px-3 py-1 bg-green-300 text-green-900 text-xs font-bold rounded-lg border-2 border-green-500" style={{ fontFamily: 'Comic Sans MS, cursive' }}>📝 EXAMPLE</span>}
-                            {isDiagram && <span className="px-3 py-1 bg-purple-300 text-purple-900 text-xs font-bold rounded-lg border-2 border-purple-500" style={{ fontFamily: 'Comic Sans MS, cursive' }}>📊 DIAGRAM</span>}
+                            {isDialogue && <span className="px-3 py-1 bg-orange-300 text-orange-900 text-xs font-bold rounded-lg border-2 border-orange-500"  >💬 DIALOGUE</span>}
+                            {isEquation && <span className="px-3 py-1 bg-blue-300 text-blue-900 text-xs font-bold rounded-lg border-2 border-blue-500"  >🔢 EQUATION</span>}
+                            {isExample && <span className="px-3 py-1 bg-green-300 text-green-900 text-xs font-bold rounded-lg border-2 border-green-500"  >📝 EXAMPLE</span>}
+                            {isDiagram && <span className="px-3 py-1 bg-purple-300 text-purple-900 text-xs font-bold rounded-lg border-2 border-purple-500"  >📊 DIAGRAM</span>}
                           </div>
                         )}
 
                         {isSubheading && (
-                          <div className="mb-4 px-4 py-2 bg-blue-100 rounded-lg border-2 border-blue-400 inline-block" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                          <div className="mb-4 px-4 py-2 bg-blue-100 rounded-lg border-2 border-blue-400 inline-block"  >
                             <span className="text-lg font-bold text-blue-700 uppercase tracking-wider">📑 {currentSegment.subheading}</span>
                           </div>
                         )}

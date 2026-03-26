@@ -21,6 +21,8 @@ import HomePage from "./pages/HomePage";
 import TableOfContents from "./pages/TableOfContents";
  
 import LineByLineReader from "./pages/LineByLineReader";
+import ChapterWorksheets from "./pages/ChapterWorksheets";
+import WorksheetPlayer from "./pages/WorksheetPlayer";
 
 // ===== Admin Imports =====
 import AdminLogin from "./admin/auth/AdminLogin";
@@ -31,7 +33,9 @@ import Schools from "./admin/pages/Schools";
 import Classes from "./admin/pages/Classes";
 import SubjectsAdmin from "./admin/pages/Subjects";
 import Books from "./admin/pages/Books";
+import Worksheets from "./admin/pages/Worksheets";
 import Users from "./admin/pages/Users";
+
 import SchoolDetailsPage from "./admin/pages/SchoolDetailsPage";
 import StudentDetailsPage from "./admin/pages/StudentDetailsPage";
 import AdminProfilePage from "./admin/pages/AdminProfilePage";
@@ -76,6 +80,8 @@ export default function App() {
           <Route path="/book/:bookId" element={<TableOfContents />} />
            
           <Route path="/reader/:chapterId" element={<LineByLineReader />} />
+          <Route path="/chapter/:chapterId/worksheets/:bookId" element={<ChapterWorksheets />} />
+<Route path="/worksheet/:id" element={<WorksheetPlayer />} />
         </Route>
 
         {/* ================= ADMIN AUTH ================= */}
@@ -92,6 +98,7 @@ export default function App() {
             <Route path="classes" element={<Classes />} />
             <Route path="subjects" element={<SubjectsAdmin />} />
             <Route path="books" element={<Books />} />
+            <Route path="worksheets" element={<Worksheets />} />
             <Route path="students" element={<Users />} />
             <Route
               path="students/:id/details"

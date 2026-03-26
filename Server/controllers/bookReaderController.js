@@ -824,4 +824,50 @@ exports.backfillAllSegments = async (req, res) => {
   }
 };
 
+// ✅ Get worksheets list
+exports.getChapterWorksheets = async (req, res) => {
+  try {
+    const { chapterId } = req.params;
+
+    const [rows] = await db.query(
+      `SELECT id, title, total_questions, generated_at
+       FROM chapter_worksheets
+       WHERE chapter_id = ?
+       ORDER BY created_at DESC`,
+      [chapterId]
+    );
+
+    res.json({ worksheets: rows });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch worksheets" });
+  }
+};
+
+// ✅ Get full worksheet
+exports.getWorksheetById = async (req, res) => {
+  try {
+    const { worksheetId } = req.params;
+
+    const [rows] = await db.query(
+      `SELECT * FROM chapter_worksheets WHERE id = ?`,
+      [worksheetId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Worksheet not found" });
+    }
+
+    const worksheet = rows[0];
+
+    // parse questions
+    worksheet.questions =
+      typeof worksheet.questions === "string"
+        ? JSON.parse(worksheet.questions)
+        : worksheet.questions;
+
+    res.json({ worksheet });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch worksheet" });
+  }
+};
 module.exports = exports;

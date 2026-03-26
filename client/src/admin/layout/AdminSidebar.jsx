@@ -55,6 +55,11 @@ const menuItems = [
     icon: <BookText className="h-5 w-5" />,
   },
   {
+  name: "Worksheets",
+  path: "/admin/worksheets",
+  icon: <FileText className="h-5 w-5" />,
+},
+  {
     name: "Students",
     path: "/admin/students",
     icon: <Users className="h-5 w-5" />,
