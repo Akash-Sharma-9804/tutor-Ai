@@ -828,17 +828,42 @@ exports.backfillAllSegments = async (req, res) => {
 exports.getChapterWorksheets = async (req, res) => {
   try {
     const { chapterId } = req.params;
+    const studentId = req.studentId;
 
     const [rows] = await db.query(
-      `SELECT id, title, total_questions, generated_at
-       FROM chapter_worksheets
-       WHERE chapter_id = ?
-       ORDER BY created_at DESC`,
-      [chapterId]
+      `
+      SELECT 
+        cw.id,
+        cw.title,
+        cw.total_questions,
+        cw.generated_at,
+
+        a.id AS attempt_id,
+        a.obtained_marks,
+        a.total_marks,
+        a.percentage,
+        a.created_at AS attempted_at
+
+      FROM chapter_worksheets cw
+
+      LEFT JOIN (
+        SELECT *
+        FROM chapter_worksheet_attempts
+        WHERE student_id = ?
+        ORDER BY created_at DESC
+      ) a 
+      ON a.worksheet_id = cw.id
+
+      WHERE cw.chapter_id = ?
+      GROUP BY cw.id
+      ORDER BY cw.generated_at ASC
+      `,
+      [studentId, chapterId]
     );
 
     res.json({ worksheets: rows });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Failed to fetch worksheets" });
   }
 };

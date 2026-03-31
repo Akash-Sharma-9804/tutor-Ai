@@ -33,13 +33,14 @@ import {
 } from "lucide-react";
 import Footer from "../components/Footer/Footer";
 import GitHubContributionHeatmap from "../components/ProgressComponent/GitHubContributionHeatmap";
-
+import { TestPerformanceSection } from "../components/ProgressComponent/TestPerformanceSection";
 export default function Progress() {
   const [subjectProgress, setSubjectProgress] = useState([]);
   const [overallProgress, setOverallProgress] = useState({
     completion: 0, timeSpent: 0, streak: 0,
   });
   const [loadingProgress, setLoadingProgress] = useState(true);
+  const [testStats, setTestStats] = useState(null);
 
   useEffect(() => {
     const fetchProgress = async () => {
@@ -48,9 +49,10 @@ export default function Progress() {
         const headers = { Authorization: `Bearer ${token}` };
 
         // Single efficient call replacing the old N+1 subject/book/progress calls
-        const [subjectsRes, statsRes] = await Promise.all([
+        const [subjectsRes, statsRes, attemptsRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subjects/subjects-with-progress`, { headers }),
           axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subjects/dashboard-stats`, { headers }),
+           axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/books/tests/attempts`, { headers }),
         ]);
 
         const subjects = subjectsRes.data;
@@ -86,6 +88,21 @@ export default function Progress() {
           lessonsThisWeek: stats.lessons.thisWeek,
         });
 
+        const att = attemptsRes?.data?.attempts || [];
+if (att.length) {
+  const avg = att.reduce((s, a) => s + parseFloat(a.percentage || 0), 0) / att.length;
+  const best = Math.max(...att.map(a => parseFloat(a.percentage || 0)));
+  const above80 = att.filter(a => parseFloat(a.percentage) >= 80).length;
+  const bySubject = {};
+  att.forEach(a => {
+    if (!bySubject[a.book_title]) bySubject[a.book_title] = [];
+    bySubject[a.book_title].push(parseFloat(a.percentage || 0));
+  });
+  const subjectAvgs = Object.entries(bySubject)
+    .map(([name, pcts]) => ({ name, avg: pcts.reduce((s, p) => s + p, 0) / pcts.length, count: pcts.length }))
+    .sort((a, b) => b.avg - a.avg);
+  setTestStats({ total: att.length, avg, best, above80, subjectAvgs, recent: att.slice(0, 4) });
+}
         // Build timeDistribution from real subject data
         const totalSegs = subjects.reduce((sum, s) => sum + (s.totalSegments || 0), 0);
         const colors = [
@@ -798,6 +815,7 @@ export default function Progress() {
                 </div>
               </motion.div>
             </div>
+            <TestPerformanceSection testStats={testStats} />
             <GitHubContributionHeatmap />
             {/* Weekly Comparison - Full Width */}
             <motion.div

@@ -3,12 +3,15 @@
 const express = require("express");
 const router = express.Router();
 const bookReaderController = require("../controllers/bookReaderController");
+const studentTestController = require("../controllers/studentTestController");
+const chapterWorksheetController = require("../controllers/chapterWorksheetController");
 const authMiddleware = require("../middleware/authMiddleware");
 
 // All routes require authentication
 router.use(authMiddleware);
 
-router.get("/", authMiddleware, bookReaderController.getAllBooks);
+router.get("/", bookReaderController.getAllBooks);
+
 // Get all books for a subject
 router.get("/subject/:subjectId", bookReaderController.getBooksBySubject);
 
@@ -26,6 +29,7 @@ router.get("/chapters/:chapterId/content", bookReaderController.getChapterConten
 
 // Get AI explanation for a section
 router.post("/chapters/:chapterId/explain", bookReaderController.explainSection);
+
 // Get detailed AI explanation for current segment
 router.post("/chapters/:chapterId/explain-detailed", bookReaderController.explainDetailed);
 
@@ -47,10 +51,54 @@ router.post("/:bookId/backfill-all-segments", bookReaderController.backfillAllSe
 // Get per-chapter progress summary for a whole book (Dashboard use)
 router.get("/:bookId/progress-summary", bookReaderController.getBookProgressSummary);
 
-router.get("/class/all", authMiddleware, (req, res, next) => {
+router.get("/class/all", (req, res, next) => {
   console.log("[bookRoutes] GET /class/all hit, studentId:", req.studentId);
   next();
 }, bookReaderController.getAllBooksForClass);
+
+// ── Subject Worksheets (student_test_attempts / student_test_answers) ──────────
+// Dashboard: all worksheets with attempt summary
+router.get("/tests", studentTestController.getStudentTests);
+
+// History: all attempts the student has ever made
+router.get("/tests/attempts", studentTestController.getAllAttempts);
+
+// Single attempt detail (for result page loaded from history)
+router.get("/tests/attempt/:attemptId", studentTestController.getAttemptDetail);
+
+// Open a single worksheet to attempt
+router.get("/tests/:id", studentTestController.getTestById);
+
+// Attempt history for one worksheet
+router.get("/tests/:id/history", studentTestController.getAttemptHistory);
+
+// Submit answers
+router.post("/tests/:id/submit", studentTestController.submitTest);
+
+
+// ── Chapter Worksheets (chapter_worksheet_attempts / chapter_worksheet_answers) ─
+// Submit a chapter worksheet attempt
+router.post(
+  "/chapters/:chapterId/worksheets/:worksheetId/submit",
+  chapterWorksheetController.submitChapterWorksheet
+);
+
+// Attempt history for a chapter worksheet
+router.get(
+  "/chapters/:chapterId/worksheets/:worksheetId/history",
+  chapterWorksheetController.getChapterWorksheetHistory
+);
+
+// Single attempt detail (questions + student answers + scores)
+router.get(
+  "/chapters/:chapterId/worksheets/:worksheetId/attempts/:attemptId",
+  chapterWorksheetController.getChapterWorksheetAttemptDetail
+);
+
+router.get(
+  "/chapters/:chapterId/worksheets/:worksheetId/attempts/:attemptId/result",
+  chapterWorksheetController.getChapterWorksheetResult
+);
 
 module.exports = router;
 

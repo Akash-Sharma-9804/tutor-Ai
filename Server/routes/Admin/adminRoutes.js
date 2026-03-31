@@ -10,6 +10,7 @@ const subjectController = require("../../controllers/Admin/adminSubjectControlle
 const bookController = require("../../controllers/Admin/adminBookController");
 const userController = require("../../controllers/Admin/adminStudentController");
 const profileController = require("../../controllers/Admin/adminAuthController");
+const subjectWorksheetController = require("../../controllers/Admin/adminSubjectWorksheetController");
 const multer = require("multer");
 const upload = multer();
 router.use(adminAuth);
@@ -133,4 +134,31 @@ router.post(
   summaryController.generateSummaryForAllChapters
 );
 
+
+ // ── Subject Worksheet routes ───────────────────────────────────────────────
+ 
+    // Generate a new subject-level worksheet (cross-chapter, max 30Q, ~100 marks)
+    router.post(
+      "/books/:bookId/subject-worksheets",
+      subjectWorksheetController.generateSubjectWorksheet
+    );
+ 
+    // List all subject worksheets for a book
+    router.get(
+      "/books/:bookId/subject-worksheets",
+      subjectWorksheetController.listSubjectWorksheets
+    );
+ 
+    // Get a single subject worksheet with full questions
+    router.get(
+      "/books/:bookId/subject-worksheets/:id",
+      subjectWorksheetController.getSubjectWorksheet
+    );
+ 
+    // Delete a subject worksheet
+    router.delete(
+      "/books/:bookId/subject-worksheets/:id",
+      subjectWorksheetController.deleteSubjectWorksheet
+    );
+    
 module.exports = router;

@@ -525,7 +525,7 @@ const pollScanStatus = async (scanId, attempts = 0) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-4 sm:py-8 px-3 sm:px-4">
+    <div className="min-h-screen bg-white dark:bg-[#121212] py-4 sm:py-8 px-3 sm:px-4">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 sm:mb-8 text-center">
           <div className="inline-flex items-center justify-center gap-2 sm:gap-3 rounded-full bg-white dark:bg-gray-800 px-4 sm:px-6 py-2 sm:py-3 shadow-md mb-3 sm:mb-4">

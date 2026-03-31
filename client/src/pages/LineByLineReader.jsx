@@ -47,6 +47,25 @@ const LineByLineReader = () => {
   const { chapterId } = useParams();
   const navigate = useNavigate();
 
+  // Initialize dark mode from localStorage (same logic as DashboardLayout)
+  useEffect(() => {
+    const initDarkMode = () => {
+      const savedMode = localStorage.getItem("darkMode");
+      let isDark = false;
+      if (savedMode !== null) {
+        isDark = JSON.parse(savedMode);
+      } else {
+        isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      }
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    };
+    initDarkMode();
+  }, []);
+
   // ── UI state ───────────────────────────────────────────────────────────────
   const [showExplanation, setShowExplanation]               = useState(true);
   const [showDetailedExplanation, setShowDetailedExplanation] = useState(false);

@@ -1,563 +1,543 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 
-/* ── theme helper — reads same localStorage key as TableOfContents ── */
-const getDark = () => {
-  const s = localStorage.getItem("theme");
-  if (s) return s === "dark";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+const typeConfig = {
+  mcq: {
+    label: "MCQ",
+    bg: "bg-violet-50 dark:bg-violet-950/50",
+    text: "text-violet-600 dark:text-violet-400",
+  },
+  fill_in_blank: {
+    label: "Fill in Blank",
+    bg: "bg-sky-50 dark:bg-sky-950/50",
+    text: "text-sky-600 dark:text-sky-400",
+  },
+  short_answer: {
+    label: "Short Answer",
+    bg: "bg-teal-50 dark:bg-teal-950/50",
+    text: "text-teal-600 dark:text-teal-400",
+  },
+  long_answer: {
+    label: "Long Answer",
+    bg: "bg-amber-50 dark:bg-amber-950/50",
+    text: "text-amber-600 dark:text-amber-400",
+  },
 };
+const getTypeMeta = (type) =>
+  typeConfig[type] || {
+    label: type || "Question",
+    bg: "bg-gray-100 dark:bg-gray-800",
+    text: "text-gray-500 dark:text-gray-400",
+  };
 
+// Route: /chapter/:chapterId/worksheet/:worksheetId
 const WorksheetPlayer = () => {
-  const { id } = useParams();
+  const { id, chapterId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [dark] = useState(getDark);
-  const [worksheet, setWorksheet] = useState(null);
-  const [showAnswer, setShowAnswer] = useState({});
-  const [selected, setSelected] = useState({});
+  const { bookId: stateBookId } = location.state || {};
+  const bookId = stateBookId; // bookId from state
 
+  const [worksheet, setWorksheet] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [currentQ, setCurrentQ] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const token = localStorage.getItem("token");
+
+  // dark mode
   useEffect(() => {
-    const fetchData = async () => {
-      const token = localStorage.getItem("token");
-      const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/books/chapters/any/worksheets/${id}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const data = res.data.worksheet;
-      data.questions =
-        typeof data.questions_json === "string"
-          ? JSON.parse(data.questions_json)
-          : data.questions_json;
-      setWorksheet(data);
-    };
-    fetchData();
+    const saved = localStorage.getItem("darkMode");
+    const isDark =
+      saved !== null
+        ? JSON.parse(saved)
+        : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.classList.toggle("dark", isDark);
   }, []);
 
-  const totalAnswered = Object.keys(showAnswer).length;
-  const total = worksheet?.questions?.length || 0;
-  const progress = total > 0 ? (totalAnswered / total) * 100 : 0;
+  // fetch worksheet
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/books/chapters/${chapterId}/worksheets/${id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const data = res.data.worksheet;
+        data.questions =
+          typeof data.questions_json === "string"
+            ? JSON.parse(data.questions_json)
+            : data.questions_json ?? [];
+        setWorksheet(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [id, chapterId]);
 
-  const handleSelect = (qi, key) => {
-    if (showAnswer[qi]) return;
-    setSelected((prev) => ({ ...prev, [qi]: key }));
+  const questions = worksheet?.questions ?? [];
+  const total = questions.length;
+  const currentQuestion = questions[currentQ];
+  const answeredCount = Object.keys(answers).length;
+  const unanswered = total - answeredCount;
+  const progress = total ? Math.round((answeredCount / total) * 100) : 0;
+
+  const handleAnswer = (qNo, value) =>
+    setAnswers((p) => ({ ...p, [qNo]: value }));
+
+  const handleSubmit = async () => {
+    setShowConfirm(false);
+    setSubmitting(true);
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/books/chapters/${chapterId}/worksheets/${id}/submit`,
+        { worksheetId: id, answers },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      navigate(`/chapter/${chapterId}/worksheet/${id}/attempts/${res.data.result.attemptId}/result`, {
+        state: {
+          result: res.data.result,
+          worksheetTitle: worksheet.title,
+          worksheetId: id,
+          chapterId,
+          bookId,
+          questions,
+          answers,
+        },
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Submission failed. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleReveal = (qi) => {
-    setShowAnswer((prev) => ({ ...prev, [qi]: true }));
-  };
-
-  const t = dark ? dk : lt;
-
-  if (!worksheet) {
+  // ── Loading ────────────────────────────────────────────────────────────────
+  if (loading) {
     return (
-      <>
-        <WPStyles t={t} dark={dark} />
-        <div className="wp-root wp-center">
-          <div className="wp-spinner" />
-          <span className="wp-loading-text">Loading worksheet…</span>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f6f3ef] dark:bg-[#0e0d0b]">
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 rounded-full border-[3px] border-[#e8e2d9] dark:border-[#2a2620]" />
+          <div className="absolute inset-0 rounded-full border-[3px] border-t-[#c8763a] animate-spin" />
         </div>
-      </>
+        <p className="mt-4 text-sm font-medium text-[#a09589] dark:text-[#7a6f65] tracking-wide">
+          Loading worksheet…
+        </p>
+      </div>
     );
   }
 
-  return (
-    <>
-      <WPStyles t={t} dark={dark} />
+  if (!worksheet) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f6f3ef] dark:bg-[#0e0d0b]">
+        <p className="text-sm text-rose-500">Worksheet not found.</p>
+      </div>
+    );
+  }
 
-      <div className="wp-root">
+  // ── Confirm Modal ──────────────────────────────────────────────────────────
+  const ConfirmModal = () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={() => setShowConfirm(false)}
+      />
+      <div className="relative z-10 bg-white dark:bg-[#1a1815] rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-[#e8e2d9] dark:border-[#2a2620]">
+        <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center mb-4">
+          <svg className="w-6 h-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h3 className="font-bold text-[#1a1510] dark:text-[#f0ebe4] text-lg mb-1">
+          Submit Worksheet?
+        </h3>
+        {unanswered > 0 ? (
+          <p className="text-sm text-[#8a7f72] dark:text-[#7a6f65] mb-5">
+            You have{" "}
+            <span className="font-semibold text-amber-600 dark:text-amber-400">
+              {unanswered} unanswered
+            </span>{" "}
+            question{unanswered !== 1 ? "s" : ""}. You can't change answers after submitting.
+          </p>
+        ) : (
+          <p className="text-sm text-[#8a7f72] dark:text-[#7a6f65] mb-5">
+            All {total} questions answered. Ready to submit and see your score?
+          </p>
+        )}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowConfirm(false)}
+            className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border border-[#e8e2d9] dark:border-[#2a2620] text-[#8a7f72] dark:text-[#9a8f83] hover:bg-[#f6f3ef] dark:hover:bg-[#252220] transition"
+          >
+            Review
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition"
+          >
+            Submit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
-        {/* ── Sticky Header ── */}
-        <header className="wp-header">
-          <div className="wp-header-inner">
-            <div className="wp-header-row">
-              <button className="wp-back-btn" onClick={() => navigate(-1)}>
-                ← Back
-              </button>
-              <h1 className="wp-title">{worksheet.title}</h1>
-              <div className="wp-progress-chip">
-                {totalAnswered}/{total}
-              </div>
+  // ── Sidebar ────────────────────────────────────────────────────────────────
+  const SidebarContent = ({ mobile = false }) => (
+    <div className="flex flex-col h-full">
+      <div className="px-4 py-4 border-b border-[#e8e2d9] dark:border-[#252220]">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-[#a09589] mb-3">
+          Legend
+        </p>
+        <div className="flex flex-col gap-1.5">
+          {[
+            { color: "bg-indigo-500", label: "Current" },
+            { color: "bg-emerald-500", label: "Answered" },
+            { color: "bg-[#e8e2d9] dark:bg-[#2a2620]", label: "Not Attempted" },
+          ].map(({ color, label }) => (
+            <div key={label} className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-sm ${color}`} />
+              <span className="text-xs text-[#8a7f72] dark:text-[#7a6f65]">{label}</span>
             </div>
-            <div className="wp-bar-row">
-              <div className="wp-bar-track">
-                <div className="wp-bar-fill" style={{ width: `${progress}%` }} />
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="grid grid-cols-4 gap-1.5">
+          {questions.map((q, index) => {
+            const isCurrent = currentQ === index;
+            const isAnswered = !!answers[q.q_no];
+            return (
+              <button
+                key={q.q_no}
+                onClick={() => {
+                  setCurrentQ(index);
+                  if (mobile) setSidebarOpen(false);
+                }}
+                className={`h-9 w-full rounded-lg text-xs font-semibold transition-all focus:outline-none ${
+                  isCurrent
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : isAnswered
+                    ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+                    : "bg-[#f0ebe4] dark:bg-[#252220] text-[#8a7f72] hover:bg-[#e8e2d9] dark:hover:bg-[#2a2620]"
+                }`}
+              >
+                {q.q_no}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="px-4 py-4 border-t border-[#e8e2d9] dark:border-[#252220] space-y-3">
+        <div>
+          <div className="flex justify-between text-xs text-[#a09589] mb-1.5">
+            <span>Progress</span>
+            <span className="font-semibold text-[#1a1510] dark:text-[#e8e2d9]">
+              {answeredCount}/{total}
+            </span>
+          </div>
+          <div className="h-1.5 bg-[#e8e2d9] dark:bg-[#252220] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setShowConfirm(true);
+            if (mobile) setSidebarOpen(false);
+          }}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition"
+        >
+          Submit Worksheet
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Main render ────────────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-[#f6f3ef] dark:bg-[#0e0d0b] flex flex-col">
+      {showConfirm && <ConfirmModal />}
+
+      {/* Submitting overlay */}
+      {submitting && (
+        <div className="fixed inset-0 z-50 bg-white/80 dark:bg-[#0e0d0b]/80 backdrop-blur-sm flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative w-12 h-12">
+              <div className="absolute inset-0 rounded-full border-[3px] border-indigo-100 dark:border-indigo-900/50" />
+              <div className="absolute inset-0 rounded-full border-[3px] border-t-indigo-500 animate-spin" />
+            </div>
+            <p className="text-sm font-medium text-[#1a1510] dark:text-[#e8e2d9]">
+              Evaluating your answers…
+            </p>
+            <p className="text-xs text-[#a09589]">
+              AI grading may take a moment for written answers
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* HEADER */}
+      <header className="sticky top-0 z-20 bg-white/80 dark:bg-[#131210]/80 backdrop-blur-md border-b border-[#e8e2d9] dark:border-[#252220]">
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#8a7f72] dark:text-[#9a8f83] hover:bg-[#f0ebe4] dark:hover:bg-[#2a2620] transition"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+
+          {/* Mobile sidebar toggle */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden p-2 rounded-lg bg-[#f0ebe4] dark:bg-[#252220] text-[#8a7f72]"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
+          <div className="flex-1 min-w-0">
+            <h1 className="text-sm sm:text-base font-bold text-[#1a1510] dark:text-[#f0ebe4] truncate">
+              {worksheet.title}
+            </h1>
+            <p className="text-xs text-[#a09589] hidden sm:block">
+              {total} Questions · {worksheet.total_marks} Marks
+            </p>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 bg-[#faf8f5] dark:bg-[#1a1815] border border-[#e8e2d9] dark:border-[#252220] rounded-xl px-3 py-1.5">
+            <span className="text-xs text-[#a09589]">Q</span>
+            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+              {currentQ + 1}
+            </span>
+            <span className="text-xs text-[#a09589]">/ {total}</span>
+          </div>
+
+          <button
+            onClick={() => setShowConfirm(true)}
+            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Submit
+          </button>
+        </div>
+
+        {/* Thin progress bar */}
+        <div className="h-0.5 bg-[#e8e2d9] dark:bg-[#252220]">
+          <div
+            className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </header>
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Desktop sidebar */}
+        <aside className="hidden md:flex flex-col w-56 bg-white/90 dark:bg-[#131210]/90 border-r border-[#e8e2d9] dark:border-[#252220] overflow-hidden">
+          <SidebarContent />
+        </aside>
+
+        {/* Mobile sidebar */}
+        {sidebarOpen && (
+          <div className="fixed inset-0 z-30 flex md:hidden">
+            <div
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setSidebarOpen(false)}
+            />
+            <div className="relative z-10 w-64 bg-white dark:bg-[#171614] h-full shadow-2xl flex flex-col">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#e8e2d9] dark:border-[#252220]">
+                <span className="text-sm font-semibold text-[#1a1510] dark:text-[#f0ebe4]">
+                  Questions
+                </span>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-[#f0ebe4] dark:hover:bg-[#2a2620]"
+                >
+                  <svg className="w-4 h-4 text-[#8a7f72]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <span className="wp-bar-pct">{Math.round(progress)}%</span>
+              <SidebarContent mobile />
             </div>
           </div>
-        </header>
+        )}
 
-        {/* ── Layout ── */}
-        <main className="wp-main">
-          <div className="wp-layout">
-
-            {/* Sidebar — desktop only */}
-            <aside className="wp-sidebar">
-              <div className="wp-sidebar-card">
-                <p className="wp-sb-label">Questions</p>
-                <p className="wp-sb-num">{total}</p>
-                <hr className="wp-sb-hr" />
-                <p className="wp-sb-label">Answered</p>
-                <p className="wp-sb-num wp-sb-accent">{totalAnswered}</p>
-                <hr className="wp-sb-hr" />
-                <p className="wp-sb-label">Left</p>
-                <p className="wp-sb-num">{total - totalAnswered}</p>
-                <hr className="wp-sb-hr" />
-                <p className="wp-sb-label" style={{ marginBottom: 10 }}>Jump to</p>
-                <div className="wp-jump-grid">
-                  {worksheet.questions?.map((_, i) => (
-                    <a
-                      key={i}
-                      href={`#wpq${i}`}
-                      className={`wp-jdot ${showAnswer[i] ? "jd-done" : selected[i] ? "jd-sel" : ""}`}
-                    >
-                      {i + 1}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </aside>
-
-            {/* Questions feed */}
-            <div className="wp-feed">
-              {worksheet.questions?.map((q, i) => {
-                const isRevealed = showAnswer[i];
-                const correctKey = q.correct_answer;
-                const userKey = selected[i];
-                const hasOptions = q.options && Object.keys(q.options).length > 0;
-
-                return (
-                  <div
-                    key={i}
-                    id={`wpq${i}`}
-                    className="wp-card"
-                    style={{ animationDelay: `${i * 40}ms` }}
-                  >
-                    <div className={`wp-card-stripe ${isRevealed ? "stripe-done" : "stripe-idle"}`} />
-
-                    <div className="wp-card-body">
-                      {/* question row */}
-                      <div className="wp-q-row">
-                        <div className={`wp-q-num ${isRevealed ? "qn-done" : ""}`}>
-                          {isRevealed ? "✓" : i + 1}
-                        </div>
-                        <p className="wp-q-text">{q.question}</p>
-                      </div>
-
-                      {/* options */}
-                      {hasOptions && (
-                        <div className="wp-options">
-                          {Object.entries(q.options).map(([k, v]) => {
-                            let cls = "wp-opt";
-                            if (isRevealed) {
-                              cls += " wp-opt--disabled";
-                              if (k === correctKey) cls += " wp-opt--correct";
-                              else if (k === userKey) cls += " wp-opt--wrong";
-                            } else if (userKey === k) {
-                              cls += " wp-opt--selected";
-                            }
-                            return (
-                              <div key={k} className={cls} onClick={() => handleSelect(i, k)}>
-                                <span className="wp-opt-key">{k}</span>
-                                <span className="wp-opt-val">{v}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* footer */}
-                      <div className="wp-card-foot">
-                        {!isRevealed ? (
-                          <button className="wp-reveal-btn" onClick={() => handleReveal(i)}>
-                            👁 Show Answer
-                          </button>
-                        ) : (
-                          <div className="wp-answer-chip">
-                            <span className="wp-ans-check">✓</span>
-                            <span>
-                              {q.correct_answer}
-                              {q.options?.[correctKey] ? ` — ${q.options[correctKey]}` : ""}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+        {/* MAIN */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-4 sm:px-8 py-8">
+            {currentQuestion ? (
+              <>
+                {/* Question card */}
+                <div className="bg-white dark:bg-[#171614] rounded-2xl border border-[#e8e2d9] dark:border-[#252220] shadow-sm overflow-hidden">
+                  {/* Card header */}
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-[#f0ebe4] dark:border-[#1e1c18] bg-[#faf8f5] dark:bg-[#131210]">
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white text-sm font-bold flex items-center justify-center shadow-md shadow-indigo-200 dark:shadow-indigo-900/30">
+                        {currentQuestion.q_no}
+                      </span>
+                      <span
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${getTypeMeta(currentQuestion.type).bg} ${getTypeMeta(currentQuestion.type).text}`}
+                      >
+                        {getTypeMeta(currentQuestion.type).label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-white dark:bg-[#1e1c18] border border-[#e8e2d9] dark:border-[#252220] rounded-lg px-2.5 py-1">
+                      <svg className="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                      <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                        {currentQuestion.marks}
+                      </span>
+                      <span className="text-xs text-[#a09589]">marks</span>
                     </div>
                   </div>
-                );
-              })}
 
-              {/* Done banner */}
-              {totalAnswered === total && total > 0 && (
-                <div className="wp-done">
-                  <div className="wp-done-icon">🎉</div>
-                  <h3 className="wp-done-title">Worksheet Complete!</h3>
-                  <p className="wp-done-sub">You've reviewed all {total} questions. Great work!</p>
+                  {/* Body */}
+                  <div className="px-6 py-6">
+                    <p className="text-[15px] leading-relaxed text-[#1a1510] dark:text-[#e8e2d9] font-medium mb-6">
+                      {currentQuestion.question}
+                    </p>
+
+                    {/* MCQ */}
+                    {currentQuestion.type === "mcq" && currentQuestion.options && (
+                      <div className="space-y-2.5">
+                        {Object.entries(currentQuestion.options).map(([key, val]) => {
+                          const isSelected = answers[currentQuestion.q_no] === key;
+                          return (
+                            <button
+                              key={key}
+                              onClick={() => handleAnswer(currentQuestion.q_no, key)}
+                              className={`w-full text-left px-4 py-3.5 rounded-xl border text-sm font-medium flex items-center gap-3 transition-all duration-150 focus:outline-none ${
+                                isSelected
+                                  ? "bg-indigo-50 dark:bg-indigo-950/30 border-indigo-400 dark:border-indigo-600"
+                                  : "bg-[#faf8f5] dark:bg-[#131210] border-[#e8e2d9] dark:border-[#252220] hover:bg-white dark:hover:bg-[#1a1815] hover:border-indigo-300 dark:hover:border-indigo-700"
+                              }`}
+                            >
+                              <span
+                                className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
+                                  isSelected
+                                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-900/30"
+                                    : "bg-[#e8e2d9] dark:bg-[#252220] text-[#8a7f72]"
+                                }`}
+                              >
+                                {key}
+                              </span>
+                              <span className="flex-1 text-[#1a1510] dark:text-[#e8e2d9]">{val}</span>
+                              {isSelected && (
+                                <svg className="w-4 h-4 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Fill in blank */}
+                    {currentQuestion.type === "fill_in_blank" && (
+                      <input
+                        type="text"
+                        value={answers[currentQuestion.q_no] || ""}
+                        onChange={(e) => handleAnswer(currentQuestion.q_no, e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-[#e8e2d9] dark:border-[#252220] bg-[#faf8f5] dark:bg-[#131210] text-[#1a1510] dark:text-[#e8e2d9] text-sm placeholder-[#c0b9b0] dark:placeholder-[#4a4540] focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
+                        placeholder="Type your answer here…"
+                      />
+                    )}
+
+                    {/* Short / long answer */}
+                    {(currentQuestion.type === "short_answer" ||
+                      currentQuestion.type === "long_answer") && (
+                      <textarea
+                        rows={currentQuestion.type === "long_answer" ? 7 : 4}
+                        value={answers[currentQuestion.q_no] || ""}
+                        onChange={(e) => handleAnswer(currentQuestion.q_no, e.target.value)}
+                        className="w-full p-4 rounded-xl border border-[#e8e2d9] dark:border-[#252220] bg-[#faf8f5] dark:bg-[#131210] text-[#1a1510] dark:text-[#e8e2d9] text-sm leading-relaxed placeholder-[#c0b9b0] dark:placeholder-[#4a4540] focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition resize-none"
+                        placeholder="Write your answer here…"
+                      />
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
 
+                {/* Navigation */}
+                <div className="flex items-center justify-between mt-5">
+                  <button
+                    disabled={currentQ === 0}
+                    onClick={() => setCurrentQ((p) => p - 1)}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium bg-white dark:bg-[#171614] border border-[#e8e2d9] dark:border-[#252220] text-[#8a7f72] dark:text-[#9a8f83] hover:bg-[#f6f3ef] dark:hover:bg-[#1e1c18] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Previous
+                  </button>
+
+                  <span className="text-xs text-[#a09589] font-medium hidden sm:block">
+                    {currentQ + 1} of {total}
+                  </span>
+
+                  {currentQ === total - 1 ? (
+                    <button
+                      onClick={() => setShowConfirm(true)}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/20"
+                    >
+                      Submit Worksheet
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setCurrentQ((p) => p + 1)}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition"
+                    >
+                      Next
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* Mobile submit */}
+                <div className="sm:hidden mt-4">
+                  <button
+                    onClick={() => setShowConfirm(true)}
+                    className="w-full py-3 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition"
+                  >
+                    Submit Worksheet ({answeredCount}/{total} answered)
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-24 text-[#a09589]">
+                <p className="text-sm">No questions available.</p>
+              </div>
+            )}
           </div>
         </main>
       </div>
-    </>
+    </div>
   );
 };
-
-/* ── Design tokens ── */
-const lt = {
-  bg: "#f7f5f2",
-  headerBg: "#ffffff",
-  border: "#e8e3dc",
-  card: "#ffffff",
-  optBg: "#faf8f5",
-  text: "#1c1812",
-  muted: "#7a6f63",
-  faint: "#b0a89e",
-  accent: "#b85c2a",
-  accentBg: "#fff3eb",
-  accentBorder: "#f0ddd0",
-  sbBg: "#ffffff",
-  jdotBg: "#f0ebe4",
-};
-const dk = {
-  bg: "#141210",
-  headerBg: "#1c1a17",
-  border: "#2a2620",
-  card: "#1e1c19",
-  optBg: "#1a1815",
-  text: "#f0ebe4",
-  muted: "#9a8f83",
-  faint: "#5a5248",
-  accent: "#d4793a",
-  accentBg: "#2d1f12",
-  accentBorder: "#3d2a18",
-  sbBg: "#1a1815",
-  jdotBg: "#252320",
-};
-
-/* ── Styles component ── */
-const WPStyles = ({ t, dark }) => (
-  <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap');
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    .wp-root {
-      min-height: 100vh;
-      background: ${t.bg};
-      font-family: 'DM Sans', sans-serif;
-      color: ${t.text};
-    }
-
-    .wp-center {
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 14px;
-    }
-
-    .wp-loading-text { font-size: 14px; color: ${t.muted}; }
-
-    .wp-spinner {
-      width: 36px; height: 36px;
-      border: 3px solid ${t.border};
-      border-top-color: ${t.accent};
-      border-radius: 50%;
-      animation: wpspin 0.75s linear infinite;
-    }
-    @keyframes wpspin { to { transform: rotate(360deg); } }
-
-    /* ── Header ── */
-    .wp-header {
-      background: ${t.headerBg};
-      border-bottom: 1px solid ${t.border};
-      position: sticky; top: 0; z-index: 20;
-    }
-
-    .wp-header-inner {
-      max-width: 1120px; margin: 0 auto;
-      padding: 14px 24px 14px;
-    }
-
-    .wp-header-row {
-      display: flex; align-items: center; gap: 12px;
-      margin-bottom: 10px;
-    }
-
-    .wp-back-btn {
-      font-size: 13px; font-weight: 500;
-      color: ${t.muted}; background: none; border: none;
-      cursor: pointer; font-family: inherit;
-      padding: 6px 10px; border-radius: 8px;
-      white-space: nowrap; flex-shrink: 0;
-      transition: color 0.15s, background 0.15s;
-    }
-    .wp-back-btn:hover {
-      color: ${t.text};
-      background: ${dark ? "#2a2620" : "#f0ebe4"};
-    }
-
-    .wp-title {
-      font-family: 'Lora', serif;
-      font-size: clamp(14px, 2vw, 20px);
-      font-weight: 700; color: ${t.text};
-      flex: 1; line-height: 1.2;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-
-    .wp-progress-chip {
-      font-size: 12px; font-weight: 600;
-      color: ${t.accent};
-      background: ${t.accentBg};
-      border: 1px solid ${t.accentBorder};
-      padding: 4px 10px; border-radius: 100px;
-      flex-shrink: 0;
-    }
-
-    .wp-bar-row {
-      display: flex; align-items: center; gap: 10px;
-    }
-
-    .wp-bar-track {
-      flex: 1; height: 4px;
-      background: ${t.border}; border-radius: 2px; overflow: hidden;
-    }
-
-    .wp-bar-fill {
-      height: 100%; background: ${t.accent};
-      border-radius: 2px; transition: width 0.5s ease;
-    }
-
-    .wp-bar-pct {
-      font-size: 11px; font-weight: 600; color: ${t.accent};
-    }
-
-    /* ── Main ── */
-    .wp-main { padding: 28px 20px 80px; }
-
-    .wp-layout {
-      max-width: 1120px; margin: 0 auto;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 24px;
-      align-items: start;
-    }
-
-    @media (min-width: 900px) {
-      .wp-layout { grid-template-columns: 190px 1fr; }
-    }
-@media (max-width: 899px) {
-  .wp-layout {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .wp-sidebar-card {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    text-align: center;
-  }
-
-  .wp-sb-hr {
-    display: none;
-  }
-
-  .wp-jump-grid {
-    grid-column: span 3;
-    justify-content: center;
-  }
-}
-    /* ── Sidebar ── */
-    .wp-sidebar {
-  display: block;
-  order: -1;
-}
-    @media (min-width: 900px) {
-  .wp-sidebar {
-    position: sticky;
-    top: 110px;
-  }
-}
-
-    .wp-sidebar-card {
-      background: ${t.sbBg};
-      border: 1px solid ${t.border};
-      border-radius: 16px;
-      padding: 18px 16px;
-    }
-
-    .wp-sb-label {
-      font-size: 10px; font-weight: 600;
-      letter-spacing: 0.1em; text-transform: uppercase;
-      color: ${t.faint}; margin-bottom: 3px;
-    }
-
-    .wp-sb-num {
-      font-size: 26px; font-weight: 700; color: ${t.text};
-    }
-
-    .wp-sb-accent { color: ${t.accent}; }
-
-    .wp-sb-hr {
-      border: none; border-top: 1px solid ${t.border};
-      margin: 12px 0;
-    }
-
-    .wp-jump-grid { display: flex; flex-wrap: wrap; gap: 5px; }
-
-    .wp-jdot {
-      width: 28px; height: 28px; border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 600; text-decoration: none;
-      background: ${t.jdotBg};
-      color: ${t.muted};
-      border: 1px solid ${t.border};
-      transition: all 0.15s;
-    }
-    .wp-jdot:hover { border-color: ${t.accent}; color: ${t.accent}; }
-    .jd-done { background: #dcfaec; color: #1d8a52; border-color: #b3e8cf; }
-    .jd-sel  { background: ${t.accentBg}; color: ${t.accent}; border-color: ${t.accent}66; }
-
-    /* ── Feed ── */
-    .wp-feed { display: flex; flex-direction: column; gap: 12px; }
-
-    /* ── Card ── */
-    .wp-card {
-      background: ${t.card};
-      border: 1px solid ${t.border};
-      border-radius: 18px;
-      display: flex; overflow: hidden;
-      animation: wpCardIn 0.38s ease both;
-      transition: box-shadow 0.2s, border-color 0.2s;
-    }
-    .wp-card:hover {
-      box-shadow: 0 4px 20px ${dark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.07)"};
-      border-color: ${t.accent}44;
-    }
-    @keyframes wpCardIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .wp-card-stripe { width: 4px; flex-shrink: 0; }
-    .stripe-done { background: #3aaa6e; }
-    .stripe-idle { background: ${t.border}; }
-
-    .wp-card-body { flex: 1; padding: 20px 22px; }
-
-    .wp-q-row {
-      display: flex; align-items: flex-start; gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .wp-q-num {
-      width: 30px; height: 30px; flex-shrink: 0;
-      border-radius: 9px;
-      background: ${t.jdotBg};
-      border: 1px solid ${t.border};
-      display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 700; color: ${t.accent};
-    }
-    .qn-done {
-      background: #dcfaec; border-color: #b3e8cf; color: #1d8a52;
-    }
-
-    .wp-q-text {
-      font-size: 15px; font-weight: 500;
-      color: ${t.text}; line-height: 1.6; flex: 1;
-    }
-
-    /* ── Options: 1 col mobile, 2 col desktop ── */
-    .wp-options {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 8px; margin-bottom: 18px;
-    }
-
-    @media (min-width: 640px) {
-      .wp-options { grid-template-columns: 1fr 1fr; }
-    }
-
-    .wp-opt {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 11px 14px;
-      border: 1.5px solid ${t.border};
-      border-radius: 11px; cursor: pointer;
-      background: ${t.optBg};
-      transition: all 0.16s;
-    }
-    .wp-opt:hover:not(.wp-opt--disabled) {
-      border-color: ${t.accent};
-      background: ${dark ? "#2d1f12" : "#fff8f3"};
-    }
-    .wp-opt--selected { border-color: ${t.accent}; background: ${dark ? "#2d1f12" : "#fff8f3"}; }
-    .wp-opt--correct  { border-color: #3aaa6e !important; background: ${dark ? "#0d2318" : "#f0faf5"} !important; }
-    .wp-opt--wrong    { border-color: #e05555 !important; background: ${dark ? "#2a0f0f" : "#fff3f3"} !important; }
-    .wp-opt--disabled { cursor: default; }
-
-    .wp-opt-key {
-      width: 22px; height: 22px; flex-shrink: 0;
-      border-radius: 7px; border: 1.5px solid ${t.faint};
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 700; color: ${t.muted};
-      transition: all 0.14s;
-    }
-    .wp-opt--selected .wp-opt-key { background: ${t.accent}; border-color: ${t.accent}; color: #fff; }
-    .wp-opt--correct .wp-opt-key  { background: #3aaa6e; border-color: #3aaa6e; color: #fff; }
-    .wp-opt--wrong .wp-opt-key    { background: #e05555; border-color: #e05555; color: #fff; }
-
-    .wp-opt-val {
-      font-size: 13.5px; color: ${t.text}; line-height: 1.4; padding-top: 1px;
-    }
-
-    /* ── Card footer ── */
-    .wp-card-foot {
-      border-top: 1px solid ${t.border};
-      padding-top: 14px;
-    }
-
-    .wp-reveal-btn {
-      display: inline-flex; align-items: center; gap: 7px;
-      font-size: 13px; font-weight: 600; color: ${t.accent};
-      background: ${t.accentBg}; border: 1.5px solid ${t.accentBorder};
-      border-radius: 10px; padding: 8px 16px;
-      cursor: pointer; font-family: inherit;
-      transition: all 0.18s;
-    }
-    .wp-reveal-btn:hover {
-      background: ${dark ? "#3a2615" : "#ffe9d6"};
-      border-color: ${t.accent};
-    }
-
-    .wp-answer-chip {
-      display: inline-flex; align-items: center; gap: 8px;
-      font-size: 13px; font-weight: 600; color: #1d8a52;
-      background: ${dark ? "#0d2318" : "#f0faf5"};
-      border: 1.5px solid ${dark ? "#1a4a30" : "#b3e8cf"};
-      border-radius: 10px; padding: 8px 16px;
-      animation: wpPop 0.28s ease;
-    }
-    @keyframes wpPop {
-      from { opacity: 0; transform: scale(0.94); }
-      to   { opacity: 1; transform: scale(1); }
-    }
-    .wp-ans-check { font-weight: 800; font-size: 14px; }
-
-    /* ── Done ── */
-    .wp-done {
-      background: ${t.card}; border: 1px solid ${t.border};
-      border-radius: 18px; padding: 40px 28px;
-      text-align: center;
-    }
-    .wp-done-icon { font-size: 44px; margin-bottom: 12px; }
-    .wp-done-title {
-      font-family: 'Lora', serif;
-      font-size: 22px; font-weight: 700;
-      color: ${t.text}; margin-bottom: 8px;
-    }
-    .wp-done-sub { font-size: 14px; color: ${t.muted}; }
-  `}</style>
-);
 
 export default WorksheetPlayer;

@@ -74,15 +74,21 @@ const DashboardLayout = () => {
         )}
 
         {/* Sidebar */}
-        <Sidebar
-          isMobileOpen={isMobileOpen}
-          setIsMobileOpen={setIsMobileOpen}
-          collapsed={sidebarCollapsed}
-          setCollapsed={setSidebarCollapsed}
-          toggleSidebar={toggleSidebar}
-          darkMode={darkMode}
-          toggleDarkMode={toggleDarkMode}
-        />
+        {/* data-sidebar-width is read by child pages (e.g. AITutor) that use position:fixed */}
+        <div
+          data-sidebar-width={sidebarCollapsed ? "80" : "256"}
+          className="flex-shrink-0"
+        >
+          <Sidebar
+            isMobileOpen={isMobileOpen}
+            setIsMobileOpen={setIsMobileOpen}
+            collapsed={sidebarCollapsed}
+            setCollapsed={setSidebarCollapsed}
+            toggleSidebar={toggleSidebar}
+            darkMode={darkMode}
+            toggleDarkMode={toggleDarkMode}
+          />
+        </div>
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col transition-all duration-300 ease-in-out">
@@ -113,7 +119,7 @@ const DashboardLayout = () => {
           </main>
 
           {/* Mobile Bottom Navigation */}
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-[#181818] border-t border-gray-200 dark:border-gray-700 z-40 shadow-lg">
+          {/* <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-[#181818] border-t border-gray-200 dark:border-gray-700 z-40 shadow-lg">
             <div className="flex justify-around items-center h-16">
               {[
                 { icon: Home, label: "Home", path: "/" },
@@ -136,7 +142,7 @@ const DashboardLayout = () => {
                 );
               })}
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

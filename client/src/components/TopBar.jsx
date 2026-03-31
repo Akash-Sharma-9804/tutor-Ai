@@ -16,36 +16,36 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
   const [searchOpen, setSearchOpen] = useState(false)
 
 
- useEffect(() => {
-  const fetchStudentProfile = async () => {
-    try {
-      const token = localStorage.getItem("token");
+  useEffect(() => {
+    const fetchStudentProfile = async () => {
+      try {
+        const token = localStorage.getItem("token");
 
-      if (!token) {
-        console.warn("⚠️ No token found, skipping student profile fetch");
-        return;
-      }
-
-      console.log("📡 Fetching student profile...");
-
-      const response = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/student/me`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        if (!token) {
+          console.warn("⚠️ No token found, skipping student profile fetch");
+          return;
         }
-      );
 
-      console.log("✅ Student profile fetched:", response.data);
-      setStudent(response.data);
-    } catch (error) {
-      console.error("❌ Failed to fetch student profile:", error);
-    }
-  };
+        console.log("📡 Fetching student profile...");
 
-  fetchStudentProfile();
-}, []);
+        const response = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/student/me`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        console.log("✅ Student profile fetched:", response.data);
+        setStudent(response.data);
+      } catch (error) {
+        console.error("❌ Failed to fetch student profile:", error);
+      }
+    };
+
+    fetchStudentProfile();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -74,7 +74,7 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [unreadCount] = useState(notifications.filter(n => n.unread).length)
   const [isDesktop, setIsDesktop] = useState(false)
-  
+
   const searchRef = useRef(null)
   const notificationsRef = useRef(null)
   const profileRef = useRef(null)
@@ -84,10 +84,10 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
     const checkDesktop = () => {
       setIsDesktop(window.innerWidth >= 1024)
     }
-    
+
     checkDesktop()
     window.addEventListener('resize', checkDesktop)
-    
+
     return () => window.removeEventListener('resize', checkDesktop)
   }, [])
 
@@ -118,7 +118,7 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
   }
 
   return (
-    <div className="h-16 bg-[#F8FAFC] dark:bg-[#181818] border-b border-gray-200 dark:border-white/10 shadow-sm">
+    <div className="h-16  bg-[#F8FAFC] dark:bg-[#181818] border-b border-gray-200 dark:border-white/10 shadow-sm">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Left Section */}
@@ -133,9 +133,8 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
             </button>
 
             {/* Date Display */}
-            <div className={`hidden lg:flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 transition-all duration-300 ${
-              sidebarCollapsed ? 'ml-0' : 'ml-2'
-            }`}>
+            <div className={`hidden md:flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 transition-all duration-300 ${sidebarCollapsed ? 'ml-0' : 'ml-2'
+              }`}>
               <Calendar className="h-4 w-4" />
               <span className="whitespace-nowrap">
                 Today: {getFormattedDate()}
@@ -145,41 +144,19 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
 
           {/* Right Section */}
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Search */}
-            <div className="relative" ref={searchRef}>
-              {searchOpen ? (
-                <div className="absolute right-0 top-12 sm:top-auto sm:relative w-64 sm:w-72 bg-white dark:bg-[#1f1f1f] rounded-lg shadow-lg border border-gray-200 dark:border-white/10 sm:shadow-none sm:border-0 z-50">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search courses, subjects..."
-                      className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#262626] text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      autoFocus
-                    />
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <button
-                      onClick={() => setSearchOpen(false)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                    >
-                      <X className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setSearchOpen(true)}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-                  aria-label="Search"
-                >
-                  <Search className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-                </button>
-              )}
-            </div>
 
+            <div className={`hidden lg:flex flex-col items-end transition-all duration-300 ${!sidebarCollapsed && isDesktop ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+              }`}>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {student?.schoolName || ""}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Class {student?.className || "-"} </p>
+            </div>
             {/* Dark Mode Toggle */}
             <button
               onClick={toggleDarkMode}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 hidden sm:flex transition-colors"
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10   transition-colors"
               aria-label="Toggle dark mode"
             >
               {darkMode ? (
@@ -216,17 +193,15 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
                     {notifications.map((notification) => (
                       <div
                         key={notification.id}
-                        className={`p-4 border-b border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition-colors ${
-                          notification.unread ? 'bg-blue-50 dark:bg-blue-500/10' : ''
-                        }`}
+                        className={`p-4 border-b border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition-colors ${notification.unread ? 'bg-blue-50 dark:bg-blue-500/10' : ''
+                          }`}
                         onClick={() => setShowNotifications(false)}
                       >
                         <div className="flex items-start gap-3">
-                          <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                            notification.unread 
-                              ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' 
+                          <div className={`h-8 w-8 rounded-full flex items-center justify-center ${notification.unread
+                              ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
                               : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400'
-                          }`}>
+                            }`}>
                             <Bell className="h-4 w-4" />
                           </div>
                           <div className="flex-1">
@@ -251,16 +226,7 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
 
             {/* User Profile */}
             <div className="flex items-center gap-2">
-              <div className={`hidden sm:flex flex-col items-end transition-all duration-300 ${
-                sidebarCollapsed && isDesktop ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
-              }`}>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                  {student?.studentName || "Student"}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Class {student?.className || "-"} • {student?.schoolName || ""}
-                </p>
-              </div>
+
               <div className="relative" ref={profileRef}>
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -296,7 +262,7 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
                         <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                         Profile
                       </button>
-                     
+
                     </div>
 
                     <div className="border-t border-gray-100 dark:border-white/10 py-1">
@@ -315,26 +281,7 @@ const TopBar = ({ setIsMobileOpen, darkMode, toggleDarkMode, sidebarCollapsed })
           </div>
         </div>
 
-        {/* Mobile Date Display */}
-        <div className="lg:hidden bg-white dark:bg-[#181818] py-2 border-t border-gray-100 dark:border-white/10">
-          <div className="flex items-center justify-between px-4">
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <Calendar className="h-4 w-4" />
-              <span>{getFormattedDate()}</span>
-            </div>
-            <button 
-              onClick={toggleDarkMode}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {darkMode ? (
-                <Sun className="h-4 w-4 text-gray-600 dark:text-gray-300" />
-              ) : (
-                <Moon className="h-4 w-4 text-gray-600 dark:text-gray-300" />
-              )}
-            </button>
-          </div>
-        </div>
+
       </div>
     </div>
   )

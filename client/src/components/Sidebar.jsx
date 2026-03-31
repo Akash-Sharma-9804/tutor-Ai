@@ -46,7 +46,7 @@ navigate("/login", { replace: true });
     { icon: BookOpen, label: 'Subjects', path: '/subjects' },
     { icon: Bot, label: 'AI Tutor', path: '/ai-tutor' },
     { icon: Scan, label: 'Scan & Learn', path: '/scan' },
-    // { icon: FileText, label: 'Tests & Quizzes', path: '/tests' },
+    { icon: FileText, label: 'Tests & Quizzes', path: '/tests' },
     { icon: BarChart3, label: 'Progress', path: '/progress' },
     // { icon: MessageSquare, label: 'Talk with AI', path: '/talk-ai' },
   ];
@@ -187,11 +187,15 @@ navigate("/login", { replace: true });
         <div className="p-6 border-b border-gray-200 dark:border-white/10 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="h-6 w-6 text-white" />
+              <div className="h-10 w-10 rounded-xl   flex items-center justify-center flex-shrink-0">
+                    <img
+    src="/logo3.png"
+    alt="QuantumEdu Logo"
+    className="w-10 h-10 object-contain"
+  />
               </div>
               <div className="flex flex-col flex-shrink-0">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">AI Tutor</h1>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">QuantumEdu</h1>
                 <p className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Learning Platform</p>
               </div>
             </div>
