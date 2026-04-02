@@ -444,3 +444,69 @@ export const normalizePhysicsContent = (content) => {
   // Step 2: Run through normalizeMathsContent for all shared type handling
   return normalizeMathsContent(aliased);
 };
+
+export const normalizeITContent = (content) => {
+  if (!content?.sections) return content;
+
+  return {
+    ...content,
+    sections: content.sections.map(section => ({
+      ...section,
+      content: (section.content || []).map(item => {
+
+        // list → text with bullet-style body
+        if (item.type === 'list') {
+          const bulletLines = (item.items || []).map(i =>
+            `* ${i.point}`
+          ).join('\n');
+          // Collect all explanations as the explanation field (shown in yellow card)
+          const expLines = (item.items || [])
+            .filter(i => i.explanation)
+            .map(i => `* **${i.point.replace(/\*\*/g,'').slice(0,60).trim()}${i.point.length > 60 ? '…' : ''}:** ${i.explanation}`)
+            .join('\n');
+          return {
+            ...item,
+            type: 'text',
+            text: bulletLines,
+            explanation: expLines,
+            _heading: item.title || '',
+            _badge: 'LIST',
+            _badgeColor: 'blue',
+          };
+        }
+
+        // code_example → example (problem = code block, solution = key points)
+        if (item.type === 'code_example') {
+          const solutionLines = [
+            item.explanation || '',
+            ...(item.key_points || []).map(kp => `* ${kp}`),
+            item.common_mistake ? `⚠️ Common mistake: ${item.common_mistake}` : '',
+          ].filter(Boolean).join('\n');
+
+          return {
+            ...item,
+            type: 'example',
+            problem: `${item.title ? item.title + '\n' : ''}${item.code || ''}`,
+            solution: solutionLines,
+          };
+        }
+
+        // process → example (steps listed as problem, explanation as solution)
+        if (item.type === 'process') {
+          const stepsText = (item.steps || []).map(s =>
+            `${s.step_no}. ${s.step}${s.explanation ? '\n   ' + s.explanation : ''}`
+          ).join('\n');
+
+          return {
+            ...item,
+            type: 'example',
+            problem: item.title ? `${item.title}\n\n${stepsText}` : stepsText,
+            solution: item.explanation || '',
+          };
+        }
+
+        return item;
+      }),
+    })),
+  };
+};

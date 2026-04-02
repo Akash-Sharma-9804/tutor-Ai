@@ -155,6 +155,7 @@ RULES:
 - Short answer: 2-3 complete sentences
 - Long answer: 4-6 complete sentences
 - Keep explanations to 1 line max (null is fine for short/long)
+- CRITICAL: Return ONLY valid JSON. Do NOT use raw backslashes (\\) in text. Write math using words or Unicode (e.g., "omega" not "\\omega", "pi" not "\\pi", "²" not "^2"). Never use LaTeX notation inside JSON strings.
 - Each question MUST include the "marks" field exactly as specified above
 - Number questions sequentially from 1 to ${totalQuestions}
 
@@ -181,14 +182,79 @@ const callGemini = async (prompt) => {
 
 const parseQuestionsJson = (raw) => {
   try {
-    const cleaned = raw
+    // Step 1: Strip markdown code fences
+    let cleaned = raw
       .replace(/^```json\s*/i, "")
       .replace(/^```\s*/i, "")
       .replace(/```\s*$/i, "")
       .trim();
-    const parsed = JSON.parse(cleaned);
-    if (!Array.isArray(parsed)) throw new Error("Not an array");
-    return parsed;
+
+    // Step 2: Extract only the JSON array (ignore any trailing junk after `]`)
+    const startIdx = cleaned.indexOf("[");
+    const endIdx = cleaned.lastIndexOf("]");
+    if (startIdx === -1 || endIdx === -1) throw new Error("No JSON array found");
+    cleaned = cleaned.slice(startIdx, endIdx + 1);
+
+    // Step 3: Try direct parse first (fast path)
+    try {
+      const parsed = JSON.parse(cleaned);
+      if (!Array.isArray(parsed)) throw new Error("Not an array");
+      return parsed;
+    } catch (_directErr) {
+      // Step 4: Repair bad escape sequences.
+      // Gemini sometimes emits lone backslashes or literal newlines inside string
+      // values (e.g. in physics formulas: v = r\omega, T = 2\pi/\omega).
+      // Walk char-by-char; inside string literals, fix any backslash not
+      // followed by a valid JSON escape character.
+      const VALID_ESCAPES = new Set(['"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u']);
+      let repaired = "";
+      let inString = false;
+      let i = 0;
+
+      while (i < cleaned.length) {
+        const ch = cleaned[i];
+
+        if (inString) {
+          if (ch === "\\") {
+            const next = cleaned[i + 1];
+            if (next !== undefined && VALID_ESCAPES.has(next)) {
+              // Valid escape — keep it; for \uXXXX consume 4 extra hex digits
+              if (next === "u") {
+                repaired += ch + next + cleaned.slice(i + 2, i + 6);
+                i += 6;
+              } else {
+                repaired += ch + next;
+                i += 2;
+              }
+            } else {
+              // Lone/bad backslash — double-escape it so JSON.parse accepts it
+              repaired += "\\\\";
+              i += 1;
+            }
+          } else if (ch === '"') {
+            inString = false;
+            repaired += ch;
+            i += 1;
+          } else if (ch === "\n" || ch === "\r") {
+            // Literal newlines inside strings are illegal JSON
+            repaired += ch === "\n" ? "\\n" : "\\r";
+            i += 1;
+          } else {
+            repaired += ch;
+            i += 1;
+          }
+        } else {
+          if (ch === '"') inString = true;
+          repaired += ch;
+          i += 1;
+        }
+      }
+
+      const parsed = JSON.parse(repaired);
+      if (!Array.isArray(parsed)) throw new Error("Not an array");
+      console.log("[Worksheet] ✅ JSON repaired successfully (bad escapes fixed)");
+      return parsed;
+    }
   } catch (err) {
     console.error("[Worksheet] JSON parse failed:", err.message);
     console.error("[Worksheet] Raw (first 500):", raw.slice(0, 500));

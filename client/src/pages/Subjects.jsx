@@ -31,6 +31,7 @@ import { useNavigate } from "react-router-dom";
 const SubjectsPage = () => {
   const [activeFilter, setActiveFilter] = useState("all");
   const [subjects, setSubjects] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [books, setBooks] = useState([]);
@@ -50,6 +51,7 @@ const SubjectsPage = () => {
   const [loadingAllBooks, setLoadingAllBooks] = useState(false);
   const [allBooksSearch, setAllBooksSearch] = useState("");
   const [allBooksSubjectFilter, setAllBooksSubjectFilter] = useState("all");
+  const [worksheetProgressMap, setWorksheetProgressMap] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -77,7 +79,7 @@ const SubjectsPage = () => {
           id: sub.id,
           name: sub.name,
           instructor: "AI Tutor",
-          students: 100 + index * 25,
+          students: sub.totalWorksheets || 0,
           progress: sub.progress || 0,
           rating: 4.7,
           color: colors[index % colors.length],
@@ -97,10 +99,30 @@ const SubjectsPage = () => {
         setSubjects(mappedSubjects);
       } catch (err) {
         console.error("Failed to fetch subjects", err);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchSubjects();
+  }, []);
+
+  // Fetch subject worksheet progress
+  useEffect(() => {
+    const fetchWorksheetProgress = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/subjects/worksheet-progress`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setWorksheetProgressMap(res.data || {});
+      } catch (err) {
+        console.error("Failed to fetch worksheet progress", err);
+      }
+    };
+    fetchWorksheetProgress();
   }, []);
 
   // Fetch student class info to check if 11/12
@@ -479,7 +501,83 @@ const SubjectsPage = () => {
             variants={containerVariants}
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
-            {filteredSubjects.length === 0 ? (
+            {loading ? (
+              <>
+                <style>{`
+                  @keyframes shimmer {
+                    0% { background-position: -600px 0; }
+                    100% { background-position: 600px 0; }
+                  }
+                  .skeleton-shimmer {
+                    background: linear-gradient(
+                      90deg,
+                      #e5e7eb 0px,
+                      #f3f4f6 40px,
+                      #e5e7eb 80px
+                    );
+                    background-size: 600px 100%;
+                    animation: shimmer 1.6s infinite linear;
+                  }
+                  .dark .skeleton-shimmer {
+                    background: linear-gradient(
+                      90deg,
+                      #1f2937 0px,
+                      #374151 40px,
+                      #1f2937 80px
+                    );
+                    background-size: 600px 100%;
+                    animation: shimmer 1.6s infinite linear;
+                  }
+                `}</style>
+                <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="rounded-2xl border border-gray-100 dark:border-white/8 bg-white dark:bg-[#14141f] overflow-hidden shadow-md"
+                      style={{ opacity: 1 - i * 0.15 }}
+                    >
+                      {/* header — mirrors real card h-32 */}
+                      <div className="h-32 skeleton-shimmer relative overflow-hidden">
+                        <div className="absolute -top-6 -right-6 h-24 w-24 rounded-full bg-white/20 dark:bg-white/5" />
+                        <div className="absolute top-5 left-5 h-12 w-12 rounded-xl bg-white/30 dark:bg-white/10" />
+                        <div className="absolute top-5 right-5 h-6 w-14 rounded-lg bg-white/30 dark:bg-white/10" />
+                        <div className="absolute bottom-5 left-5 h-5 w-32 rounded-md bg-white/30 dark:bg-white/10" />
+                        <div className="absolute bottom-5 right-5 h-4 w-20 rounded-md bg-white/20 dark:bg-white/5" />
+                      </div>
+
+                      {/* body — mirrors real card p-6 */}
+                      <div className="p-6 space-y-4">
+                        {/* progress label row */}
+                        <div className="flex items-center justify-between">
+                          <div className="h-4 w-16 rounded skeleton-shimmer" />
+                          <div className="h-4 w-10 rounded skeleton-shimmer" />
+                        </div>
+                        {/* progress bar */}
+                        <div className="h-2 w-full rounded-full skeleton-shimmer" />
+
+                        {/* stats grid — 3 cols */}
+                        <div className="grid grid-cols-3 gap-3 pt-1">
+                          {[0, 1, 2].map((j) => (
+                            <div
+                              key={j}
+                              className="flex flex-col items-center gap-1.5 p-2 rounded-lg border border-gray-100 dark:border-white/5"
+                            >
+                              <div className="h-4 w-4 rounded skeleton-shimmer" />
+                              <div className="h-4 w-8 rounded skeleton-shimmer" />
+                              <div className="h-3 w-14 rounded skeleton-shimmer" />
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* action button */}
+                        <div className="h-11 w-full rounded-xl skeleton-shimmer mt-1" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            
+            ) : filteredSubjects.length === 0 ? (
               <motion.div
                 initial={{ opacity: 1 }}
                 animate={{ opacity: 1 }}
@@ -576,8 +674,8 @@ const SubjectsPage = () => {
                           {subject.students}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Students
-                        </p>
+  Worksheets
+</p>
                       </div>
                       <div className="text-center p-2 rounded-lg bg-gradient-to-br from-purple-50 to-pink-50 dark:from-blue-900/30 dark:to-blue-900/30 border border-purple-200 dark:border-transparent">
                         <Clock className="h-4 w-4 text-purple-600 dark:text-gray-400 mx-auto mb-1" />
@@ -591,10 +689,10 @@ const SubjectsPage = () => {
                       <div className="text-center p-2 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-blue-900/30 dark:to-blue-900/30 border border-green-200 dark:border-transparent">
                         <Calendar className="h-4 w-4 text-green-600 dark:text-gray-400 mx-auto mb-1" />
                         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          {subject.upcomingDeadline}
+                           {subject.progress}%
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Deadline
+                          Completed
                         </p>
                       </div>
                     </div>
@@ -617,46 +715,66 @@ const SubjectsPage = () => {
 
         {/* Sidebar with Charts and Insights */}
         <div className="space-y-6">
-          {/* Subject Distribution Chart */}
+          {/* Subject Worksheet Progress */}
           <div className="rounded-xl border border-indigo-200 dark:border-white/10 bg-white dark:bg-[#14141f] p-6 shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                Your Subjects
+                Worksheet Scores
               </h3>
               <PieChart className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div className="space-y-4">
-              {subjects.slice(0, 4).map((subject, index) => (
-                <motion.div
-                  key={subject.id}
-                  initial={{ opacity: 1, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.06, duration: 0.4 }}
-                  className="space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`h-3 w-3 rounded-full bg-gradient-to-r ${subject.color}`}
-                      />
-                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {subject.name}
-                      </span>
+              {subjects.slice(0, 4).map((subject, index) => {
+                const wp = worksheetProgressMap[subject.id];
+                const pct = wp ? Math.round(wp.percentage) : null;
+                const attempted = wp ? wp.worksheets_attempted : 0;
+                const total = wp ? wp.worksheets_total : (subject.students || 0);
+                return (
+                  <motion.div
+                    key={subject.id}
+                    initial={{ opacity: 1, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.06, duration: 0.4 }}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`h-3 w-3 rounded-full bg-gradient-to-r ${subject.color}`} />
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {subject.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {pct !== null ? (
+                          <span className={`text-sm font-semibold ${
+                            pct >= 70 ? "text-emerald-600 dark:text-emerald-400" :
+                            pct >= 40 ? "text-amber-600 dark:text-amber-400" :
+                            "text-rose-500 dark:text-rose-400"
+                          }`}>{pct}%</span>
+                        ) : (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">No attempts</span>
+                        )}
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                          ({attempted}/{total})
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      {subject.progress}%
-                    </span>
-                  </div>
-                  <div className="h-2 bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${subject.progress}%` }}
-                      transition={{ duration: 0.8, delay: index * 0.05 }}
-                      className={`h-full bg-gradient-to-r ${subject.color} rounded-full`}
-                    />
-                  </div>
-                </motion.div>
-              ))}
+                    <div className="h-2 bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: pct !== null ? `${pct}%` : "0%" }}
+                        transition={{ duration: 0.8, delay: index * 0.05 }}
+                        className={`h-full rounded-full bg-gradient-to-r ${
+                          pct === null ? "from-gray-300 to-gray-400" :
+                          pct >= 70 ? "from-emerald-400 to-teal-500" :
+                          pct >= 40 ? "from-amber-400 to-orange-500" :
+                          "from-rose-400 to-pink-500"
+                        }`}
+                      />
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           </div>
 

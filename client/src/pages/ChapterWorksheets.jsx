@@ -73,6 +73,15 @@ const ChapterWorksheets = () => {
     fetchData();
   }, [chapterId]);
 
+  // 📊 Average score across attempted worksheets
+  const attemptedWorksheets = worksheets.filter(ws => ws.attempt_id);
+  const avgScore = attemptedWorksheets.length > 0
+    ? Math.round(
+        attemptedWorksheets.reduce((sum, ws) => sum + (ws.percentage || 0), 0) /
+        attemptedWorksheets.length
+      )
+    : null;
+
   // 🔓 Progressive unlock logic
   const processedWorksheets = worksheets.map((ws, index) => {
     const prev = worksheets[index - 1];
@@ -121,20 +130,39 @@ const ChapterWorksheets = () => {
               <h1 className="font-bold text-lg sm:text-2xl mb-1">Practice Worksheets</h1>
               <p className="text-xs sm:text-sm text-white/80">Reinforce your understanding chapter by chapter</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 shrink-0">
-              <div className="flex items-center gap-2">
-                <FileText size={14} />
-                <span className="text-xs sm:text-sm font-medium">Available</span>
+            <div className="flex gap-2 shrink-0">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4">
+                <div className="flex items-center gap-2">
+                  <FileText size={14} />
+                  <span className="text-xs sm:text-sm font-medium">Available</span>
+                </div>
+                <p className="text-2xl sm:text-3xl font-bold mt-1">{worksheets.length}</p>
+                <p className="text-[10px] sm:text-xs text-white/70">worksheets</p>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold mt-1">{worksheets.length}</p>
-              <p className="text-[10px] sm:text-xs text-white/70">worksheets</p>
+
+              {avgScore !== null && (
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4">
+                  <div className="flex items-center gap-2">
+                    <BarChart2 size={14} />
+                    <span className="text-xs sm:text-sm font-medium">Avg Score</span>
+                  </div>
+                  <p className={`text-2xl sm:text-3xl font-bold mt-1 ${
+                    avgScore >= 70 ? "text-emerald-300" :
+                    avgScore >= 40 ? "text-amber-300" :
+                    "text-rose-300"
+                  }`}>{avgScore}%</p>
+                  <p className="text-[10px] sm:text-xs text-white/70">
+                    {attemptedWorksheets.length}/{worksheets.length} done
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </motion.div>
 
       {/* ── WORKSHEETS LIST ───────────────────────────────────────────────────── */}
-      <div>
+      <div className="lg:w-[60vw] mx-auto">
         <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 sm:mb-4 flex items-center gap-2">
           <Layers size={18} className="text-blue-600 dark:text-blue-400" />
           <span>Practice Worksheets</span>
@@ -203,6 +231,10 @@ const ChapterWorksheets = () => {
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r ${subjectGradient} text-white`}>
                           <ClipboardList size={10} />
                           {ws.total_questions} questions
+                        </span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r ${subjectGradient} text-white`}>
+                          <ClipboardList size={10} />
+                          {ws.worksheet_total_marks} Marks
                         </span>
                         {attempted && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">

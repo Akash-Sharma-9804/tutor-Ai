@@ -152,42 +152,98 @@ exports.getSubjectsWithProgress = async (req, res) => {
     const completedMap = {};
     completedCounts.forEach(r => { completedMap[r.chapter_id] = r.completed; });
 
-    // Step 6: Aggregate progress per subject
-    const subjectProgress = {};
+    // ✅ Calculate progress per book using EXACT same logic as getBookProgressSummary:
+    //    - compute percent per chapter: Math.min(100, round(done / total * 100))
+    //    - skip chapters with total_segments === 0
+    //    - overallPercent = average of chapter percents (only chapters with content)
+    const bookProgressMap = {};
+
+    books.forEach(book => {
+      const bookChapters = chapterTotals.filter(c => c.book_id === book.id);
+
+      const chaptersWithProgress = bookChapters.map(ch => {
+        const total = ch.total_segments || 0;
+        const doneRaw = completedMap[ch.chapter_id] || 0;
+        const done = Math.min(doneRaw, total);
+        const percent = total > 0
+          ? Math.min(100, Math.round((done / total) * 100))
+          : 0;
+        return { total, percent };
+      });
+
+      // Only average chapters that actually have segments (mirrors progress-summary filter)
+      const chaptersWithContent = chaptersWithProgress.filter(c => c.total > 0);
+      const overallPercent = chaptersWithContent.length > 0
+        ? Math.min(100, Math.round(
+            chaptersWithContent.reduce((sum, c) => sum + c.percent, 0) /
+            chaptersWithContent.length
+          ))
+        : 0;
+
+      bookProgressMap[book.id] = overallPercent;
+    });
+
+    // Step 6: Aggregate subject progress — average overallPercent across all books in subject
+    const subjectProgressPercent = {};
+
     subjectIds.forEach(id => {
-      subjectProgress[id] = { totalSegments: 0, completedSegments: 0 };
+      const subjectBooks = books.filter(b => b.subject_id === id);
+
+      if (subjectBooks.length === 0) {
+        subjectProgressPercent[id] = 0;
+        return;
+      }
+
+      const total = subjectBooks.reduce((sum, b) => sum + (bookProgressMap[b.id] || 0), 0);
+      subjectProgressPercent[id] = Math.round(total / subjectBooks.length);
     });
 
-    chapterTotals.forEach(ch => {
-      const subjectId = bookToSubject[ch.book_id];
-      if (!subjectId || !subjectProgress[subjectId]) return;
-      subjectProgress[subjectId].totalSegments += ch.total_segments || 0;
-      subjectProgress[subjectId].completedSegments += completedMap[ch.chapter_id] || 0;
-    });
+    // ✅ Count worksheets per subject
+const [worksheetCounts] = await db.query(
+  `SELECT b.subject_id, COUNT(w.id) as total
+   FROM books b
+   JOIN book_chapters bc ON bc.book_id = b.id
+   JOIN chapter_worksheets w ON w.chapter_id = bc.id
+   WHERE b.subject_id IN (${subjectPlaceholders})
+   GROUP BY b.subject_id`,
+  subjectIds
+);
 
-    // Count total chapters per subject
-    const chapterCountBySubject = {};
-    subjectIds.forEach(id => { chapterCountBySubject[id] = 0; });
-    chapterTotals.forEach(ch => {
-      const subjectId = bookToSubject[ch.book_id];
-      if (subjectId) chapterCountBySubject[subjectId] = (chapterCountBySubject[subjectId] || 0) + 1;
-    });
+// ✅ Count chapters per subject
+const chapterCountBySubject = {};
+
+chapterTotals.forEach(ch => {
+  const subjectId = bookToSubject[ch.book_id];
+  if (!subjectId) return;
+
+  chapterCountBySubject[subjectId] =
+    (chapterCountBySubject[subjectId] || 0) + 1;
+});
+
+const worksheetCountBySubject = {};
+worksheetCounts.forEach(w => {
+  worksheetCountBySubject[w.subject_id] = w.total;
+});
 
     // Step 7: Build final response
     const result = subjects.map(s => {
-      const prog = subjectProgress[s.id] || { totalSegments: 0, completedSegments: 0 };
-      const percent = prog.totalSegments > 0
-        ? Math.round((prog.completedSegments / prog.totalSegments) * 100)
-        : 0;
-      return {
-        id: s.id,
-        name: s.name,
-        progress: percent,
-        totalSegments: prog.totalSegments,
-        completedSegments: prog.completedSegments,
-        totalChapters: chapterCountBySubject[s.id] || 0,
-      };
-    });
+  const percent = subjectProgressPercent[s.id] || 0;
+
+  return {
+    id: s.id,
+    name: s.name,
+
+    // ✅ correct progress (like progress-summary)
+    progress: percent,
+
+    // ✅ optional: keep these as 0 or remove if not needed
+    totalSegments: 0,
+    completedSegments: 0,
+
+    totalChapters: chapterCountBySubject[s.id] || 0,
+    totalWorksheets: worksheetCountBySubject[s.id] || 0,
+  };
+});
 
     res.json(result);
   } catch (err) {
@@ -322,6 +378,30 @@ exports.getDashboardStats = async (req, res) => {
   } catch (err) {
     console.error("Failed to fetch dashboard stats:", err);
     res.status(500).json({ message: "Failed to fetch stats" });
+  }
+};
+
+/**
+ * GET /api/subjects/worksheet-progress
+ * Returns subject_worksheet_progress rows for the logged-in student
+ */
+exports.getSubjectWorksheetProgress = async (req, res) => {
+  try {
+    const studentId = req.studentId;
+    const [rows] = await db.query(
+      `SELECT subject_id, total_marks, obtained_marks, percentage,
+              worksheets_attempted, worksheets_total, updated_at
+       FROM subject_worksheet_progress
+       WHERE student_id = ?`,
+      [studentId]
+    );
+    // Return as a map { subjectId: { percentage, ... } } for easy frontend lookup
+    const map = {};
+    rows.forEach(r => { map[r.subject_id] = r; });
+    res.json(map);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch worksheet progress" });
   }
 };
 

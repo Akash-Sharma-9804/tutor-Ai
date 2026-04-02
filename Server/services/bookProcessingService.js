@@ -17,6 +17,9 @@ const axios = require("axios");
 const OpenAI = require("openai");
 const { uploadFileToFTP } = require("./uploadToFTP");
 const {
+  generateChapterSummaryFromSections,
+} = require("./chapterSummaryService");
+const {
   getOCRPages,
   uploadPageDiagrams,
   checkMemory,
@@ -24,7 +27,7 @@ const {
 const { isMathsSubject, buildMathsPrompt } = require("./mathsPrompt");
 const { isEnglishSubject, buildEnglishPrompt } = require("./englishPrompt");
 const { isPhysicsSubject, buildPhysicsPrompt } = require("./physicsPrompt");
-
+const { isComputerSubject, buildComputerPrompt } = require("./computerPrompt");
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const EMBEDDING_MODEL = "text-embedding-3-small";
@@ -66,7 +69,7 @@ async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 5000) {
       if (error.response?.status === 429 && i < maxRetries - 1) {
         const waitTime = initialDelay * Math.pow(2, i);
         console.log(
-          `⏳ Rate limited. Waiting ${waitTime / 1000}s before retry ${i + 1}/${maxRetries}...`
+          `⏳ Rate limited. Waiting ${waitTime / 1000}s before retry ${i + 1}/${maxRetries}...`,
         );
         await delay(waitTime);
       } else {
@@ -99,7 +102,7 @@ async function processPageChunk(
   bookMetadata,
   chunkIndex,
   retryMode = false,
-  subjectName = ""
+  subjectName = "",
 ) {
   console.log(`\n📄 Processing page ${pageNumber} (Chunk ${chunkIndex})...`);
 
@@ -124,29 +127,74 @@ async function processPageChunk(
 
     // ── Choose prompt: maths-specific, english-specific, or general ──────────
     const effectiveSubject = subjectName || bookMetadata.subject || "";
-    const useMathsPrompt   = isMathsSubject(effectiveSubject);
-    const usePhysicsPrompt = !useMathsPrompt && isPhysicsSubject(effectiveSubject);
-    const useEnglishPrompt = !useMathsPrompt && !usePhysicsPrompt && isEnglishSubject(effectiveSubject);
- 
+    const useMathsPrompt = isMathsSubject(effectiveSubject);
+    const usePhysicsPrompt =
+      !useMathsPrompt && isPhysicsSubject(effectiveSubject);
+    const useComputerPrompt =
+      !useMathsPrompt &&
+      !usePhysicsPrompt &&
+      isComputerSubject(effectiveSubject);
+    const useEnglishPrompt =
+      !useMathsPrompt &&
+      !usePhysicsPrompt &&
+      !useComputerPrompt &&
+      isEnglishSubject(effectiveSubject);
+
     if (useMathsPrompt) {
-      console.log(`🔢 Using MATHS prompt for page ${pageNumber} (subject: ${effectiveSubject})`);
+      console.log(
+        `🔢 Using MATHS prompt for page ${pageNumber} (subject: ${effectiveSubject})`,
+      );
     } else if (usePhysicsPrompt) {
-      console.log(`⚛️  Using PHYSICS prompt for page ${pageNumber} (subject: ${effectiveSubject})`);
+      console.log(
+        `⚛️  Using PHYSICS prompt for page ${pageNumber} (subject: ${effectiveSubject})`,
+      );
     } else if (useEnglishPrompt) {
-      console.log(`📖 Using ENGLISH prompt for page ${pageNumber} (subject: ${effectiveSubject})`);
+      console.log(
+        `📖 Using ENGLISH prompt for page ${pageNumber} (subject: ${effectiveSubject})`,
+      );
+    } else if (useComputerPrompt) {
+      console.log(
+        `� Using COMPUTER prompt for page ${pageNumber} (subject: ${effectiveSubject})`,
+      );
     }
     // Build parts array: text prompt + diagram images inline
     const parts = [
       {
         text: useMathsPrompt
-          ? buildMathsPrompt(pageMarkdown, pageImages, pageNumber, bookMetadata, retryMode)
+          ? buildMathsPrompt(
+              pageMarkdown,
+              pageImages,
+              pageNumber,
+              bookMetadata,
+              retryMode,
+            )
           : usePhysicsPrompt
-          ? buildPhysicsPrompt(pageMarkdown, pageImages, pageNumber, bookMetadata, retryMode)
-          : useEnglishPrompt
-          ? buildEnglishPrompt(pageMarkdown, pageImages, pageNumber, bookMetadata, retryMode)
-          : `${
-          retryMode
-            ? `🚨🚨🚨 CRITICAL - RETRY MODE ACTIVATED 🚨🚨🚨
+            ? buildPhysicsPrompt(
+                pageMarkdown,
+                pageImages,
+                pageNumber,
+                bookMetadata,
+                retryMode,
+              )
+            : useComputerPrompt
+              ? buildComputerPrompt(
+                  pageMarkdown,
+                  pageImages,
+                  pageNumber,
+                  bookMetadata,
+                  retryMode,
+                )
+              : useEnglishPrompt
+                ? buildEnglishPrompt(
+                    pageMarkdown,
+                    pageImages,
+                    pageNumber,
+                    bookMetadata,
+                    retryMode,
+                  )
+                : `${
+                    retryMode
+                      ? `🚨🚨🚨 CRITICAL - RETRY MODE ACTIVATED 🚨🚨🚨
 
 THE PREVIOUS ATTEMPT FAILED - IT RETURNED EMPTY CONTENT OR INVALID DATA.
 
@@ -164,8 +212,8 @@ THIS IS YOUR FINAL ATTEMPT - GENERATE CONTENT NOW!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 `
-            : ""
-        }
+                      : ""
+                  }
 You are an expert CBSE Class ${bookMetadata.class} ${bookMetadata.subject} teacher creating study material for Class ${bookMetadata.class} students.
 
 PAGE CONTINUATION RULE (CRITICAL):
@@ -453,7 +501,7 @@ QUALITY REQUIREMENTS:
       {
         headers: { "Content-Type": "application/json" },
         timeout: 180000,
-      }
+      },
     );
 
     return response;
@@ -474,7 +522,7 @@ QUALITY REQUIREMENTS:
         bookMetadata,
         chunkIndex,
         true,
-        subjectName
+        subjectName,
       );
     }
     throw new Error("EMPTY_RESPONSE_FROM_GEMINI");
@@ -487,11 +535,19 @@ QUALITY REQUIREMENTS:
   cleanedOutput = cleanedOutput.trim();
 
   // Strip unstable fields
-  cleanedOutput = cleanedOutput.replace(/"key_terms"\s*:\s*\[[^\]]*\]\s*,?/gi, "");
-  cleanedOutput = cleanedOutput.replace(/"simplified"\s*:\s*"[^"]*"\s*,?/gi, "");
+  cleanedOutput = cleanedOutput.replace(
+    /"key_terms"\s*:\s*\[[^\]]*\]\s*,?/gi,
+    "",
+  );
+  cleanedOutput = cleanedOutput.replace(
+    /"simplified"\s*:\s*"[^"]*"\s*,?/gi,
+    "",
+  );
 
-  while (cleanedOutput.startsWith("`")) cleanedOutput = cleanedOutput.substring(1);
-  while (cleanedOutput.endsWith("`")) cleanedOutput = cleanedOutput.substring(0, cleanedOutput.length - 1);
+  while (cleanedOutput.startsWith("`"))
+    cleanedOutput = cleanedOutput.substring(1);
+  while (cleanedOutput.endsWith("`"))
+    cleanedOutput = cleanedOutput.substring(0, cleanedOutput.length - 1);
   cleanedOutput = cleanedOutput.trim();
 
   const jsonStart = cleanedOutput.indexOf("{");
@@ -514,11 +570,11 @@ QUALITY REQUIREMENTS:
       // JSON.parse converts them to form-feed (U+000C) and tab characters, corrupting
       // all LaTeX. Raw tabs are caught below by the ch==='\t' check instead.
       // Exclude ALL single-letter sequences that are valid JSON escapes BUT also
-// appear as LaTeX command prefixes: \b (→ backspace), \n (→ \nabla, \nu),
-// \r (→ \rho, \right, \rangle), \f (→ \frac), \t (→ \theta, \times).
-// We only allow \\ (escaped backslash), \" (escaped quote), \/ (escaped slash),
-// \uXXXX (unicode), and raw \n/\r/\t that appear OUTSIDE strings (handled below).
-const VALID_ESCAPES = new Set(['"', '/', '\\', 'u']);
+      // appear as LaTeX command prefixes: \b (→ backspace), \n (→ \nabla, \nu),
+      // \r (→ \rho, \right, \rangle), \f (→ \frac), \t (→ \theta, \times).
+      // We only allow \\ (escaped backslash), \" (escaped quote), \/ (escaped slash),
+      // \uXXXX (unicode), and raw \n/\r/\t that appear OUTSIDE strings (handled below).
+      const VALID_ESCAPES = new Set(['"', "/", "\\", "u"]);
       let result = "";
       let inString = false;
       let i = 0;
@@ -538,7 +594,7 @@ const VALID_ESCAPES = new Set(['"', '/', '\\', 'u']);
             result += ch + next;
             i += 2;
             // Skip 4 hex digits for \uXXXX
-            if (next === 'u') {
+            if (next === "u") {
               result += str.substring(i, i + 4);
               i += 4;
             }
@@ -551,9 +607,21 @@ const VALID_ESCAPES = new Set(['"', '/', '\\', 'u']);
           continue;
         }
         // Raw newline/CR/tab inside string — must be escaped
-        if (inString && ch === "\n") { result += "\\n"; i++; continue; }
-        if (inString && ch === "\r") { result += "\\n"; i++; continue; }
-        if (inString && ch === "\t") { result += "\\t"; i++; continue; }
+        if (inString && ch === "\n") {
+          result += "\\n";
+          i++;
+          continue;
+        }
+        if (inString && ch === "\r") {
+          result += "\\n";
+          i++;
+          continue;
+        }
+        if (inString && ch === "\t") {
+          result += "\\t";
+          i++;
+          continue;
+        }
         // Track string boundaries
         if (ch === '"') inString = !inString;
         result += ch;
@@ -561,7 +629,6 @@ const VALID_ESCAPES = new Set(['"', '/', '\\', 'u']);
       }
       return result;
     }
-
 
     let chunkData;
 
@@ -589,22 +656,26 @@ const VALID_ESCAPES = new Set(['"', '/', '\\', 'u']);
       const openBrackets = (fixed.match(/\[/g) || []).length;
       const closeBrackets = (fixed.match(/]/g) || []).length;
 
-      if (closeBraces < openBraces) fixed += "}".repeat(openBraces - closeBraces);
-      if (closeBrackets < openBrackets) fixed += "]".repeat(openBrackets - closeBrackets);
+      if (closeBraces < openBraces)
+        fixed += "}".repeat(openBraces - closeBraces);
+      if (closeBrackets < openBrackets)
+        fixed += "]".repeat(openBrackets - closeBrackets);
 
       try {
         chunkData = JSON.parse(fixed);
         console.log("✅ JSON auto-repaired successfully!");
       } catch (e2) {
-        console.log("❌ Auto-repair failed, retrying with simplified prompt...");
+        console.log(
+          "❌ Auto-repair failed, retrying with simplified prompt...",
+        );
         throw new Error("RETRY_CHUNK");
       }
     }
 
-      const restoreNewlines = (obj) => {
-      if (typeof obj === 'string') return obj.replace(/\\n/g, '\n');
+    const restoreNewlines = (obj) => {
+      if (typeof obj === "string") return obj.replace(/\\n/g, "\n");
       if (Array.isArray(obj)) return obj.map(restoreNewlines);
-      if (obj && typeof obj === 'object') {
+      if (obj && typeof obj === "object") {
         const out = {};
         for (const k of Object.keys(obj)) out[k] = restoreNewlines(obj[k]);
         return out;
@@ -615,12 +686,24 @@ const VALID_ESCAPES = new Set(['"', '/', '\\', 'u']);
 
     // Normalize subheading structure
     const mathsTypes = new Set([
-      "definition", "theorem", "proof", "formula",
-      "concept", "note", "activity", "topic_intro",
-      "worked_example", "exercise", "summary_table",
-      "diagram",   // ← new maths prompt type; image_url injected by injectImageUrls
+      "definition",
+      "theorem",
+      "proof",
+      "formula",
+      "concept",
+      "note",
+      "activity",
+      "topic_intro",
+      "worked_example",
+      "exercise",
+      "summary_table",
+      "diagram", // ← new maths prompt type; image_url injected by injectImageUrls
       // English prompt types — pass through as-is
-      "passage", "dialogue", "author_note", "question", "glossary",
+      "passage",
+      "dialogue",
+      "author_note",
+      "question",
+      "glossary",
     ]);
     chunkData.sections?.forEach((section, sectionIndex) => {
       section.content = section.content?.map((item, contentIndex) => {
@@ -672,21 +755,24 @@ const VALID_ESCAPES = new Set(['"', '/', '\\', 'u']);
     });
 
     // Validate content
-    const hasNoSections = !chunkData.sections || chunkData.sections.length === 0;
+    const hasNoSections =
+      !chunkData.sections || chunkData.sections.length === 0;
     const hasEmptyContent = chunkData.sections?.some(
-      (s) => !s.content || s.content.length === 0
+      (s) => !s.content || s.content.length === 0,
     );
     const totalSegments =
       chunkData.sections?.reduce(
         (sum, s) => sum + (s.content?.length || 0),
-        0
+        0,
       ) || 0;
 
     if (hasNoSections || hasEmptyContent || totalSegments === 0) {
       console.warn(`⚠️ Empty content detected for page ${pageNumber}`);
 
       if (!retryMode) {
-        console.log(`🔄 Retrying page ${pageNumber} with strict requirements...`);
+        console.log(
+          `🔄 Retrying page ${pageNumber} with strict requirements...`,
+        );
         await delay(3000);
         return await processPageChunk(
           pageMarkdown,
@@ -695,7 +781,7 @@ const VALID_ESCAPES = new Set(['"', '/', '\\', 'u']);
           bookMetadata,
           chunkIndex,
           true,
-          subjectName
+          subjectName,
         );
       }
 
@@ -722,12 +808,15 @@ const VALID_ESCAPES = new Set(['"', '/', '\\', 'u']);
     console.log(
       `✅ Chunk ${chunkIndex}: Processed ${
         chunkData.sections?.length || 0
-      } sections (${totalSegments} segments)`
+      } sections (${totalSegments} segments)`,
     );
 
     return chunkData.sections || [];
   } catch (parseError) {
-    console.error(`❌ JSON Parse Error for chunk ${chunkIndex}:`, parseError.message);
+    console.error(
+      `❌ JSON Parse Error for chunk ${chunkIndex}:`,
+      parseError.message,
+    );
     console.error("First 300 chars:", cleanedOutput?.substring(0, 300));
     throw new Error("INVALID_JSON_FROM_MODEL");
   }
@@ -791,7 +880,7 @@ async function processBookFromPDF(
   pdfPublicURL,
   bookId,
   bookMetadata,
-  dbConnection
+  dbConnection,
 ) {
   try {
     // ── Download PDF ─────────────────────────────────────────────────────────
@@ -806,7 +895,9 @@ async function processBookFromPDF(
     console.log(`📄 PDF size: ${sizeMB.toFixed(2)}MB`);
 
     if (sizeMB > 50) {
-      throw new Error("PDF too large (>50MB). Please split into smaller files.");
+      throw new Error(
+        "PDF too large (>50MB). Please split into smaller files.",
+      );
     }
 
     // ── Get school/class/subject info for FTP paths ───────────────────────────
@@ -817,7 +908,7 @@ async function processBookFromPDF(
        JOIN classes c ON s.class_id = c.id
        JOIN schools sc ON c.school_id = sc.id
        WHERE b.id = ?`,
-      [bookId]
+      [bookId],
     );
 
     const schoolName = schoolSubjectInfo[0]?.school_name || "Unknown";
@@ -828,7 +919,10 @@ async function processBookFromPDF(
     const className = `Class ${classNum}`;
     const subjectNameForPath =
       schoolSubjectInfo[0]?.subject_name || bookMetadata.subject;
-    const chapterNum = String(bookMetadata.chapter_number || 1).padStart(2, "0");
+    const chapterNum = String(bookMetadata.chapter_number || 1).padStart(
+      2,
+      "0",
+    );
     const ftpBaseDir = `/books/${schoolName}/${className}/${subjectNameForPath}/ch${chapterNum}`;
 
     // Store in metadata for convenience
@@ -847,7 +941,7 @@ async function processBookFromPDF(
       pdfBase64,
       bookId,
       bookMetadata.chapter_number || 1,
-      dbConnection
+      dbConnection,
     );
 
     if (!ocrPages || ocrPages.length === 0) {
@@ -871,7 +965,7 @@ async function processBookFromPDF(
       const pageImages = page.images || []; // [{ id, image_base64 }]
 
       console.log(
-        `\n📖 Page ${pageNumber}/${actualPages} — ${pageImages.length} diagram(s)`
+        `\n📖 Page ${pageNumber}/${actualPages} — ${pageImages.length} diagram(s)`,
       );
 
       // ✅ ORDER: Gemini first (needs base64) → FTP upload → inject URLs
@@ -886,12 +980,12 @@ async function processBookFromPDF(
           bookMetadata,
           i + 1,
           false,
-          subjectNameForPath
+          subjectNameForPath,
         );
       } catch (pageError) {
         console.error(
           `❌ Failed to process page ${pageNumber}:`,
-          pageError.message
+          pageError.message,
         );
 
         // Retry logic (same as original)
@@ -908,12 +1002,14 @@ async function processBookFromPDF(
               bookMetadata,
               i + 1,
               false,
-              subjectNameForPath
+              subjectNameForPath,
             );
             console.log(`✅ Retry succeeded for page ${pageNumber}`);
           } catch (retry1Error) {
             console.error(`❌ Retry 2 failed:`, retry1Error.message);
-            console.log(`🔁 Retrying page ${pageNumber} (attempt 3 - safe mode)...`);
+            console.log(
+              `🔁 Retrying page ${pageNumber} (attempt 3 - safe mode)...`,
+            );
             try {
               sections = await processPageChunk(
                 pageMarkdown,
@@ -922,13 +1018,15 @@ async function processBookFromPDF(
                 bookMetadata,
                 i + 1,
                 true, // safe mode
-                subjectNameForPath
+                subjectNameForPath,
               );
-              console.log(`✅ Safe-mode retry succeeded for page ${pageNumber}`);
+              console.log(
+                `✅ Safe-mode retry succeeded for page ${pageNumber}`,
+              );
             } catch (retry2Error) {
               // Create fallback content
               console.warn(
-                `⚠️ All retries failed for page ${pageNumber} — using fallback`
+                `⚠️ All retries failed for page ${pageNumber} — using fallback`,
               );
               sections = [
                 {
@@ -975,7 +1073,7 @@ async function processBookFromPDF(
         bookId,
         bookMetadata.chapter_number || 1,
         ftpBaseDir,
-        dbConnection
+        dbConnection,
       );
 
       // ── Step 3: Inject FTP URLs into Gemini's diagram blocks ─────────────
@@ -1001,7 +1099,7 @@ async function processBookFromPDF(
     // ── Build final chapter JSON ──────────────────────────────────────────────
     const totalSegments = allSections.reduce(
       (sum, section) => sum + (section.content?.length || 0),
-      0
+      0,
     );
 
     console.log(`\n✅ All ${actualPages} pages processed`);
@@ -1034,7 +1132,7 @@ async function processBookFromPDF(
     const ftpResult = await uploadFileToFTP(
       contentJsonBuffer,
       "content.json",
-      ftpBaseDir
+      ftpBaseDir,
     );
 
     // ── Upload segments.json to FTP (for highlight/navigation) ───────────────
@@ -1045,13 +1143,11 @@ async function processBookFromPDF(
       has_images: (p.images?.length || 0) > 0,
     }));
 
-    const segmentsBuffer = Buffer.from(
-      JSON.stringify({ segments }, null, 2)
-    );
+    const segmentsBuffer = Buffer.from(JSON.stringify({ segments }, null, 2));
     const ftpSegResult = await uploadFileToFTP(
       segmentsBuffer,
       "segments.json",
-      ftpBaseDir
+      ftpBaseDir,
     );
 
     // ── Save to DB ────────────────────────────────────────────────────────────
@@ -1059,29 +1155,29 @@ async function processBookFromPDF(
 
     const [existingChapter] = await dbConnection.query(
       `SELECT id FROM book_chapters WHERE book_id = ? AND chapter_no = ?`,
-      [bookId, bookMetadata.chapter_number || 1]
+      [bookId, bookMetadata.chapter_number || 1],
     );
 
     if (existingChapter.length > 0) {
       await dbConnection.query(
         `UPDATE book_chapters 
-         SET content_json_path = ?,
-             segments_json_path = ?,
-             total_segments = ?
-         WHERE book_id = ? AND chapter_no = ?`,
+     SET content_json_path = ?,
+         segments_json_path = ?,
+         total_segments = ?
+     WHERE book_id = ? AND chapter_no = ?`,
         [
           ftpResult.url,
           ftpSegResult.url,
           totalSegments,
           bookId,
           bookMetadata.chapter_number || 1,
-        ]
+        ],
       );
     } else {
       await dbConnection.query(
         `INSERT INTO book_chapters
-         (book_id, chapter_no, chapter_title, content_json_path, segments_json_path, total_segments)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+     (book_id, chapter_no, chapter_title, content_json_path, segments_json_path, total_segments)
+     VALUES (?, ?, ?, ?, ?, ?)`,
         [
           bookId,
           bookMetadata.chapter_number || 1,
@@ -1089,9 +1185,33 @@ async function processBookFromPDF(
           ftpResult.url,
           ftpSegResult.url,
           totalSegments,
-        ]
+        ],
       );
     }
+
+    // ───────────── AUTO SUMMARY GENERATION ─────────────
+    (async () => {
+      try {
+        console.log(
+          `📘 [Summary] Generating for chapter ${bookMetadata.chapter_number}`,
+        );
+
+        const summary = await generateChapterSummaryFromSections(allSections);
+
+        console.log("✅ [Summary] Generated");
+
+        await dbConnection.query(
+          `UPDATE book_chapters 
+       SET summary_json = ? 
+       WHERE book_id = ? AND chapter_no = ?`,
+          [JSON.stringify(summary), bookId, bookMetadata.chapter_number || 1],
+        );
+
+        console.log("💾 [Summary] Saved");
+      } catch (err) {
+        console.error("❌ [Summary] Failed:", err.message);
+      }
+    })();
 
     console.log(`✅ Chapter ${bookMetadata.chapter_number} saved to DB`);
     console.log(`   Content JSON: ${ftpResult.url}`);
@@ -1107,9 +1227,7 @@ async function processBookFromPDF(
     console.error("❌ Book processing failed:", error.message);
 
     if (error.response?.status === 429) {
-      throw new Error(
-        "Rate limit exceeded. Check API billing/quota."
-      );
+      throw new Error("Rate limit exceeded. Check API billing/quota.");
     }
     if (error.response?.status === 403) {
       throw new Error("API access forbidden. Check API key.");
@@ -1223,7 +1341,7 @@ function structurePageContent(pageMarkdown, pageNumber) {
 function createSemanticChunksFromStructure(
   structuredPages,
   minWords = 150,
-  maxWords = 400
+  maxWords = 400,
 ) {
   const chunks = [];
   let currentChunk = {
@@ -1247,7 +1365,7 @@ function createSemanticChunksFromStructure(
           chunks.push({
             chunk_text: currentChunk.text.trim(),
             page_numbers: [...new Set(currentChunk.page_numbers)].sort(
-              (a, b) => a - b
+              (a, b) => a - b,
             ),
             paragraph_ids: [...currentChunk.paragraph_ids],
           });
@@ -1272,7 +1390,7 @@ function createSemanticChunksFromStructure(
     chunks.push({
       chunk_text: currentChunk.text.trim(),
       page_numbers: [...new Set(currentChunk.page_numbers)].sort(
-        (a, b) => a - b
+        (a, b) => a - b,
       ),
       paragraph_ids: [...currentChunk.paragraph_ids],
     });

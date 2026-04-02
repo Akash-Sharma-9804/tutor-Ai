@@ -543,6 +543,11 @@ exports.saveProgress = async (req, res) => {
 
     // Also save segment-level progress if segment_id provided
     if (segment_id !== undefined && segment_id !== null) {
+
+  // ❗ prevent saving unwanted segments (like subheading)
+  if (typeof segment_id === "string" && segment_id.includes("subheading")) {
+    return res.json({ success: true }); // skip
+  }
       await db.query(
         `INSERT INTO reading_progress_segments
          (user_id, chapter_id, segment_id, page_number, completed, time_spent_seconds)
@@ -727,8 +732,11 @@ exports.getBookProgressSummary = async (req, res) => {
 
     const chaptersWithProgress = chapters.map(ch => {
       const total = ch.total_segments || 0;
-      const done = completedMap[ch.id] || 0;
-      const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+      const doneRaw = completedMap[ch.id] || 0;
+const done = Math.min(doneRaw, total);
+      const percent = total > 0
+  ? Math.min(100, Math.round((done / total) * 100))
+  : 0;
       return {
         id: ch.id,
         chapter_no: ch.chapter_no,
@@ -741,9 +749,12 @@ exports.getBookProgressSummary = async (req, res) => {
 
     // Only count chapters that have segments for overall %
     const chaptersWithContent = chaptersWithProgress.filter(c => c.totalSegments > 0);
-    const overallPercent = chaptersWithContent.length > 0
-      ? Math.round(chaptersWithProgress.reduce((s, c) => s + c.percent, 0) / chaptersWithProgress.length)
-      : 0;
+  const overallPercent = chaptersWithContent.length > 0
+  ? Math.min(100, Math.round(
+      chaptersWithContent.reduce((s, c) => s + c.percent, 0) /
+      chaptersWithContent.length
+    ))
+  : 0;
 
     res.json({ chapters: chaptersWithProgress, overallPercent });
   } catch (err) {
@@ -837,25 +848,27 @@ exports.getChapterWorksheets = async (req, res) => {
         cw.title,
         cw.total_questions,
         cw.generated_at,
-
+        cw.total_marks AS worksheet_total_marks,
         a.id AS attempt_id,
         a.obtained_marks,
-        a.total_marks,
+        a.total_marks AS attempt_total_marks,
         a.percentage,
         a.created_at AS attempted_at
 
       FROM chapter_worksheets cw
 
-      LEFT JOIN (
-        SELECT *
-        FROM chapter_worksheet_attempts
-        WHERE student_id = ?
-        ORDER BY created_at DESC
-      ) a 
-      ON a.worksheet_id = cw.id
+      LEFT JOIN chapter_worksheet_attempts a 
+  ON a.id = (
+    SELECT a2.id 
+    FROM chapter_worksheet_attempts a2
+    WHERE a2.worksheet_id = cw.id 
+      AND a2.student_id = ?
+    ORDER BY a2.created_at DESC
+    LIMIT 1
+  )
 
       WHERE cw.chapter_id = ?
-      GROUP BY cw.id
+       
       ORDER BY cw.generated_at ASC
       `,
       [studentId, chapterId]

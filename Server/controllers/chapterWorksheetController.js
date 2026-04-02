@@ -105,6 +105,9 @@ exports.submitChapterWorksheet = async (req, res) => {
       [obtainedMarks, percentage, attemptId]
     );
 
+    // 6. Recalculate and store subject worksheet progress
+    await recalculateSubjectWorksheetProgress(studentId, chapterId, db);
+
     res.json({
       success: true,
       result: {
@@ -119,6 +122,93 @@ exports.submitChapterWorksheet = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
+
+/**
+ * Recalculates subject_worksheet_progress for a student+subject
+ * Called after every worksheet submission
+ * Chain: chapterId → book → subject → all worksheets in subject
+ */
+async function recalculateSubjectWorksheetProgress(studentId, chapterId, db) {
+  try {
+    // 1. Find subject_id from chapterId
+    const [[chapterRow]] = await db.query(
+      `SELECT b.subject_id FROM book_chapters bc
+       JOIN books b ON b.id = bc.book_id
+       WHERE bc.id = ?`,
+      [chapterId]
+    );
+    if (!chapterRow) return;
+    const subjectId = chapterRow.subject_id;
+
+    // 2. Get all worksheets across all chapters of all books in this subject
+    const [allWorksheets] = await db.query(
+      `SELECT cw.id, cw.total_marks
+       FROM chapter_worksheets cw
+       JOIN book_chapters bc ON bc.id = cw.chapter_id
+       JOIN books b ON b.id = bc.book_id
+       WHERE b.subject_id = ? AND cw.status = 'done'`,
+      [subjectId]
+    );
+
+    if (allWorksheets.length === 0) return;
+
+    const worksheetIds = allWorksheets.map(w => w.id);
+    const placeholders = worksheetIds.map(() => '?').join(',');
+
+    // 3. Get latest attempt per worksheet for this student
+    const [attempts] = await db.query(
+      `SELECT a.worksheet_id, a.obtained_marks, a.total_marks
+       FROM chapter_worksheet_attempts a
+       INNER JOIN (
+         SELECT worksheet_id, MAX(id) as max_id
+         FROM chapter_worksheet_attempts
+         WHERE student_id = ? AND worksheet_id IN (${placeholders})
+         GROUP BY worksheet_id
+       ) latest ON a.id = latest.max_id`,
+      [studentId, ...worksheetIds]
+    );
+
+    // 4. Calculate totals
+    const attemptedMap = {};
+    attempts.forEach(a => { attemptedMap[a.worksheet_id] = a; });
+
+    let totalMarks = 0;
+    let obtainedMarks = 0;
+    let worksheetsAttempted = 0;
+
+    allWorksheets.forEach(ws => {
+      totalMarks += ws.total_marks || 0;
+      const attempt = attemptedMap[ws.id];
+      if (attempt) {
+        obtainedMarks += attempt.obtained_marks || 0;
+        worksheetsAttempted++;
+      }
+    });
+
+    const percentage = totalMarks > 0
+      ? parseFloat(((obtainedMarks / totalMarks) * 100).toFixed(2))
+      : 0;
+
+    // 5. Upsert into subject_worksheet_progress
+    await db.query(
+      `INSERT INTO subject_worksheet_progress
+         (student_id, subject_id, total_marks, obtained_marks, percentage, worksheets_attempted, worksheets_total)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         total_marks = VALUES(total_marks),
+         obtained_marks = VALUES(obtained_marks),
+         percentage = VALUES(percentage),
+         worksheets_attempted = VALUES(worksheets_attempted),
+         worksheets_total = VALUES(worksheets_total)`,
+      [studentId, subjectId, totalMarks, obtainedMarks, percentage, worksheetsAttempted, allWorksheets.length]
+    );
+
+    console.log(`[worksheetProgress] student=${studentId} subject=${subjectId} → ${percentage}% (${worksheetsAttempted}/${allWorksheets.length})`);
+  } catch (err) {
+    console.error("recalculateSubjectWorksheetProgress error:", err);
+    // Non-fatal — don't crash the submit response
+  }
+}
 
 // ✅ GET ATTEMPT HISTORY for a chapter worksheet
 // GET /api/books/chapters/:chapterId/worksheets/:worksheetId/history

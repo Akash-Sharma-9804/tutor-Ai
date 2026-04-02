@@ -29,6 +29,60 @@ const parseRow = (r) => {
   return final.map(c => c.trim());
 };
 
+ 
+
+// ─── Badge color map ──────────────────────────────────────────────────────────
+const BADGE_STYLES = {
+  purple: { badge: 'bg-purple-600 text-white', border: 'border-purple-400', bg: 'bg-purple-50', heading: 'text-purple-800' },
+  amber:  { badge: 'bg-amber-500 text-white',  border: 'border-amber-400',  bg: 'bg-amber-50',  heading: 'text-amber-800'  },
+  blue:   { badge: 'bg-blue-600 text-white',   border: 'border-blue-400',   bg: 'bg-blue-50',   heading: 'text-blue-800'   },
+  teal:   { badge: 'bg-teal-600 text-white',   border: 'border-teal-400',   bg: 'bg-teal-50',   heading: 'text-teal-800'   },
+  yellow: { badge: 'bg-yellow-500 text-white', border: 'border-yellow-400', bg: 'bg-yellow-50', heading: 'text-yellow-800' },
+  green:  { badge: 'bg-green-600 text-white',  border: 'border-green-400',  bg: 'bg-green-50',  heading: 'text-green-800'  },
+};
+
+// ─── Inline markdown: **bold**, `code`, then math ────────────────────────────
+const renderFormattedLine = (line) => {
+  const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**'))
+      return <strong key={i}>{renderMixedText(part.slice(2, -2))}</strong>;
+    if (part.startsWith('`') && part.endsWith('`'))
+      return (
+        <code key={i} style={{
+          background: '#e0e7ff', color: '#3730a3', borderRadius: '4px',
+          padding: '1px 6px', fontFamily: 'monospace', fontSize: '0.9em',
+          border: '1px solid #c7d2fe', whiteSpace: 'pre',
+        }}>{part.slice(1, -1)}</code>
+      );
+    return <span key={i}>{renderMixedText(part)}</span>;
+  });
+};
+
+// ─── Multi-line text block: handles bullet lines + normal lines ──────────────
+const renderTextBlock = (text, codeStyle) =>
+  (text || '').split('\n').map((line, i) => {
+    if (!line.trim()) return null;
+    if (/^\s{2,}/.test(line) && !line.trim().startsWith('*')) {
+      // indented continuation line (sub-point explanation)
+      return (
+        <div key={i} style={{ paddingLeft: '1.5em', marginBottom: '0.15em' }}>
+          <span style={{ fontSize: '0.9em', color: '#4b5563' }}>{renderFormattedLine(line.trim())}</span>
+        </div>
+      );
+    }
+    if (/^\s*\*\s/.test(line)) {
+      const content = line.replace(/^\s*\*\s/, '');
+      return (
+        <div key={i} style={{ display: 'flex', gap: '0.5em', marginBottom: '0.25em', alignItems: 'flex-start' }}>
+          <span style={{ color: '#2563eb', fontWeight: 700, flexShrink: 0, marginTop: '2px' }}>•</span>
+          <span>{renderFormattedLine(content)}</span>
+        </div>
+      );
+    }
+    return <div key={i} style={{ marginBottom: '0.2em' }}>{renderFormattedLine(line)}</div>;
+  });
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TEXT SEGMENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,17 +96,39 @@ export const TextSegment = ({
     ? (mainTextWordCount > 0 ? currentWords.slice(0, mainTextWordCount) : currentWords)
     : [];
 
+  const badge   = segment?._badge;
+  const heading = segment?._heading;
+  const color   = segment?._badgeColor || 'blue';
+  const styles  = BADGE_STYLES[color] || BADGE_STYLES.blue;
+
+  const bodyContent = mainWords.length > 0
+    ? <p style={{ fontFamily: 'Comic Sans MS, cursive', wordSpacing: '0.15em' }}><HighlightedWords words={mainWords} highlightedIndex={highlightedWordIndex} /></p>
+    : <div style={{ fontFamily: 'Comic Sans MS, cursive', wordSpacing: '0.15em', fontSize: '1rem', lineHeight: '1.75' }}>{renderTextBlock(text)}</div>;
+
+  // Plain text — no badge, no heading
+  if (!badge && !heading) return (
+    <div className="text-base sm:text-lg leading-relaxed text-slate-800"
+      style={{ fontFamily: 'Comic Sans MS, cursive', wordSpacing: '0.15em' }}>
+      {bodyContent}
+    </div>
+  );
+
   return (
-    <p
-      className="text-base sm:text-lg md:text-xl leading-relaxed text-slate-800"
-      style={{ fontFamily: 'Comic Sans MS, cursive', wordSpacing: '0.15em' }}
-    >
-      {mainWords.length > 0
-        ? <HighlightedWords words={mainWords} highlightedIndex={highlightedWordIndex} />
-        : text.split('\n').map((line, i) =>
-            line.trim() ? <span key={i} style={{ display: 'block' }}>{renderMixedText(line)}</span> : null
-          )}
-    </p>
+    <div className={`rounded-2xl border-4 ${styles.border} ${styles.bg} shadow-md mb-2 overflow-hidden`}>
+      {/* Top bar: badge + optional heading */}
+      <div className={`flex items-center gap-2 px-4 py-2 border-b-2 ${styles.border} bg-white/60`}>
+        {badge && (
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${styles.badge} flex-shrink-0`}>
+            {badge}
+          </span>
+        )}
+        {heading && (
+          <span className={`text-sm font-bold ${styles.heading} truncate`}>{heading}</span>
+        )}
+      </div>
+      {/* Body */}
+      <div className="px-4 py-3 text-slate-800">{bodyContent}</div>
+    </div>
   );
 };
 
@@ -352,12 +428,12 @@ export const EquationSegment = ({
                     <div className="text-sm sm:text-base leading-relaxed text-slate-700 space-y-1">
                       {revealed === 0
                         ? rawExp.split('\n').map((line, li) =>
-                            line.trim() ? (
-                              <div key={li} className={line.trim().startsWith('Reason:') ? 'text-slate-500 italic text-xs mt-1' : ''}>
-                                {renderMixedText(line)}
-                              </div>
-                            ) : null
-                          )
+                          line.trim() ? (
+                            <div key={li} className={line.trim().startsWith('Reason:') ? 'text-slate-500 italic text-xs mt-1' : ''}>
+                              {renderMixedText(line)}
+                            </div>
+                          ) : null
+                        )
                         : expWords.map((word, wi) => (
                           <span key={wi} style={{ color: wi < revealed ? 'rgb(51,65,85)' : 'rgba(51,65,85,0.25)', transition: 'color 0.3s' }}>
                             {word}{' '}
@@ -404,7 +480,7 @@ export const DiagramSegment = ({
   })();
 
   const expWords = mainTextWordCount > 0 ? currentWords.slice(mainTextWordCount) : currentWords;
-  const expIdx   = mainTextWordCount > 0 ? highlightedWordIndex - mainTextWordCount : highlightedWordIndex;
+  const expIdx = mainTextWordCount > 0 ? highlightedWordIndex - mainTextWordCount : highlightedWordIndex;
 
   return (
     <div className="mb-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -417,9 +493,9 @@ export const DiagramSegment = ({
         {imageUrl
           ? <img src={imageUrl} alt={segment.title || 'Diagram'} className="w-full rounded-lg object-contain max-h-72" />
           : <div className="flex flex-col items-center justify-center h-48 text-purple-400 bg-purple-50 rounded-lg border-2 border-dashed border-purple-300">
-              <span className="text-4xl mb-2">📊</span>
-              <p className="text-sm text-center px-4">{segment.title || 'Diagram'}</p>
-            </div>
+            <span className="text-4xl mb-2">📊</span>
+            <p className="text-sm text-center px-4">{segment.title || 'Diagram'}</p>
+          </div>
         }
       </div>
       {(segment.description || segment.explanation) && (
@@ -430,11 +506,28 @@ export const DiagramSegment = ({
           </div>
           {segment.description && <p className="text-sm leading-relaxed text-slate-700 mb-3">{segment.description}</p>}
           {segment.explanation && (
-            <p className="text-sm leading-relaxed text-slate-700" style={{ wordSpacing: '0.15em' }}>
-              {isReading && expWords.length > 0
-                ? <HighlightedWords words={expWords} highlightedIndex={expIdx} color="#7c3aed" shadowColor="rgba(124,58,237,0.35)" />
-                : renderMixedText(segment.explanation)}
-            </p>
+            <div className="text-sm sm:text-base leading-relaxed text-slate-700 space-y-1" style={{ wordSpacing: '0.15em', fontFamily: 'Comic Sans MS, cursive' }}>
+        {isReading && expWords.length > 0 && mainTextWordCount > 0
+          ? <p><HighlightedWords words={expWords} highlightedIndex={expIdx} color="#b45309" shadow="0 0 10px rgba(180,83,9,0.3)" /></p>
+          : (segment.explanation || '').split('\n').map((line, i) => {
+              if (!line.trim()) return null;
+              if (/^\s*\*\s/.test(line)) {
+                const content = line.replace(/^\s*\*\s/, '');
+                const parts = content.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, pi) => {
+                  if (p.startsWith('**') && p.endsWith('**')) return <strong key={pi}>{p.slice(2,-2)}</strong>;
+                  if (p.startsWith('`') && p.endsWith('`')) return <code key={pi} style={{background:'#fef9c3',color:'#92400e',borderRadius:'4px',padding:'1px 5px',fontFamily:'monospace',fontSize:'0.9em',border:'1px solid #fde68a'}}>{p.slice(1,-1)}</code>;
+                  return <span key={pi}>{renderMixedText(p)}</span>;
+                });
+                return <div key={i} style={{display:'flex',gap:'0.5em',alignItems:'flex-start'}}><span style={{color:'#b45309',fontWeight:700,flexShrink:0}}>•</span><span>{parts}</span></div>;
+              }
+              const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, pi) => {
+                if (p.startsWith('**') && p.endsWith('**')) return <strong key={pi}>{p.slice(2,-2)}</strong>;
+                if (p.startsWith('`') && p.endsWith('`')) return <code key={pi} style={{background:'#fef9c3',color:'#92400e',borderRadius:'4px',padding:'1px 5px',fontFamily:'monospace',fontSize:'0.9em',border:'1px solid #fde68a'}}>{p.slice(1,-1)}</code>;
+                return <span key={pi}>{renderMixedText(p)}</span>;
+              });
+              return <p key={i}>{parts}</p>;
+            })}
+      </div>
           )}
         </div>
       )}

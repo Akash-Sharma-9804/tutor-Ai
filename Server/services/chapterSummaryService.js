@@ -18,15 +18,97 @@ const callGemini = async (prompt) => {
 
 // 🔹 Extract clean text from sections
 const extractTextFromSections = (sections) => {
-  return sections
-    .flatMap((s) => s.content || [])
-    .map((item) => {
-      if (item.type === "text") return item.explanation || item.text;
-      if (item.type === "example") return item.solution;
-      if (item.type === "equation") return item.application || "";
-      return "";
-    })
-    .join("\n");
+  let texts = [];
+
+  for (const section of sections) {
+    for (const item of section.content || []) {
+
+      // ✅ English passages
+      if (item.type === "passage") {
+        if (item.text) texts.push(item.text);
+        if (item.explanation) texts.push(item.explanation);
+      }
+
+      // ✅ Normal text (Physics, etc.)
+      else if (item.type === "text") {
+        if (item.text) texts.push(item.text);
+        if (item.explanation) texts.push(item.explanation);
+      }
+
+      // ✅ Examples (very important)
+      else if (item.type === "example") {
+        if (item.problem) texts.push(item.problem);
+        if (item.solution) texts.push(item.solution);
+      }
+
+      // ✅ Equations (concept + application)
+      else if (item.type === "equation") {
+        if (item.explanation) texts.push(item.explanation);
+        if (item.application) texts.push(item.application);
+      }
+
+      // ✅ Diagrams (concept explanation)
+      else if (item.type === "diagram_concept") {
+        if (item.explanation) texts.push(item.explanation);
+      }
+
+      // ❌ Skip: glossary, question, subheading
+      // 🔥 NEW UNIVERSAL SUPPORT (ADDED — DOES NOT BREAK OLD)
+
+// concept / topic_intro / note
+if (item.type === "concept" || item.type === "topic_intro" || item.type === "note") {
+  if (item.heading) texts.push(item.heading);
+  if (item.title) texts.push(item.title);
+  if (item.text) texts.push(item.text);
+  if (item.explanation) texts.push(item.explanation);
+}
+
+// 🔥 derivation / proof (VERY IMPORTANT for Physics)
+if (item.type === "derivation" || item.type === "proof") {
+  if (item.proving) texts.push(item.proving);
+  if (item.setup) texts.push(item.setup);
+  if (item.conclusion) texts.push(item.conclusion);
+  if (item.key_insight) texts.push(item.key_insight);
+
+  if (Array.isArray(item.steps)) {
+    for (const step of item.steps) {
+      if (step.statement) texts.push(step.statement);
+      if (step.reason) texts.push(step.reason);
+    }
+  }
+}
+
+// 🔥 formulas
+if (item.type === "formula") {
+  if (item.name) texts.push(item.name);
+  if (item.formula_latex) texts.push(item.formula_latex);
+  if (item.when_to_use) texts.push(item.when_to_use);
+  if (item.common_mistake) texts.push(item.common_mistake);
+}
+
+// 🔥 definitions
+if (item.type === "definition") {
+  if (item.term) texts.push(item.term);
+  if (item.text) texts.push(item.text);
+  if (item.plain_english) texts.push(item.plain_english);
+}
+
+// 🔥 diagrams
+if (item.type === "diagram") {
+  if (item.title) texts.push(item.title);
+  if (item.what_to_look_at) texts.push(item.what_to_look_at);
+  if (item.observation) texts.push(item.observation);
+}
+
+// 🔥 activity / questions (optional but useful for context)
+if (item.type === "activity") {
+  if (item.text) texts.push(item.text);
+  if (item.explanation) texts.push(item.explanation);
+}
+    }
+  }
+
+  return texts.join("\n");
 };
 
 // 🔹 Chunking
@@ -45,17 +127,23 @@ const generateChapterSummaryFromSections = async (sections) => {
   let fullText = extractTextFromSections(sections);
 
 // 🔥 LIMIT TEXT SIZE (VERY IMPORTANT)
-fullText = fullText.slice(0, 20000); // instead of 92k → 20k
+fullText = fullText.slice(0, 60000);// instead of 92k → 20k
 
 console.log("✂️ [Summary] Trimmed text length:", fullText.length);
 
-  if (!fullText || fullText.length < 100) {
-    throw new Error("Not enough content to summarize");
-  }
+  if (!fullText || fullText.length < 50) {
+  console.warn("⚠️ Low content, generating minimal summary...");
+  return {
+    summary: fullText || "Limited content available for this chapter.",
+    key_points: [],
+    definitions: [],
+    formulas: []
+  };
+}
 
-  const chunks = splitText(fullText, 4000);
+  const chunks = splitText(fullText, 3000);
   console.log(`📦 [Summary] Total chunks: ${chunks.length}`);
-const MAX_CHUNKS = 8;
+const MAX_CHUNKS = 20;
 const finalChunks = chunks.slice(0, MAX_CHUNKS);
 
 console.log(`📦 [Summary] Using ${finalChunks.length} chunks (limited)`); 
@@ -73,7 +161,8 @@ Focus on:
 - Important ideas
 - Definitions if present
 
-Keep it concise (120-150 words).
+Make it detailed and informative (200-300 words).
+Include examples, concepts, and important explanations.
 
 CONTENT:
 ${finalChunks[i]}
@@ -101,9 +190,11 @@ STRICT RULES:
 - Return ONLY valid JSON (no markdown, no explanation)
 - Do NOT cut the response midway
 - Ensure JSON is COMPLETE and properly closed
-- Keep summary between 400–500 words (NOT more)
-- Keep key_points max 8
-- Keep definitions max 5
+- Keep summary between 700–800 words
+- Keep key_points max 12
+- Keep definitions max 8
+- Include formulas if present
+ 
 
 FORMAT:
 {

@@ -8,5 +8,6 @@ router.get("/subjects-with-progress", authMiddleware, subjectController.getSubje
 router.get("/dashboard-stats", authMiddleware, subjectController.getDashboardStats);
 router.get("/class/:classId", subjectController.getSubjectsByClass);
 router.post("/student/select", authMiddleware, subjectController.saveStudentSubjects);
+router.get("/worksheet-progress", authMiddleware, subjectController.getSubjectWorksheetProgress);
 
 module.exports = router;

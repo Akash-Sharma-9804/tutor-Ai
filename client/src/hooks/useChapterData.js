@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios'; // shared axios instance
-import { normalizeMathsContent, normalizeEnglishContent, normalizePhysicsContent } from '../utils/normalizeContent';
+import { normalizeMathsContent, normalizeEnglishContent,normalizeITContent, normalizePhysicsContent  } from '../utils/normalizeContent';
 
 // Picks the right normalizer based on subject name from chapter metadata
 const normalizeBySubject = (content, chapter) => {
@@ -8,6 +8,8 @@ const normalizeBySubject = (content, chapter) => {
   if (/physics/i.test(subject))  return normalizePhysicsContent(content);
   if (/math/i.test(subject))     return normalizeMathsContent(content);
   if (/english/i.test(subject))  return normalizeEnglishContent(normalizeMathsContent(content));
+   if (/information technology|it\b|computer/i.test(subject))
+                                            return normalizeITContent(normalizeMathsContent(content));
   // Default: run both maths + english normalizers for generic subjects
   return normalizeEnglishContent(normalizeMathsContent(content));
 };

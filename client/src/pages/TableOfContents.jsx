@@ -1,94 +1,106 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { motion } from "framer-motion";
-import { BookOpen, ChevronRight, ArrowLeft, FileText, Clock, CheckCircle2, Circle, BookMarked, Menu, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  BookOpen, ChevronRight, ArrowLeft, FileText,
+  CheckCircle2, Circle, Lock, Zap, Trophy, Clock3,
+} from "lucide-react";
 
-// Subject color mapping for gradient backgrounds
-const subjectColors = {
-  Mathematics: "from-indigo-600 to-blue-500",
-  Science: "from-green-500 to-emerald-500",
-  Physics: "from-blue-600 to-cyan-500",
-  Chemistry: "from-purple-500 to-pink-500",
-  Biology: "from-green-600 to-teal-500",
-  History: "from-amber-500 to-orange-500",
-  Geography: "from-teal-500 to-cyan-500",
-  English: "from-violet-500 to-purple-500",
-  "Computer Science": "from-orange-500 to-amber-500",
-  default: "from-blue-600 to-purple-600"
+// ─── Subject themes ────────────────────────────────────────────────────────────
+const THEMES = {
+  Mathematics:        { h1: "#3730a3", h2: "#4f46e5", accent: "#6366f1", soft: "#eef2ff", text: "#312e81", icon: "📐", particle: "◇" },
+  Science:            { h1: "#065f46", h2: "#059669", accent: "#10b981", soft: "#ecfdf5", text: "#064e3b", icon: "🔬", particle: "✦" },
+  Physics:            { h1: "#1e3a8a", h2: "#1d4ed8", accent: "#3b82f6", soft: "#eff6ff", text: "#1e3a8a", icon: "⚛️",  particle: "○" },
+  Chemistry:          { h1: "#581c87", h2: "#7c3aed", accent: "#a855f7", soft: "#faf5ff", text: "#4c1d95", icon: "🧪", particle: "◈" },
+  Biology:            { h1: "#14532d", h2: "#15803d", accent: "#22c55e", soft: "#f0fdf4", text: "#14532d", icon: "🧬", particle: "❋" },
+  History:            { h1: "#7c2d12", h2: "#c2410c", accent: "#f97316", soft: "#fff7ed", text: "#7c2d12", icon: "📜", particle: "◉" },
+  Geography:          { h1: "#134e4a", h2: "#0f766e", accent: "#14b8a6", soft: "#f0fdfa", text: "#134e4a", icon: "🌍", particle: "◎" },
+  English:            { h1: "#4c1d95", h2: "#6d28d9", accent: "#8b5cf6", soft: "#f5f3ff", text: "#4c1d95", icon: "📖", particle: "◆" },
+  "Computer Science": { h1: "#7c2d12", h2: "#b45309", accent: "#f59e0b", soft: "#fffbeb", text: "#78350f", icon: "💻", particle: "▣" },
+  default:            { h1: "#1e3a8a", h2: "#2563eb", accent: "#3b82f6", soft: "#eff6ff", text: "#1e3a8a", icon: "📚", particle: "◇" },
 };
 
-const getSubjectGradient = (subjectName) => {
-  if (!subjectName) return subjectColors.default;
-  const key = Object.keys(subjectColors).find(k =>
-    subjectName.toLowerCase().includes(k.toLowerCase())
+const getTheme = (name) => {
+  if (!name) return THEMES.default;
+  const k = Object.keys(THEMES).find((k) => name.toLowerCase().includes(k.toLowerCase()));
+  return THEMES[k] || THEMES.default;
+};
+
+// ─── SVG Ring ──────────────────────────────────────────────────────────────────
+const Ring = ({ pct, size = 64, sw = 6, color = "#fff", trackColor = "rgba(255,255,255,0.18)" }) => {
+  const r = (size - sw * 2) / 2;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={trackColor} strokeWidth={sw} />
+      <motion.circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
+        stroke={color} strokeWidth={sw} strokeLinecap="round"
+        initial={{ strokeDasharray: `0 ${c}` }}
+        animate={{ strokeDasharray: `${(pct / 100) * c} ${c}` }}
+        transition={{ duration: 1.4, delay: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+      />
+    </svg>
   );
-  return subjectColors[key] || subjectColors.default;
 };
 
+// ─── Stat chip ─────────────────────────────────────────────────────────────────
+const StatChip = ({ icon: Icon, label, value, color }) => (
+  <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15">
+    <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.18)" }}>
+      <Icon size={15} className="text-white" />
+    </div>
+    <div>
+      <p className="text-white/60 text-[10px] font-semibold uppercase tracking-widest leading-none mb-0.5">{label}</p>
+      <p className="text-white font-bold text-sm leading-none">{value}</p>
+    </div>
+  </div>
+);
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
 const TableOfContents = () => {
   const { bookId } = useParams();
-  const navigate = useNavigate();
+  const navigate   = useNavigate();
 
-  const [book, setBook] = useState(null);
-  const [chapters, setChapters] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState({});
-  const [subjectGradient, setSubjectGradient] = useState("from-blue-600 to-purple-600");
-  const [showTooltip, setShowTooltip] = useState(null);
-  const [showLockMsg, setShowLockMsg] = useState(null);
+  const [book,       setBook]       = useState(null);
+  const [chapters,   setChapters]   = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [progress,   setProgress]   = useState({});
+  const [segments,   setSegments]   = useState({});
+  const [overallPct, setOverallPct] = useState(0);
+  const [theme,      setTheme]      = useState(THEMES.default);
+  const [showTooltip,  setShowTooltip]  = useState(null);
+  const [showLockMsg,  setShowLockMsg]  = useState(null);
 
-  // Initialize dark mode from localStorage (same logic as DashboardLayout)
   useEffect(() => {
-    const initDarkMode = () => {
-      const savedMode = localStorage.getItem("darkMode");
-      let isDark = false;
-      if (savedMode !== null) {
-        isDark = JSON.parse(savedMode);
-      } else {
-        isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      }
-      if (isDark) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    };
-    initDarkMode();
+    const saved = localStorage.getItem("darkMode");
+    const isDark = saved !== null ? JSON.parse(saved) : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.classList.toggle("dark", isDark);
   }, []);
 
-  useEffect(() => {
-    loadBookChapters();
-  }, [bookId]);
+  useEffect(() => { loadBookChapters(); }, [bookId]);
 
   const loadBookChapters = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-
-      const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/books/${bookId}/chapters`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setBook(res.data.book);
-      setChapters(res.data.chapters);
-
-      // Set subject gradient based on subject name
-      const gradient = getSubjectGradient(res.data.book?.subject_name);
-      setSubjectGradient(gradient);
-
-      const progressRes = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/books/${bookId}/progress-summary`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      const map = {};
-      progressRes.data.chapters?.forEach((ch) => {
-        map[ch.id] = ch.percent;
+      const token   = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      const [bookRes, progRes] = await Promise.all([
+        axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/books/${bookId}/chapters`, { headers }),
+        axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/books/${bookId}/progress-summary`, { headers }),
+      ]);
+      setBook(bookRes.data.book);
+      setChapters(bookRes.data.chapters);
+      setTheme(getTheme(bookRes.data.book?.subject_name));
+      const pctMap = {}, segMap = {};
+      progRes.data.chapters?.forEach((ch) => {
+        pctMap[ch.id] = ch.percent;
+        segMap[ch.id] = { completed: ch.completedSegments, total: ch.totalSegments };
       });
-
-      setProgress(map);
+      setProgress(pctMap);
+      setSegments(segMap);
+      setOverallPct(progRes.data.overallPercent ?? 0);
     } catch (err) {
       console.error("Failed to load chapters:", err);
     } finally {
@@ -98,235 +110,408 @@ const TableOfContents = () => {
 
   const openChapter = (id) => navigate(`/reader/${id}`);
 
+  // ─── Skeleton ─────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-10 h-10 border-4 border-blue-100 dark:border-purple-900 border-t-blue-600 dark:border-t-purple-500 rounded-full animate-spin" />
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
+        <div className="h-64 bg-gradient-to-br from-gray-300 to-gray-200 dark:from-gray-800 dark:to-gray-700 animate-pulse" />
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 -mt-8 space-y-3 pb-10">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-24 rounded-2xl bg-white dark:bg-gray-800 animate-pulse shadow-sm" style={{ animationDelay: `${i * 0.1}s` }} />
+          ))}
+        </div>
       </div>
     );
   }
 
-  const total = chapters.length;
-  const doneCount = chapters.filter((c) => progress[c.id] === 100).length;
-  const overall = total ? Math.round((doneCount / total) * 100) : 0;
+  const total     = chapters.length;
+  const doneCount = chapters.filter(c => progress[c.id] === 100).length;
+  const inProgCount = chapters.filter(c => (progress[c.id] ?? 0) > 0 && progress[c.id] < 100).length;
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 max-w-full overflow-hidden">
-      {/* BOOK HEADER CARD - Responsive */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={`bg-gradient-to-r ${subjectGradient} rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 text-white mb-4 sm:mb-6 relative overflow-hidden`}
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
+
+      {/* ═══════════════════════════════════════════════════════════════
+          HERO BANNER — full bleed, rich gradient with texture
+      ═══════════════════════════════════════════════════════════════ */}
+      <div
+        className="relative overflow-hidden"
+        style={{
+          background: `linear-gradient(135deg, ${theme.h1} 0%, ${theme.h2} 55%, ${theme.accent} 100%)`,
+          paddingBottom: "72px",
+        }}
       >
-        {/* Decorative elements */}
-        <div className="absolute top-0 right-0 w-20 sm:w-32 h-20 sm:h-32 bg-white/10 rounded-full -mr-8 sm:-mr-10 -mt-8 sm:-mt-10" />
-        <div className="absolute bottom-0 left-0 w-16 sm:w-24 h-16 sm:h-24 bg-white/10 rounded-full -ml-4 sm:-ml-8 -mb-4 sm:-mb-8" />
-
-        <div className="relative z-10">
-          {/* Back button - responsive */}
-          <button
-            onClick={() => navigate("/subjects")}
-            className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-white/80 hover:text-white mb-3 sm:mb-4 transition-colors"
+        {/* Grid texture overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)
+            `,
+            backgroundSize: "40px 40px",
+          }}
+        />
+        {/* Glow orbs */}
+        <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)" }} />
+        <div className="absolute bottom-0 left-1/4 w-96 h-48 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 70%)" }} />
+        {/* Floating particles */}
+        {[...Array(6)].map((_, i) => (
+          <motion.div key={i} className="absolute text-white/10 font-bold select-none pointer-events-none"
+            style={{ fontSize: `${14 + i * 6}px`, left: `${8 + i * 15}%`, top: `${10 + (i % 3) * 28}%` }}
+            animate={{ y: [0, -10, 0], rotate: [0, 10, 0] }}
+            transition={{ duration: 3 + i, repeat: Infinity, delay: i * 0.4 }}
           >
-            <ArrowLeft size={16} sm={18} />
-            <span className="hidden xs:inline">Back to Subjects</span>
-            <span className="xs:hidden">Back</span>
-          </button>
+            {theme.particle}
+          </motion.div>
+        ))}
 
-          {/* Main content - flex layout */}
-          <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
-            {/* Book Icon */}
-            <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0">
-              <BookOpen className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8" />
-            </div>
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-5 sm:pt-6">
+          {/* Back */}
+          <motion.button
+            initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+            onClick={() => navigate("/subjects")}
+            className="flex items-center gap-2 text-white/70 hover:text-white text-sm font-medium mb-1 sm:mb-2  mt-0 sm:mt-5 transition-colors group"
+          >
+            <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+            Back to Subjects
+          </motion.button>
 
-            {/* Book Info */}
-            <div className="flex-1 min-w-0">
-              <h1 className="font-bold text-lg sm:text-xl md:text-2xl mb-1 truncate">{book?.title}</h1>
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-white/80">
-                {book?.subject_name && (
-                  <span className="flex items-center gap-1 bg-white/20 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg text-xs">
-                    <BookMarked size={12} sm={14} />
-                    <span className="hidden sm:inline">{book.subject_name}</span>
-                  </span>
-                )}
-                {book?.class_num && (
-                  <span className="bg-white/20 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg text-xs">Class {book.class_num}</span>
-                )}
-                {book?.board && (
-                  <span className="bg-white/20 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg text-xs hidden sm:inline">{book.board}</span>
-                )}
-              </div>
-            </div>
-
-            {/* Progress Card - Responsive - Full width on mobile */}
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg sm:rounded-xl p-3 sm:p-4 w-full sm:w-auto sm:min-w-[140px] md:min-w-[180px]">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 sm:gap-2 text-white/90">
-                  <Clock size={14} sm={16} />
-                  <span className="text-xs sm:text-sm font-medium">Progress</span>
-                </div>
-                <span className="text-sm sm:text-lg md:text-xl font-bold">{overall}%</span>
-              </div>
-              <div className="flex items-center gap-2 sm:gap-3 mt-1.5 sm:mt-2">
-                <div className="flex-1 h-2 sm:h-3 bg-white/30 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${overall}%` }}
-                    transition={{ duration: 1, delay: 0.3 }}
-                    className="h-full bg-white rounded-full"
-                  />
-                </div>
-              </div>
-              <p className="text-[10px] sm:text-xs text-white/70 mt-1.5 sm:mt-2">
-                {doneCount}/{total} chapters
-              </p>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* CHAPTERS LIST */}
-      <div className="space-y-2.5 sm:space-y-3">
-        <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 sm:mb-4 flex items-center gap-2">
-          <BookOpen size={18} sm={20} className="text-blue-600 dark:text-blue-400" />
-          <span>Chapters</span>
-          <span className="text-xs sm:text-sm font-normal text-gray-500 dark:text-gray-400">({chapters.length})</span>
-        </h2>
-
-        {chapters.map((ch, i) => {
-          const pct = progress[ch.id] ?? 0;
-          const done = pct === 100;
-
-          return (
+          {/* Top row: book info + ring */}
+          <div className="flex flex-col sm:flex-row sm:items-start gap-6">
             <motion.div
-              key={ch.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="bg-white dark:bg-[#1e1c19] border border-gray-200 dark:border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5 cursor-pointer hover:shadow-lg hover:border-transparent transition-all duration-300 group overflow-hidden"
-              onClick={() => openChapter(ch.id)}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="flex items-start gap-4 flex-1 min-w-0"
             >
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
-
-                {/* LEFT - Chapter Info */}
-                <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
-                  {/* Number Badge */}
-                  <div className={`w-8 h-8 sm:w-9 md:w-10 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    done
-                      ? `bg-gradient-to-r ${subjectGradient} text-white`
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20'
-                  }`}>
-                    {done ? <CheckCircle2 size={16} /> : <span className="font-bold text-sm">{i + 1}</span>}
-                  </div>
-
-                  {/* Title & Status */}
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-xs sm:text-base text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
-                      {ch.chapter_title}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      {done ? (
-                        <span className="flex items-center gap-1 text-green-600 dark:text-green-400 text-xs font-medium">
-                          <CheckCircle2 size={12} /> <span className="hidden xs:inline">Completed</span>
-                        </span>
-                      ) : pct > 0 ? (
-                        <span className="text-blue-600 dark:text-blue-400 text-xs font-medium">{pct}%</span>
-                      ) : (
-                        <span className="text-gray-400 dark:text-gray-500 text-xs flex items-center gap-1">
-                          <Circle size={10} /> <span className="hidden xs:inline">Not started</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Progress Bar - Responsive */}
-                    <div className="mt-2 h-1.5 sm:h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden w-full max-w-[180px] sm:max-w-[280px]">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${pct}%` }}
-                        transition={{ duration: 0.6, delay: i * 0.05 }}
-                        className={`h-full rounded-full bg-gradient-to-r ${subjectGradient}`}
-                      />
-                    </div>
-                  </div>
+              {/* Subject icon box */}
+              <div
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex-shrink-0 flex items-center justify-center text-3xl sm:text-4xl"
+                style={{ background: "rgba(255,255,255,0.18)", backdropFilter: "blur(12px)", border: "1.5px solid rgba(255,255,255,0.25)" }}
+              >
+                {theme.icon}
+              </div>
+              <div className="min-w-0 pt-1">
+                {/* Tags row */}
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {book?.subject_name && (
+                    <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg"
+                      style={{ background: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.9)" }}>
+                      {book.subject_name}
+                    </span>
+                  )}
+                  {book?.class_num && (
+                    <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg"
+                      style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.85)" }}>
+                      Class {book.class_num}
+                    </span>
+                  )}
+                  {book?.board && (
+                    <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg"
+                      style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.85)" }}>
+                      {book.board}
+                    </span>
+                  )}
                 </div>
-
-                {/* RIGHT - Actions - Stack on mobile */}
-                <div className="flex items-center gap-1.5 sm:gap-3 ml-10 sm:ml-0 flex-shrink-0">
-
-                  {/* Worksheet Button with Lock */}
-                  <div
-                    className="relative"
-                    onMouseEnter={() => !done && setShowTooltip(ch.id)}
-                    onMouseLeave={() => setShowTooltip(null)}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (done) {
-                          navigate(`/chapter/${ch.id}/worksheets/${bookId}`);
-                        } else {
-                          setShowLockMsg(ch.id);
-                          setTimeout(() => setShowLockMsg(null), 2500);
-                        }
-                      }}
-                      className={`text-xs flex items-center gap-1 px-2 sm:px-2.5 md:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl whitespace-nowrap transition-all ${
-                        done
-                          ? "bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 border border-indigo-200 dark:border-indigo-700/50 text-indigo-600 dark:text-indigo-400 hover:border-indigo-400 dark:hover:border-indigo-600 hover:shadow-md"
-                          : "bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500"
-                      }`}
-                    >
-                      <FileText size={12} sm={14} />
-                      <span className="xs:inline">Worksheet</span>
-                      {!done && (
-                        <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </button>
-
-                    {/* Hover Tooltip */}
-                    {showTooltip === ch.id && !done && (
-                      <div className="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1.5 text-xs text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg whitespace-nowrap">
-                        Complete chapter to unlock
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
-                      </div>
-                    )}
-
-                    {/* Toast Message on Click */}
-                    {showLockMsg === ch.id && !done && (
-                      <div className="absolute z-50 top-full left-1/2 transform -translate-x-1/2 mt-1 px-2 py-1.5 text-xs text-white bg-orange-500 dark:bg-orange-600 rounded-lg shadow-lg whitespace-nowrap animate-pulse">
-                        Complete lessons to unlock!
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action Button - Responsive */}
-                  <button className={`text-xs px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl flex items-center gap-1 font-semibold transition-all shadow-md ${
-                    done
-                      ? `bg-gradient-to-r ${subjectGradient} text-white hover:opacity-90 hover:shadow-lg`
-                      : `bg-gradient-to-r ${subjectGradient} text-white hover:opacity-90`
-                  }`}>
-                    <span className=" ">{done ? "Review" : pct > 0 ? "Continue" : "Start"}</span>
-                    
-                    <ChevronRight size={12} sm={14} />
-                  </button>
-
-                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight tracking-tight">
+                  {book?.title}
+                </h1>
+                {book?.author && (
+                  <p className="text-white/50 text-xs sm:text-sm mt-1.5 font-medium leading-snug line-clamp-1">
+                    {book.author}
+                  </p>
+                )}
               </div>
             </motion.div>
-          );
-        })}
+
+            {/* Overall progress ring */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.25 }}
+              className="flex-shrink-0 rounded-2xl px-5 py-4 flex items-center gap-4"
+              style={{ background: "rgba(255,255,255,0.13)", backdropFilter: "blur(16px)", border: "1.5px solid rgba(255,255,255,0.2)" }}
+            >
+              <div className="relative">
+                <Ring pct={overallPct} size={68} sw={6} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-white font-extrabold text-[13px] leading-none">{overallPct}%</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-white/55 text-[10px] font-bold uppercase tracking-widest mb-1">Overall</p>
+                <p className="text-white font-extrabold text-lg leading-tight">{doneCount}<span className="text-white/50 font-semibold text-sm">/{total}</span></p>
+                <p className="text-white/55 text-[11px] font-medium">chapters done</p>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Stats strip */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="flex flex-wrap gap-2 mt-6"
+          >
+            <StatChip icon={BookOpen}    label="Total"       value={`${total} chapters`} />
+            <StatChip icon={Trophy}      label="Completed"   value={`${doneCount} chapters`} />
+            <StatChip icon={Zap}         label="In Progress" value={`${inProgCount} chapters`} />
+            {total - doneCount - inProgCount > 0 && (
+              <StatChip icon={Clock3}    label="Remaining"   value={`${total - doneCount - inProgCount} chapters`} />
+            )}
+          </motion.div>
+        </div>
       </div>
 
-      {/* Empty State */}
-      {chapters.length === 0 && (
-        <div className="text-center py-10 sm:py-12">
-          <BookOpen className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">No chapters available for this book</p>
+      {/* ═══════════════════════════════════════════════════════════════
+          CHAPTERS — overlap card rising from banner
+      ═══════════════════════════════════════════════════════════════ */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-10 pb-16 relative z-10">
+
+        {/* Section label */}
+        <div className="flex items-center gap-3 mb-4">
+          <div
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold shadow-md"
+            style={{ background: theme.soft, color: theme.text }}
+          >
+            <BookOpen size={15} />
+            <span>Chapters</span>
+            <span
+              className="text-[11px] font-bold px-1.5 py-0.5 rounded-md ml-0.5"
+              style={{ background: theme.accent, color: "#fff" }}
+            >
+              {total}
+            </span>
+          </div>
+          {doneCount === total && total > 0 && (
+            <span className="flex items-center gap-1.5 text-[12px] font-bold text-emerald-600 dark:text-emerald-400">
+              <Trophy size={14} /> All chapters complete!
+            </span>
+          )}
         </div>
-      )}
+
+        {/* Chapter list */}
+        <div className="space-y-3">
+          {chapters.map((ch, i) => {
+            const pct    = progress[ch.id] ?? 0;
+            const seg    = segments[ch.id] ?? {};
+            const done   = pct === 100;
+            const inProg = pct > 0 && pct < 100;
+            const actionLabel = done ? "Review" : inProg ? "Continue" : "Start";
+
+            return (
+              <motion.div
+                key={ch.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + i * 0.07, duration: 0.4 }}
+                onClick={() => openChapter(ch.id)}
+                className="group relative cursor-pointer"
+              >
+                {/* Card */}
+                <div
+                  className="relative overflow-hidden rounded-2xl transition-all duration-300
+                              bg-white dark:bg-[#1a1a1a]
+                              border border-gray-100 dark:border-white/[0.07]
+                              hover:shadow-xl hover:-translate-y-0.5
+                              dark:hover:border-white/[0.13]"
+                  style={{
+                    boxShadow: done
+                      ? `0 2px 12px ${theme.accent}22`
+                      : "0 1px 4px rgba(0,0,0,0.06)",
+                  }}
+                >
+                  {/* Top progress fill (done chapters get a full-width tinted header) */}
+                  {done && (
+                    <div
+                      className="absolute inset-x-0 top-0 h-[3px]"
+                      style={{ background: `linear-gradient(90deg, ${theme.h1}, ${theme.accent})` }}
+                    />
+                  )}
+
+                  <div className="flex items-center py-5 gap-0">
+                    {/* Chapter number sidebar */}
+                    <div
+                      className="flex-shrink-0 w-14 sm:w-16 flex flex-col items-center justify-center self-stretch py-4 gap-1"
+                      style={{
+                        background: done
+                          ? `linear-gradient(160deg, ${theme.h1}18, ${theme.accent}22)`
+                          : inProg
+                          ? "rgba(245,158,11,0.06)"
+                          : "rgba(0,0,0,0.02)",
+                        borderRight: done
+                          ? `1.5px solid ${theme.accent}25`
+                          : "1.5px solid rgba(0,0,0,0.05)",
+                      }}
+                    >
+                      {done ? (
+                        <CheckCircle2 size={22} style={{ color: theme.accent }} />
+                      ) : (
+                        <>
+                          <span
+                            className="text-[10px] font-bold uppercase tracking-wider"
+                            style={{ color: inProg ? "#d97706" : "#9ca3af" }}
+                          >CH</span>
+                          <span
+                            className="text-lg font-extrabold tabular-nums leading-none"
+                            style={{ color: inProg ? "#f59e0b" : "#d1d5db" }}
+                          >
+                            {String(ch.chapter_no ?? i + 1).padStart(2, "0")}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Main content */}
+                    <div className="flex-1 min-w-0 px-4 py-3.5 sm:py-4">
+                      {/* Title */}
+                      <h3
+                        className="font-bold text-sm sm:text-base leading-snug text-gray-900 dark:text-gray-100 transition-colors duration-200"
+                        style={{ letterSpacing: "-0.01em" }}
+                      >
+                        {ch.chapter_title}
+                      </h3>
+
+                      {/* Meta row */}
+                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                        {done ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold"
+                            style={{ color: theme.accent }}>
+                            <CheckCircle2 size={11} /> Completed
+                          </span>
+                        ) : inProg ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-500">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                            {pct}% in progress
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                            <Circle size={10} /> Not started
+                          </span>
+                        )}
+
+                        {seg.total > 0 && (
+                          <span className="text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
+                            {seg.completed ?? 0}/{seg.total} segments
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Progress bar */}
+                      {(inProg || done) && (
+                        <div className="mt-2.5 h-1.5 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700/50 max-w-xs">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${pct}%` }}
+                            transition={{ duration: 0.9, delay: 0.5 + i * 0.07 }}
+                            className="h-full rounded-full"
+                            style={{
+                              background: done
+                                ? `linear-gradient(90deg, ${theme.h2}, ${theme.accent})`
+                                : "linear-gradient(90deg, #f59e0b, #fbbf24)",
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right actions */}
+                    <div
+                      className="flex-shrink-0 flex flex-col sm:flex-row items-center gap-2 px-3 sm:px-4 py-3"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {/* Worksheet btn */}
+                      <div
+                        className="relative"
+                        onMouseEnter={() => !done && setShowTooltip(ch.id)}
+                        onMouseLeave={() => setShowTooltip(null)}
+                      >
+                        <button
+                          onClick={() => {
+                            if (done) navigate(`/chapter/${ch.id}/worksheets/${bookId}`);
+                            else {
+                              setShowLockMsg(ch.id);
+                              setTimeout(() => setShowLockMsg(null), 2400);
+                            }
+                          }}
+                          className="hidden sm:flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl border transition-all duration-200"
+                          style={done ? {
+                            background: theme.soft,
+                            color: theme.text,
+                            borderColor: `${theme.accent}40`,
+                          } : {
+                            background: "transparent",
+                            color: "#9ca3af",
+                            borderColor: "#e5e7eb",
+                            cursor: "not-allowed",
+                          }}
+                        >
+                          {done ? <FileText size={12} /> : <Lock size={11} />}
+                          Worksheet
+                        </button>
+
+                        <AnimatePresence>
+                          {showTooltip === ch.id && !done && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
+                              className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-1 px-2.5 py-1.5 text-[11px] font-semibold text-white rounded-lg whitespace-nowrap pointer-events-none"
+                              style={{ background: "#111827" }}
+                            >
+                              Complete chapter to unlock
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#111827]" />
+                            </motion.div>
+                          )}
+                          {showLockMsg === ch.id && !done && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                              className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-1.5 text-[11px] font-bold text-white bg-orange-500 rounded-lg whitespace-nowrap"
+                            >
+                              Finish chapter to unlock
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      {/* CTA button */}
+                      <button
+                        onClick={() => openChapter(ch.id)}
+                        className="flex items-center gap-1.5 text-xs sm:text-[13px] font-extrabold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-white transition-all duration-200 active:scale-95 whitespace-nowrap"
+                        style={{
+                          background: inProg
+                            ? "linear-gradient(135deg, #f59e0b, #ef4444)"
+                            : `linear-gradient(135deg, ${theme.h2}, ${theme.accent})`,
+                          boxShadow: inProg
+                            ? "0 4px 14px rgba(245,158,11,0.4)"
+                            : `0 4px 14px ${theme.accent}55`,
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
+                        onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+                      >
+                        {actionLabel}
+                        <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* Empty state */}
+        {total === 0 && (
+          <div className="text-center py-20">
+            <div
+              className="w-20 h-20 rounded-2xl mx-auto mb-4 flex items-center justify-center text-3xl"
+              style={{ background: theme.soft }}
+            >
+              {theme.icon}
+            </div>
+            <p className="font-bold text-gray-700 dark:text-gray-300 text-base">No chapters yet</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Check back soon</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

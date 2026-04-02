@@ -313,11 +313,28 @@ export const ExplanationCard = ({ segment, isReading, currentWords, highlightedW
         <div className="p-2 bg-yellow-500 rounded-lg border-2 border-yellow-600 shadow-md"><Lightbulb className="h-6 w-6 text-white" /></div>
         <h2 className="text-sm md:text-xl font-bold text-slate-800">💡 Simple Explanation</h2>
       </div>
-      <p className="text-sm sm:text-base leading-relaxed text-slate-700" style={{ wordSpacing: '0.15em' }}>
+      <div className="text-sm sm:text-base leading-relaxed text-slate-700 space-y-1" style={{ wordSpacing: '0.15em' }}>
         {isReading && expWords.length > 0 && mainTextWordCount > 0
-          ? <HighlightedWords words={expWords} highlightedIndex={expIdx} color="#b45309" shadow="0 0 10px rgba(180,83,9,0.3)" />
-          : renderMixedText(segment.explanation)}
-      </p>
+          ? <p><HighlightedWords words={expWords} highlightedIndex={expIdx} color="#b45309" shadow="0 0 10px rgba(180,83,9,0.3)" /></p>
+          : (segment.explanation || '').split('\n').map((line, i) => {
+              if (!line.trim()) return null;
+              if (/^\s*[\*\-]\s+/.test(line)) {
+                const content = line.replace(/^\s*[\*\-]\s+/, '');
+                const parts = content.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, pi) => {
+                  if (p.startsWith('**') && p.endsWith('**')) return <strong key={pi}>{p.slice(2,-2)}</strong>;
+                  if (p.startsWith('`') && p.endsWith('`')) return <code key={pi} style={{background:'#fef9c3',color:'#92400e',borderRadius:'4px',padding:'1px 5px',fontFamily:'monospace',fontSize:'0.9em',border:'1px solid #fde68a'}}>{p.slice(1,-1)}</code>;
+                  return <span key={pi}>{renderMixedText(p)}</span>;
+                });
+                return <div key={i} style={{display:'flex',gap:'0.5em',marginBottom:'0.2em'}}><span style={{color:'#b45309',fontWeight:700,flexShrink:0}}>•</span><span>{parts}</span></div>;
+              }
+              const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, pi) => {
+                if (p.startsWith('**') && p.endsWith('**')) return <strong key={pi}>{p.slice(2,-2)}</strong>;
+                if (p.startsWith('`') && p.endsWith('`')) return <code key={pi} style={{background:'#fef9c3',color:'#92400e',borderRadius:'4px',padding:'1px 5px',fontFamily:'monospace',fontSize:'0.9em',border:'1px solid #fde68a'}}>{p.slice(1,-1)}</code>;
+                return <span key={pi}>{renderMixedText(p)}</span>;
+              });
+              return <p key={i}>{parts}</p>;
+            })}
+      </div>
     </div>
   );
 };
