@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const HeroBox = ({student}) => {
+const HeroBox = ({student, subjects}) => {
   const navigate = useNavigate();
   
   return (
@@ -64,7 +64,7 @@ const HeroBox = ({student}) => {
             <div className="grid grid-cols-3 gap-4 pt-2">
               <div className="text-center p-3 rounded-xl bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-purple-200 dark:border-gray-800/60">
                 <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  12
+                  {subjects?.length || 0}
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-100 mt-1">
                   Subjects

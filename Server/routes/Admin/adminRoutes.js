@@ -115,6 +115,12 @@ router.delete(
   "/books/:bookId/chapters/:chapterId/worksheets/:id",
   worksheetController.deleteWorksheet
 );
+
+// Update title / worksheet_no for a chapter worksheet
+router.put(
+  "/books/:bookId/chapters/:chapterId/worksheets/:id",
+  worksheetController.updateWorksheet
+);
  
 // List ALL worksheets for a book across all chapters (for overview page)
 router.get(
@@ -159,6 +165,12 @@ router.post(
     router.delete(
       "/books/:bookId/subject-worksheets/:id",
       subjectWorksheetController.deleteSubjectWorksheet
+    );
+
+    // Update title / worksheet_no for a subject worksheet
+    router.put(
+      "/books/:bookId/subject-worksheets/:id",
+      subjectWorksheetController.updateSubjectWorksheet
     );
     
 module.exports = router;

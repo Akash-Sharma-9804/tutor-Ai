@@ -275,6 +275,38 @@ exports.getSubjectWorksheet = async (req, res) => {
   }
 };
 
+// ── PUT /books/:bookId/subject-worksheets/:id ─────────────────────────────────
+// Update title and/or worksheet_no
+exports.updateSubjectWorksheet = async (req, res) => {
+  const { bookId, id } = req.params;
+  const { title, worksheet_no } = req.body;
+
+  if (!title && worksheet_no === undefined) {
+    return res.status(400).json({ success: false, message: "Provide at least title or worksheet_no to update." });
+  }
+
+  try {
+    const [[row]] = await db.query(
+      "SELECT id FROM subject_worksheets WHERE id = ? AND book_id = ?",
+      [id, bookId]
+    );
+    if (!row) return res.status(404).json({ success: false, message: "Subject worksheet not found" });
+
+    const fields = [];
+    const values = [];
+    if (title !== undefined)        { fields.push("title = ?");        values.push(title.trim()); }
+    if (worksheet_no !== undefined) { fields.push("worksheet_no = ?"); values.push(Number(worksheet_no)); }
+    values.push(id);
+
+    await db.query(`UPDATE subject_worksheets SET ${fields.join(", ")} WHERE id = ?`, values);
+
+    res.json({ success: true, message: "Subject worksheet updated successfully" });
+  } catch (error) {
+    console.error("[SubjectWorksheet] updateSubjectWorksheet error:", error);
+    res.status(500).json({ success: false, message: "Failed to update subject worksheet" });
+  }
+};
+
 // ── DELETE /books/:bookId/subject-worksheets/:id ──────────────────────────────
 exports.deleteSubjectWorksheet = async (req, res) => {
   const { bookId, id } = req.params;

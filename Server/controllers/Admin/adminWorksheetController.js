@@ -263,6 +263,38 @@ exports.getWorksheet = async (req, res) => {
   }
 };
 
+// ── PUT /books/:bookId/chapters/:chapterId/worksheets/:id ─────────────────────
+// Update title and/or worksheet_no
+exports.updateWorksheet = async (req, res) => {
+  const { bookId, chapterId, id } = req.params;
+  const { title, worksheet_no } = req.body;
+
+  if (!title && worksheet_no === undefined) {
+    return res.status(400).json({ success: false, message: "Provide at least title or worksheet_no to update." });
+  }
+
+  try {
+    const [[row]] = await db.query(
+      "SELECT id FROM chapter_worksheets WHERE id = ? AND chapter_id = ? AND book_id = ?",
+      [id, chapterId, bookId]
+    );
+    if (!row) return res.status(404).json({ success: false, message: "Worksheet not found" });
+
+    const fields = [];
+    const values = [];
+    if (title !== undefined)        { fields.push("title = ?");        values.push(title.trim()); }
+    if (worksheet_no !== undefined) { fields.push("worksheet_no = ?"); values.push(Number(worksheet_no)); }
+    values.push(id);
+
+    await db.query(`UPDATE chapter_worksheets SET ${fields.join(", ")} WHERE id = ?`, values);
+
+    res.json({ success: true, message: "Worksheet updated successfully" });
+  } catch (error) {
+    console.error("[Worksheet] updateWorksheet error:", error);
+    res.status(500).json({ success: false, message: "Failed to update worksheet" });
+  }
+};
+
 // ── DELETE /books/:bookId/chapters/:chapterId/worksheets/:id ──────────────────
 exports.deleteWorksheet = async (req, res) => {
   const { bookId, chapterId, id } = req.params;

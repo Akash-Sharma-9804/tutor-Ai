@@ -14,6 +14,7 @@ const Dashboard = () => {
   const [student, setStudent] = useState(null);
   const [subjects, setSubjects] = useState([]);
   const [stats, setStats] = useState(null);
+  const [subjectWorksheetsBySubject, setSubjectWorksheetsBySubject] = useState({});
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const hasFetched = useRef(false);
 
@@ -48,6 +49,10 @@ const Dashboard = () => {
           ...s,
           progressLoaded: true,
         })));
+        // Extract subjectWorksheetsBySubject from stats
+        if (statsRes.data && statsRes.data.worksheets && statsRes.data.worksheets.subjectWorksheetsBySubject) {
+          setSubjectWorksheetsBySubject(statsRes.data.worksheets.subjectWorksheetsBySubject);
+        }
       } catch (error) {
         console.error("❌ Dashboard fetch failed:", error);
       } finally {
@@ -66,9 +71,9 @@ const Dashboard = () => {
       className="px-0 sm:px-6 lg:px-8 pt-8 space-y-6 text-gray-900 dark:text-white"
     >
     
-      <HeroBox student={student} />
+      <HeroBox student={student} subjects={subjects} />
       <QuickStats subjects={subjects} stats={stats} />
-      <CourseSection subjects={subjects} student={student} stats={stats} />
+      <CourseSection subjects={subjects} student={student} stats={stats} subjectWorksheetsBySubject={subjectWorksheetsBySubject} loading={loadingDashboard} />
       <DashboardAdditionalSection />
       <div className="  md:-mx-8 -mx-4">
         <Footer />

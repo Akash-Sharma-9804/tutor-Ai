@@ -719,12 +719,12 @@ const SubjectsPage = () => {
           <div className="rounded-xl border border-indigo-200 dark:border-white/10 bg-white dark:bg-[#14141f] p-6 shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                Worksheet Scores
+                Subject Scores
               </h3>
               <PieChart className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div className="space-y-4">
-              {subjects.slice(0, 4).map((subject, index) => {
+              {subjects.map((subject, index) => {
                 const wp = worksheetProgressMap[subject.id];
                 const pct = wp ? Math.round(wp.percentage) : null;
                 const attempted = wp ? wp.worksheets_attempted : 0;

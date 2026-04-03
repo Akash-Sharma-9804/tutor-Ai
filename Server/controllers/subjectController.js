@@ -255,12 +255,62 @@ worksheetCounts.forEach(w => {
 /**
  * GET /api/subjects/dashboard-stats
  * Returns real stats: study hours, streak, lessons completed, avg progress
+ * Also includes chapter and subject worksheet counts for the student's subjects
  */
 exports.getDashboardStats = async (req, res) => {
   try {
     const studentId = req.studentId;
 
-    // Total time spent reading (in seconds)
+    // Step 1: Get student's class
+    const [[student]] = await db.query(
+      `SELECT c.class_name, s.id as subject_id
+       FROM students s
+       JOIN classes c ON s.class_id = c.id
+       WHERE s.id = ?`,
+      [studentId]
+    );
+
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    const className = student.class_name;
+    const isUpperSecondary = /^(11|12)(\s*[\(\s]*(Science|Arts|Commerce)[\)]*)?$/i.test(className?.trim());
+
+    // Step 2: Get all subjects for this student
+    let subjectIds;
+    if (isUpperSecondary) {
+      const [rows] = await db.query(
+        `SELECT subject_id FROM student_subjects WHERE student_id = ?`,
+        [studentId]
+      );
+      subjectIds = rows.map(r => r.subject_id);
+    } else {
+      const [rows] = await db.query(
+        `SELECT DISTINCT s.id as subject_id
+         FROM students st
+         JOIN classes c ON st.class_id = c.id
+         JOIN subjects s ON s.class_id = c.id
+         WHERE st.id = ?`,
+        [studentId]
+      );
+      subjectIds = rows.map(r => r.subject_id);
+    }
+
+    if (subjectIds.length === 0) {
+      // No subjects - return empty counts
+      return res.json({
+        studyHours: { total: 0, today: 0, thisWeek: 0 },
+        lessons: { total: 0, thisWeek: 0, today: 0 },
+        worksheets: {
+          chapterWorksheets: 0,
+          subjectWorksheets: 0
+        },
+        streak: { current: 0, weekDays: [] }
+      });
+    }
+
+    const subjectPlaceholders = subjectIds.map(() => '?').join(',');
+
+    // Step 3: Get study hours (reading progress segments)
     const [[timeRow]] = await db.query(
       `SELECT COALESCE(SUM(time_spent_seconds), 0) as total_seconds
        FROM reading_progress_segments
@@ -306,6 +356,52 @@ exports.getDashboardStats = async (req, res) => {
        WHERE user_id = ? AND last_read_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`,
       [studentId]
     );
+
+    // Step 4: Count all chapter worksheets (status = 'done') for student's subjects
+    const [[chapterWorksheetRow]] = await db.query(
+      `SELECT COUNT(*) as total
+       FROM chapter_worksheets cw
+       JOIN book_chapters bc ON bc.id = cw.chapter_id
+       JOIN books b ON b.id = bc.book_id
+       WHERE b.subject_id IN (${subjectPlaceholders})
+       AND cw.status = 'done'`,
+      subjectIds
+    );
+
+    // Step 5: Get all subject worksheets (status = 'done') for student's subjects with details
+    const [subjectWorksheets] = await db.query(
+      `SELECT sw.id, sw.book_id, sw.worksheet_no, sw.title, sw.status,
+              sw.total_questions, sw.total_marks, sw.difficulty, sw.created_at,
+              b.subject_id
+       FROM subject_worksheets sw
+       JOIN books b ON b.id = sw.book_id
+       WHERE b.subject_id IN (${subjectPlaceholders})
+       AND sw.status = 'done'`,
+      subjectIds
+    );
+
+    // Group worksheets by subject
+    const subjectWorksheetsMap = {};
+    subjectIds.forEach(sid => { subjectWorksheetsMap[sid] = []; });
+    subjectWorksheets.forEach(w => {
+      if (!subjectWorksheetsMap[w.subject_id]) {
+        subjectWorksheetsMap[w.subject_id] = [];
+      }
+      subjectWorksheetsMap[w.subject_id].push({
+        id: w.id,
+        book_id: w.book_id,
+        worksheet_no: w.worksheet_no,
+        title: w.title,
+        status: w.status,
+        total_questions: w.total_questions,
+        total_marks: w.total_marks,
+        difficulty: w.difficulty,
+        created_at: w.created_at
+      });
+    });
+
+    // Count total subject worksheets
+    const subjectWorksheetCount = subjectWorksheets.length;
 
     // Calculate streak — count consecutive days with activity going back from today
     const [activityDays] = await db.query(
@@ -361,7 +457,7 @@ exports.getDashboardStats = async (req, res) => {
 
     res.json({
       studyHours: {
-        total: Math.round((totalSeconds / 3600) * 10) / 10,        // e.g. 4.2
+        total: Math.round((totalSeconds / 3600) * 10) / 10,
         today: Math.round((todaySeconds / 3600) * 10) / 10,
         thisWeek: Math.round((weekSeconds / 3600) * 10) / 10,
       },
@@ -370,9 +466,14 @@ exports.getDashboardStats = async (req, res) => {
         thisWeek: weekLessonsRow.total,
         today: todayLessonsRow.total,
       },
+      worksheets: {
+        chapterWorksheets: chapterWorksheetRow.total,
+        subjectWorksheets: subjectWorksheetCount,
+        subjectWorksheetsBySubject: subjectWorksheetsMap,
+      },
       streak: {
         current: streak,
-        weekDays,                                                    // [{label, active}]
+        weekDays,
       },
     });
   } catch (err) {

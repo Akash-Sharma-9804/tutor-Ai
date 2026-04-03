@@ -6,7 +6,7 @@ import {
     BookOpen, FileText, Plus, Trash2, Eye, School, GraduationCap, BookText,
     ChevronDown, ChevronUp, CheckCircle, Loader2, Download, RefreshCw,
     AlertCircle, Layers, Hash, Settings2, Star, ToggleLeft, ToggleRight,
-    BookOpenCheck, List,
+    BookOpenCheck, List, Pencil,
 } from "lucide-react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -524,6 +524,82 @@ const WorksheetViewModal = ({ worksheet, onClose, isSubject = false }) => {
     );
 };
 
+// ── Edit title/worksheet_no modal ─────────────────────────────────────────────
+const EditModal = ({ worksheet, bookId, chapterId, isSubject, onClose, onUpdated }) => {
+    const [title, setTitle]           = useState(worksheet.title || "");
+    const [worksheetNo, setWorksheetNo] = useState(worksheet.worksheet_no ?? 1);
+    const [saving, setSaving]         = useState(false);
+    const [error, setError]           = useState("");
+
+    const handleSave = async () => {
+        if (!title.trim()) { setError("Title cannot be empty."); return; }
+        if (!worksheetNo || worksheetNo < 1) { setError("Worksheet number must be at least 1."); return; }
+        setSaving(true); setError("");
+        try {
+            const url = isSubject
+                ? `/books/${bookId}/subject-worksheets/${worksheet.id}`
+                : `/books/${bookId}/chapters/${chapterId}/worksheets/${worksheet.id}`;
+            const res = await adminAxios.put(url, { title: title.trim(), worksheet_no: Number(worksheetNo) });
+            onUpdated({ ...worksheet, title: title.trim(), worksheet_no: Number(worksheetNo) });
+            onClose();
+        } catch (err) {
+            setError(err.response?.data?.message || "Failed to save changes. Please retry.");
+        } finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="p-2.5 rounded-xl bg-indigo-100 dark:bg-indigo-900/30">
+                        <Pencil className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                        <h2 className="font-bold text-gray-900 dark:text-white">Edit Worksheet</h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Update title or number</p>
+                    </div>
+                    <button onClick={onClose} disabled={saving} className="ml-auto p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 transition-colors">✕</button>
+                </div>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">Worksheet No.</label>
+                        <input
+                            type="number" min={1} value={worksheetNo}
+                            onChange={e => setWorksheetNo(e.target.value)}
+                            disabled={saving}
+                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">Title</label>
+                        <input
+                            type="text" value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            disabled={saving}
+                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" />
+                    </div>
+                    {error && (
+                        <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 flex-shrink-0" />{error}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                    <button onClick={onClose} disabled={saving}
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium text-sm disabled:opacity-50">
+                        Cancel
+                    </button>
+                    <button onClick={handleSave} disabled={saving}
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ── Delete confirm modal ──────────────────────────────────────────────────────
 const DeleteModal = ({ worksheet, bookId, chapterId, isSubject, onClose, onDeleted }) => {
     const [deleting, setDeleting] = useState(false);
@@ -567,6 +643,7 @@ const ChapterRow = ({ chapter, bookId, onGenerateClick }) => {
     const [loading, setLoading]                 = useState(false);
     const [viewingWorksheet, setViewingWorksheet] = useState(null);
     const [deletingWorksheet, setDeletingWorksheet] = useState(null);
+    const [editingWorksheet, setEditingWorksheet] = useState(null);
 
     const loadWorksheets = async () => {
         setLoading(true);
@@ -587,6 +664,7 @@ const ChapterRow = ({ chapter, bookId, onGenerateClick }) => {
 
     const handleGenerated    = (newWs) => { setWorksheets(prev => [newWs, ...prev]); if (!expanded) { setExpanded(true); loadWorksheets(); } };
     const handleDeleted      = (id)    => setWorksheets(prev => prev.filter(w => w.id !== id));
+    const handleUpdated      = (updated) => setWorksheets(prev => prev.map(w => w.id === updated.id ? { ...w, ...updated } : w));
 
     return (
         <>
@@ -645,6 +723,9 @@ const ChapterRow = ({ chapter, bookId, onGenerateClick }) => {
                                                     <Eye className="h-4 w-4" />
                                                 </button>
                                             )}
+                                            <button onClick={() => setEditingWorksheet(ws)} className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-500 transition-colors" title="Edit title / number">
+                                                <Pencil className="h-4 w-4" />
+                                            </button>
                                             <button onClick={() => setDeletingWorksheet(ws)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 transition-colors" title="Delete">
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
@@ -657,6 +738,10 @@ const ChapterRow = ({ chapter, bookId, onGenerateClick }) => {
                 )}
             </div>
             {viewingWorksheet && <WorksheetViewModal worksheet={viewingWorksheet} onClose={() => setViewingWorksheet(null)} />}
+            {editingWorksheet && (
+                <EditModal worksheet={editingWorksheet} bookId={bookId} chapterId={chapter.id} isSubject={false}
+                    onClose={() => setEditingWorksheet(null)} onUpdated={handleUpdated} />
+            )}
             {deletingWorksheet && (
                 <DeleteModal worksheet={deletingWorksheet} bookId={bookId} chapterId={chapter.id} isSubject={false}
                     onClose={() => setDeletingWorksheet(null)} onDeleted={handleDeleted} />
@@ -671,6 +756,7 @@ const SubjectWorksheetsPanel = ({ bookId, chapters, onShowGenerateModal }) => {
     const [loading, setLoading]                 = useState(false);
     const [viewingWorksheet, setViewingWorksheet] = useState(null);
     const [deletingWorksheet, setDeletingWorksheet] = useState(null);
+    const [editingWorksheet, setEditingWorksheet] = useState(null);
 
     const load = async () => {
         setLoading(true);
@@ -690,6 +776,7 @@ const SubjectWorksheetsPanel = ({ bookId, chapters, onShowGenerateModal }) => {
     };
 
     const handleDeleted = (id) => setWorksheets(prev => prev.filter(w => w.id !== id));
+    const handleUpdated = (updated) => setWorksheets(prev => prev.map(w => w.id === updated.id ? { ...w, ...updated } : w));
 
     const handleGenerated = (newWs) => {
         setWorksheets(prev => [newWs, ...prev]);
@@ -757,6 +844,9 @@ const SubjectWorksheetsPanel = ({ bookId, chapters, onShowGenerateModal }) => {
                                             <Eye className="h-4 w-4" />
                                         </button>
                                     )}
+                                    <button onClick={() => setEditingWorksheet(ws)} className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-500 transition-colors" title="Edit title / number">
+                                        <Pencil className="h-4 w-4" />
+                                    </button>
                                     <button onClick={() => setDeletingWorksheet(ws)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 transition-colors" title="Delete">
                                         <Trash2 className="h-4 w-4" />
                                     </button>
@@ -768,6 +858,10 @@ const SubjectWorksheetsPanel = ({ bookId, chapters, onShowGenerateModal }) => {
             )}
 
             {viewingWorksheet && <WorksheetViewModal worksheet={viewingWorksheet} onClose={() => setViewingWorksheet(null)} isSubject />}
+            {editingWorksheet && (
+                <EditModal worksheet={editingWorksheet} bookId={bookId} isSubject
+                    onClose={() => setEditingWorksheet(null)} onUpdated={handleUpdated} />
+            )}
             {deletingWorksheet && (
                 <DeleteModal worksheet={deletingWorksheet} bookId={bookId} isSubject
                     onClose={() => setDeletingWorksheet(null)} onDeleted={handleDeleted} />
